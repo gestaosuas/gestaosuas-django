@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Dados NAICA | {{ directorate.name }}{% endblock %}
+
+{% block content %}
+<section class="simple-shell benefits-shell">
+    <a class="back-link" href="{% url 'naica:home' directorate.pk %}?year={{ selected_year }}">&larr; Voltar para o painel</a>
+
+    <div class="benefits-hero">
+        <div>
+            <p class="eyebrow">Tabela de Dados</p>
+            <h1>Indicadores NAICA &mdash; {{ selected_year }}</h1>
+            <p class="section-description">Visualizacao anual dos indicadores por unidade.</p>
+        </div>
+        <div class="benefits-filter-bar static-bar">
+            <span class="pill">Ano {{ selected_year }}</span>
+            <a href="{% url 'naica:form' directorate.pk %}?year={{ selected_year }}" class="primary-button" style="text-decoration:none;">
+                <i data-lucide="file-plus" style="width:16px;height:16px;"></i> Novo Preenchimento
+            </a>
+        </div>
+    </div>
+
+    {% for unit_table in units_tables %}
+    <div class="data-table-card" style="margin-top:28px;">
+        <div class="section-head">
+            <div class="section-line" style="background:#8b5cf6;"></div>
+            <h2>{{ unit_table.unit }}</h2>
+        </div>
+
+        {% for group in unit_table.groups %}
+        <div style="margin-top:18px;">
+            <h3 style="margin:0 0 10px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;">{{ group.title }}</h3>
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Indicador</th>
+                            {% for label in month_labels %}
+                                <th>{{ label }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in group.rows %}
+                        <tr>
+                            <td><strong>{{ row.label }}</strong></td>
+                            {% for item in row.values %}
+                            <td class="val-cell {% if request.user.profile.role == 'admin' %}editable-cell{% endif %}" 
+                                style="color: #64748b; font-weight: 600;"
+                                {% if request.user.profile.role == 'admin' %}
+                                contenteditable="true"
+                                data-sub-id="{{ item.sub_id|default:'' }}"
+                                data-month="{{ item.month }}"
+                                data-year="{{ item.year }}"
+                                data-key="{{ row.key }}"
+                                data-unit="{{ item.unit }}"
+                                {% endif %}>
+                                <span class="val-inner" style="padding: 4px 10px; border-radius: 6px; display: inline-block; min-width: 30px;">
+                                    {% if item.val != '' and item.val != None and item.val != 0 %}{{ item.val }}{% endif %}
+                                </span>
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</section>
+
+<style>
+.val-cell.editable-cell .val-inner { cursor: pointer; transition: all 0.2s; }
+.val-cell.editable-cell:hover .val-inner { background: #eff6ff !important; color: #3b82f6 !important; outline: 2px solid #bfdbfe; }
+.val-cell.editable-cell:focus { outline: none; }
+.val-cell.editable-cell:focus .val-inner { background: white !important; outline: 2px solid #3b82f6 !important; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+.val-cell.saving .val-inner { opacity: 0.6; }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        lucide.createIcons();
+        
+        document.querySelectorAll('.editable-cell').forEach(cell => {
+            cell.addEventListener('focus', function() {
+                const inner = this.querySelector('.val-inner');
+                if(inner) {
+                    let val = inner.innerText.trim();
+                    if(val === '—' || val === '-') val = '';
+                    this.setAttribute('data-original', val);
+                }
+            });
+
+            cell.addEventListener('blur', function() {
+                saveCell(this);
+            });
+
+            cell.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.blur();
+                }
+            });
+        });
+
+        function saveCell(cell) {
+            const inner = cell.querySelector('.val-inner');
+            if(!inner) return;
+            
+            const subId = cell.dataset.subId;
+            const month = cell.dataset.month;
+            const year = cell.dataset.year;
+            const key = cell.dataset.key;
+            const unit = cell.dataset.unit;
+            
+            let value = inner.innerText.trim();
+            if(value === '—' || value === '-') value = '';
+            
+            const originalValue = (cell.getAttribute('data-original') || '').trim();
+
+            if (value === originalValue) return;
+
+            cell.classList.add('saving');
+
+            const formData = new FormData();
+            formData.append('sub_id', subId);
+            formData.append('month', month);
+            formData.append('year', year);
+            formData.append('key', key);
+            formData.append('unit', unit);
+            formData.append('value', value || '0');
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('{% url "naica:quick-edit" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                cell.classList.remove('saving');
+                if (data.status === 'success') {
+                    const newVal = (data.value !== null && data.value !== 0 && data.value !== '0') ? data.value : '';
+                    inner.innerText = newVal;
+                    cell.setAttribute('data-original', newVal);
+                    if (data.sub_id) {
+                        cell.setAttribute('data-sub-id', data.sub_id);
+                    }
+                    
+                    window.showToast('Salvo', 'Indicador atualizado com sucesso!', 'success');
+                    
+                    inner.style.transition = 'none';
+                    inner.style.backgroundColor = '#4ade80';
+                    inner.style.color = 'white';
+                    
+                    setTimeout(() => {
+                        inner.style.transition = 'all 0.6s';
+                        inner.style.backgroundColor = 'transparent';
+                        inner.style.color = '#64748b';
+                    }, 400);
+                } else {
+                    inner.innerText = originalValue || '—';
+                    alert('Erro ao salvar dados.');
+                }
+            })
+            .catch(err => {
+                cell.classList.remove('saving');
+                inner.innerText = originalValue || '—';
+                console.error(err);
+            });
+        }
+    });
+</script>
+{% endblock %}

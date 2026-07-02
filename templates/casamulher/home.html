@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}Casa da Mulher e Diversidade | {{ directorate.name }}{% endblock %}
+
+{% block body_class %}dashboard-fit-vh theme-pink{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+
+    <main class="dashboard-main" style="padding-top: 0;">
+        <div class="monitoring-header-container header-pink-violet">
+            <div class="monitoring-header-content">
+                <div class="monitoring-title-area">
+                    <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 10px;">
+                        <div style="width: 50px; height: 50px; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #db2777;">
+                            <i data-lucide="heart" style="width: 32px; height: 32px;"></i>
+                        </div>
+                        <div>
+                            <h1>{{ directorate.name }}</h1>
+                            <p style="margin:0; font-size: 14px; opacity: 0.9;">Casa da Mulher e Núcleo de Diversidade</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="monitoring-header-actions visit-header-actions" style="flex-direction: row; align-items: center;">
+                    <form method="get" class="visit-filter-form visit-filter-form-hero" style="margin: 0;">
+                        <div class="filter-row-group">
+                            <select name="month" class="filter-select" onchange="this.form.submit()">
+                                <option value="all" {% if selected_month == 'all' %}selected{% endif %}>Ano Inteiro</option>
+                                {% for m_num, m_name in months_range %}
+                                <option value="{{ m_num }}" {% if selected_month == m_num|stringformat:"s" %}selected{% endif %}>{{ m_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="year" class="filter-select" onchange="this.form.submit()">
+                                {% for y in years_range %}
+                                <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="button" class="btn-primary-premium" id="toggle-mgmt-menu" style="margin-left: 10px; background: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.4);">
+                                <i data-lucide="settings"></i><span id="mgmt-btn-text">Ações da Diretoria</span>
+                                <i data-lucide="chevron-down" id="mgmt-btn-icon"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="monitoring-main-card">
+
+            <!-- Actions drawer overlay -->
+            <div class="management-overlay" id="mgmt-menu" style="display:none;">
+                <div class="mgmt-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+                    <a href="{% url 'casamulher:form-casa-da-mulher' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon pink"><i data-lucide="file-plus"></i></div>
+                        <div class="mgmt-info"><strong>Atualizar Casa da Mulher</strong><span>Inserir indicadores mensais (Violência Doméstica)</span></div>
+                    </a>
+                    <a href="{% url 'casamulher:form-diversidade' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon indigo"><i data-lucide="file-plus"></i></div>
+                        <div class="mgmt-info"><strong>Atualizar Atendimentos Diversos</strong><span>Inserir indicadores mensais de gênero/orientação</span></div>
+                    </a>
+                    <a href="{% url 'casamulher:form-nucleo-diversidade' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon violet"><i data-lucide="file-plus"></i></div>
+                        <div class="mgmt-info"><strong>Atualizar Núcleo de Diversidade</strong><span>Inserir indicadores de pessoas atendidas</span></div>
+                    </a>
+                    <a href="{% url 'casamulher:data-casa-da-mulher' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon pink"><i data-lucide="database"></i></div>
+                        <div class="mgmt-info"><strong>Dados Casa da Mulher</strong><span>Tabela anual de indicadores</span></div>
+                    </a>
+                    <a href="{% url 'casamulher:data-diversidade' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon indigo"><i data-lucide="database"></i></div>
+                        <div class="mgmt-info"><strong>Dados Atendimentos Diversos</strong><span>Tabela anual de indicadores</span></div>
+                    </a>
+                    <a href="{% url 'casamulher:data-nucleo-diversidade' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon violet"><i data-lucide="database"></i></div>
+                        <div class="mgmt-info"><strong>Dados Núcleo de Diversidade</strong><span>Tabela anual de indicadores</span></div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="dashboard-split-layout">
+                <aside class="metrics-stack">
+                    {% for c in cards %}
+                    <article class="metric-card-modern">
+                        <div class="metric-top">
+                            <div class="icon-circle" style="--accent-color:{{ c.color }};background:{{ c.color }}15;"><i data-lucide="users"></i></div>
+                            {% if c.variation %}<span class="variation {{ c.variation.direction }}"><i data-lucide="{{ c.variation.icon }}"></i>{{ c.variation.text }}</span>{% endif %}
+                        </div>
+                        <p class="metric-context">{{ c.label }}</p>
+                        <strong>{{ c.value }}</strong>
+                        {% if c.sparkline %}
+                        <div class="sparkline-box">
+                            <svg viewBox="0 0 92 34">
+                                <polyline points="{{ c.sparkline }}" style="stroke: {{ c.color }}; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;" />
+                            </svg>
+                        </div>
+                        {% endif %}
+                    </article>
+                    {% endfor %}
+                </aside>
+
+                <div class="charts-stack">
+                    <div class="charts-row-inner">
+                        <article class="chart-panel">
+                            <div class="chart-header">
+                                <div>
+                                    <h2>Tipos de Violência (Casa da Mulher)</h2>
+                                    <p class="chart-subtitle">{{ period_label }}</p>
+                                </div>
+                            </div>
+                            <div class="monitoring-chart-wrap monitoring-chart-wrap-line"><canvas id="donutViolence"></canvas></div>
+                        </article>
+                        <article class="chart-panel">
+                            <div class="chart-header">
+                                <div>
+                                    <h2>Situação da Demanda (Atendimentos Diversos)</h2>
+                                    <p class="chart-subtitle">{{ period_label }}</p>
+                                </div>
+                            </div>
+                            <div class="monitoring-chart-wrap monitoring-chart-wrap-line"><canvas id="donutDemand"></canvas></div>
+                        </article>
+                    </div>
+                    <div class="charts-row-inner">
+                        <article class="chart-panel">
+                            <div class="chart-header">
+                                <div>
+                                    <h2>Distribuição por Faixa Etária (Casa da Mulher)</h2>
+                                    <p class="chart-subtitle">{{ period_label }}</p>
+                                </div>
+                            </div>
+                            <div class="monitoring-chart-wrap monitoring-chart-wrap-line"><canvas id="barAge"></canvas></div>
+                        </article>
+                        <article class="chart-panel">
+                            <div class="chart-header">
+                                <div>
+                                    <h2>Distribuição por Cor/Raça (Casa da Mulher)</h2>
+                                    <p class="chart-subtitle">{{ period_label }}</p>
+                                </div>
+                            </div>
+                            <div class="monitoring-chart-wrap monitoring-chart-wrap-line"><canvas id="barRace"></canvas></div>
+                        </article>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+{{ donut_violence_items|json_script:"donut-violence" }}
+{{ donut_demand_items|json_script:"donut-demand" }}
+{{ bar_age_items|json_script:"bar-age" }}
+{{ bar_race_items|json_script:"bar-race" }}
+
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    var t = document.getElementById("toggle-mgmt-menu"),
+        m = document.getElementById("mgmt-menu"),
+        bt = document.getElementById("mgmt-btn-text"),
+        bi = document.getElementById("mgmt-btn-icon");
+        
+    t.addEventListener("click", function(){
+        var v = m.style.display !== "none";
+        m.style.display = v ? "none" : "block";
+        bt.textContent = v ? "Ações da Diretoria" : "Fechar";
+        bi.setAttribute("data-lucide", v ? "chevron-down" : "chevron-up");
+        lucide.createIcons();
+    });
+    
+    if(window.Chart && window.ChartDataLabels) Chart.register(ChartDataLabels);
+    
+    var dv = JSON.parse(document.getElementById("donut-violence").textContent);
+    var dd = JSON.parse(document.getElementById("donut-demand").textContent);
+    var ba = JSON.parse(document.getElementById("bar-age").textContent);
+    var br = JSON.parse(document.getElementById("bar-race").textContent);
+    
+    function makeDonut(id, items){
+        var canvas = document.getElementById(id);
+        if(!canvas) return;
+        if(!items.length) {
+            var ctx = canvas.getContext("2d");
+            ctx.font = "14px Inter";
+            ctx.fillStyle = "#94a3b8";
+            ctx.textAlign = "center";
+            ctx.fillText("Nenhum dado registrado no período", canvas.width/2 || 150, canvas.height/2 || 100);
+            return;
+        }
+        new Chart(canvas, {
+            type: "doughnut",
+            data: {
+                labels: items.map(function(i){ return i.label }),
+                datasets: [{
+                    data: items.map(function(i){ return i.value }),
+                    backgroundColor: items.map(function(i){ return i.color }),
+                    borderColor: "#fff",
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                cutout: "55%",
+                plugins: {
+                    legend: {
+                        position: "bottom",
+                        labels: { font: { size: 10, weight: "700" }, padding: 12, usePointStyle: true, pointStyleWidth: 8 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(c){
+                                var t = c.dataset.data.reduce(function(a, b){ return a + b }, 0);
+                                return c.label + ": " + c.raw + (t ? " (" + Math.round(c.raw/t*100) + "%)" : "");
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function makeBar(id, items){
+        var canvas = document.getElementById(id);
+        if(!canvas) return;
+        if(!items.length || items.every(function(i){ return i.value === 0 })) {
+            var ctx = canvas.getContext("2d");
+            ctx.font = "14px Inter";
+            ctx.fillStyle = "#94a3b8";
+            ctx.textAlign = "center";
+            ctx.fillText("Nenhum dado registrado no período", canvas.width/2 || 150, canvas.height/2 || 100);
+            return;
+        }
+        new Chart(canvas, {
+            type: "bar",
+            data: {
+                labels: items.map(function(i){ return i.label }),
+                datasets: [{
+                    data: items.map(function(i){ return i.value }),
+                    backgroundColor: items.map(function(i){ return i.color || "#db2777" }),
+                    borderRadius: 8,
+                    barThickness: 16
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                indexAxis: "y",
+                plugins: {
+                    legend: { display: false },
+                    datalabels: { anchor: "end", align: "right", font: { weight: "800", size: 9 }, formatter: function(v){ return v || "" } }
+                },
+                scales: {
+                    x: {
+                        display: false,
+                        beginAtZero: true,
+                        suggestedMax: Math.max.apply(null, items.map(function(i){ return i.value }).concat([1])) * 1.3
+                    },
+                    y: { grid: { display: false }, ticks: { font: { size: 10, weight: "700" }, color: "#64748b", padding: 4 } }
+                }
+            }
+        });
+    }
+    
+    makeDonut("donutViolence", dv);
+    makeDonut("donutDemand", dd);
+    makeBar("barAge", ba);
+    makeBar("barRace", br);
+});
+</script>
+
+<style>
+.variation { display: flex; align-items: center; gap: 3px; padding: 3px 6px; border-radius: 14px; font-size: 10px; font-weight: 800; }
+.variation.positive { background: #ecfdf5; color: #10b981; }
+.variation.negative { background: #fef2f2; color: #ef4444; }
+.variation i { width: 11px; height: 11px; }
+
+.header-pink-violet {
+    background: linear-gradient(135deg, #ec4899 0%, #7c3aed 100%);
+    box-shadow: 0 4px 20px rgba(236, 72, 153, 0.15);
+}
+
+.sparkline-box {
+    margin-top: 8px;
+    height: 38px;
+}
+.sparkline-box svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Custom background adjustments for mgmt overlay */
+.mgmt-icon.pink { background-color: #fdf2f8; color: #ec4899; }
+.mgmt-icon.indigo { background-color: #eef2ff; color: #6366f1; }
+.mgmt-icon.violet { background-color: #f5f3ff; color: #7c3aed; }
+</style>
+{% endblock %}

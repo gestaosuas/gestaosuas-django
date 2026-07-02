@@ -1,0 +1,50 @@
+{% extends "base_tv.html" %}
+
+{% block title %}Casa da Mulher{% endblock %}
+{% block header_bg %}linear-gradient(100deg,#9d174d,#db2777){% endblock %}
+{% block module_name %}Casa da Mulher{% endblock %}
+{% block module_sub %}{{ system_name }} • {{ selected_year }}{% endblock %}
+
+{% block kpis %}
+{% for card in cards %}
+<div class="tv-kpi" style="--accent:{{ card.color|default:'#db2777' }}">
+    <div class="tv-kpi-label">{{ card.label }}</div>
+    <div class="tv-kpi-value">{{ card.value }}</div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block charts %}
+<div class="tv-panel">
+    <h2>Tipos de Violência</h2>
+    <div class="tv-panel-body"><canvas id="c-viol"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Situação da Demanda</h2>
+    <div class="tv-panel-body"><canvas id="c-demand"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Faixa Etária</h2>
+    <div class="tv-panel-body"><canvas id="c-age"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Raça / Cor</h2>
+    <div class="tv-panel-body"><canvas id="c-race"></canvas></div>
+</div>
+{% endblock %}
+
+{{ donut_violence_items|json_script:"d-viol" }}
+{{ donut_demand_items|json_script:"d-demand" }}
+{{ bar_age_items|json_script:"d-age" }}
+{{ bar_race_items|json_script:"d-race" }}
+
+{% block extra_js %}
+<script>
+(function () {
+    TV.makeDonut('c-viol',   JSON.parse(document.getElementById('d-viol').textContent));
+    TV.makeDonut('c-demand', JSON.parse(document.getElementById('d-demand').textContent));
+    TV.makeBar('c-age',  JSON.parse(document.getElementById('d-age').textContent),  '#db2777');
+    TV.makeBar('c-race', JSON.parse(document.getElementById('d-race').textContent), '#9333ea');
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Em Construção | {{ directorate.name }}{% endblock %}
+
+{% block body_class %}dashboard-fit-vh theme-blue{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+    
+    <main class="dashboard-main" style="padding-top: 0; display: flex; flex-direction: column;">
+        <div class="monitoring-header-container">
+            <div class="monitoring-header-content">
+                <div class="monitoring-title-area">
+                    <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 10px;">
+                        <div style="width: 50px; height: 50px; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #1e3a8a;">
+                            <i data-lucide="hard-hat" style="width: 32px; height: 32px;"></i>
+                        </div>
+                        <div>
+                            <h1>{{ directorate.name }}</h1>
+                            <p style="margin:0; font-size: 14px; opacity: 0.9;">Painel de Monitoramento Estratégico</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="monitoring-header-actions visit-header-actions" style="flex-direction: row; align-items: center;">
+                    <a href="{% url 'directorates:list' %}" class="btn-primary-premium">
+                        <i data-lucide="arrow-left"></i>
+                        <span>VOLTAR À LISTA</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="monitoring-main-card" style="flex: 1; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; min-height: 0;">
+            <div class="construction-container" style="text-align: center; max-width: 600px; padding: 48px; background: white; border-radius: 32px; border: 1px solid #f1f5f9;">
+                <div class="icon-pulse-container" style="position: relative; width: 120px; height: 120px; margin: 0 auto 32px;">
+                    <div class="pulse-ring" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #3b82f622; border-radius: 50%; animation: pulse 2s infinite;"></div>
+                    <div class="icon-circle" style="position: absolute; top: 10px; left: 10px; width: 100px; height: 100px; background: #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);">
+                        <i data-lucide="construction" style="width: 48px; height: 48px;"></i>
+                    </div>
+                </div>
+                
+                <h1 style="font-size: 32px; font-weight: 900; color: #1e3a8a; margin-bottom: 16px; letter-spacing: -0.02em;">Módulo em Construção</h1>
+                <p style="font-size: 16px; color: #64748b; font-weight: 600; line-height: 1.6; margin-bottom: 32px;">
+                    Estamos trabalhando para trazer a melhor experiência de monitoramento para a diretoria: <br>
+                    <strong style="color: #3b82f6;">{{ directorate.name }}</strong>
+                </p>
+                
+                <div class="progress-bar-modern" style="width: 100%; height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden;">
+                    <div class="progress-fill" style="width: 65%; height: 100%; background: linear-gradient(90deg, #3b82f6, #60a5fa); border-radius: 4px; animation: progress 3s ease-in-out infinite;"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<style>
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1.5); opacity: 0; }
+}
+@keyframes progress {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(0); }
+    100% { transform: translateX(100%); }
+}
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        lucide.createIcons();
+    });
+</script>
+{% endblock %}

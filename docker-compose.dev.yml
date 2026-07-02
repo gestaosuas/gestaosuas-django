@@ -1,0 +1,23 @@
+# Ambiente de desenvolvimento — sobrepõe o docker-compose.yml
+# Iniciar: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+# Parar:   docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+
+services:
+  app:
+    container_name: gestaosuas_app_dev
+    ports:
+      - "8001:8000"
+    environment:
+      - DJANGO_DEBUG=1
+      - DJANGO_ALLOWED_HOSTS=*
+      - DB_ENGINE=django.db.backends.postgresql
+      - DB_NAME=postgres
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_HOST=host.docker.internal
+      - DB_PORT=54322
+      - SUPABASE_URL=http://host.docker.internal:54321
+      - SUPABASE_ANON_KEY=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
+      - DJANGO_SECRET_KEY=gestaosuas-django-dev-key-local
+    # Sem depends_on do db — usa o Supabase Postgres local do host
+    depends_on: []

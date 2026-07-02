@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Historico Relatorios NAICA | {{ directorate.name }}{% endblock %}
+
+{% block content %}
+<section class="simple-shell benefits-shell">
+    <a class="back-link" href="{% url 'naica:home' directorate.pk %}?year={{ selected_year }}">&larr; Voltar para o painel</a>
+
+    <div class="benefits-hero">
+        <div>
+            <p class="eyebrow">Historico</p>
+            <h1>Relatorios Narrativos</h1>
+            <p class="section-description">Todos os relatorios descritivos dos NAICAs.</p>
+        </div>
+        <div class="benefits-filter-bar static-bar">
+            <span class="pill">Ano {{ selected_year }}</span>
+        </div>
+    </div>
+
+    <div class="report-history-grid" style="margin-top:24px;">
+        {% for report in reports %}
+        <a href="{% url 'naica:monthly-report' directorate.pk %}?year={{ report.year }}&month={{ report.month }}" class="history-card">
+            <h2>{{ report.month }}/{{ report.year }}</h2>
+            <p>{{ report.get_status_display }}</p>
+            {% if report.updated_at %}
+                <span style="font-size:11px;color:var(--muted);">{{ report.updated_at|date:"d/m/Y H:i" }}</span>
+            {% endif %}
+        </a>
+        {% empty %}
+        <div class="panel" style="text-align:center;padding:48px;grid-column:1/-1;">
+            <i data-lucide="folder-open" style="width:48px;height:48px;color:#94a3b8;margin-bottom:16px;"></i>
+            <h2>Nenhum relatorio encontrado</h2>
+            <p style="color:var(--muted);">Nao ha relatorios narrativos registrados para NAICA ainda.</p>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

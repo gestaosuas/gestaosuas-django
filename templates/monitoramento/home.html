@@ -1,0 +1,2637 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Monitoramento | {{ directorate.name }}{% endblock %}
+
+{% block body_class %}{{ theme_class|default:'theme-emerald' }}{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+
+    <main class="dashboard-main {% if is_subvencao_only %}subvention-minimal-page{% endif %}" style="padding-top: 0;">
+        <div class="monitoring-header-container {{ header_class }}">
+            <div class="monitoring-header-content">
+                <div class="monitoring-title-area">
+                    <a href="{% url 'directorates:list' %}" class="back-link-modern" style="color: rgba(255,255,255,0.9); margin-bottom: 12px; display: inline-flex; align-items: center; gap: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; text-decoration: none;">
+                        <i data-lucide="arrow-left" style="width: 14px; height: 14px;"></i> DIRETORIAS
+                    </a>
+                    <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 10px;">
+                        <div style="width: 58px; height: 58px; background: white; border-radius: 15px; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.4);">
+                            {% if is_subvencao_only and not is_emendas and not is_fundos %}
+                                <img src="{% static 'img/subvencao-img.png' %}" alt="Subvenção" style="width: 100%; height: 100%; object-fit: contain; padding: 2px; image-rendering: -webkit-optimize-contrast;">
+                            {% elif is_emendas %}
+                                <img src="{% static 'img/emendas-img.png' %}" alt="Emendas" style="width: 100%; height: 100%; object-fit: contain; padding: 2px; image-rendering: -webkit-optimize-contrast;">
+                            {% else %}
+                                <i data-lucide="bar-chart-3" style="width: 32px; height: 32px; color: {{ icon_color|default:'#059669' }};"></i>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <h1>{{ directorate.name }}</h1>
+                            <p style="margin:0; font-size: 14px; opacity: 0.9;">Monitoramento e Avaliação {% if bimester_label %}— {{ bimester_label }}{% endif %}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="monitoring-header-actions visit-header-actions" style="flex-direction: row; align-items: center; flex-wrap: wrap;">
+                    <form method="get" class="visit-filter-form visit-filter-form-hero" style="margin: 0;">
+                        <div class="filter-row-group">
+                            <input type="hidden" name="tab" value="{{ dashboard_tab }}">
+                            <select name="bimestre" class="filter-select" onchange="this.form.submit()">
+                                <option value="all" {% if selected_bimester == 'all' %}selected{% endif %}>Todo o Período</option>
+                                {% for b_num, b_label in bimester_options %}
+                                    <option value="{{ b_num }}" {% if selected_bimester == b_num|stringformat:"s" %}selected{% endif %}>{{ b_label }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="year" class="filter-select" onchange="this.form.submit()">
+                                {% for y in years_range %}
+                                    <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </form>
+
+                    {% if is_subvencao_only %}
+                    <nav class="subvention-top-tabs" aria-label="Navegacao da subvencao">
+                        <a href="?tab=oscs&bimestre={{ selected_bimester }}&year={{ selected_year }}" class="subvention-top-tab {% if dashboard_tab == 'oscs' %}is-active{% endif %}">
+                            <i data-lucide="building-2"></i>
+                            <span>Cadastrar OSC</span>
+                        </a>
+                        <a href="?tab=visits&bimestre={{ selected_bimester }}&year={{ selected_year }}" class="subvention-top-tab {% if dashboard_tab == 'visits' %}is-active{% endif %}">
+                            <i data-lucide="clipboard-list"></i>
+                            <span>Instrumental de Visita</span>
+                        </a>
+                        <a href="?tab=plans&bimestre={{ selected_bimester }}&year={{ selected_year }}" class="subvention-top-tab {% if dashboard_tab == 'plans' %}is-active{% endif %}">
+                            <i data-lucide="folder-cog"></i>
+                            <span>Plano de Trabalho</span>
+                        </a>
+                        <a href="?tab=reports&bimestre={{ selected_bimester }}&year={{ selected_year }}" class="subvention-top-tab {% if dashboard_tab == 'reports' %}is-active{% endif %}">
+                            <i data-lucide="file-check-2"></i>
+                            <span>Relatórios e Pareceres</span>
+                        </a>
+                    </nav>
+                    {% else %}
+                    <div style="display: flex; gap: 10px;">
+                        <a href="{% url 'directorates:osc-list' directorate.pk %}" class="btn-primary-premium" style="background: white; color: #0f172a; text-decoration: none;">
+                            <i data-lucide="building"></i> OSCs
+                        </a>
+                        <a href="{% url 'directorates:visit-list' directorate.pk %}" class="btn-primary-premium" style="background: white; color: #0f172a; text-decoration: none;">
+                            <i data-lucide="clipboard-list"></i> Visitas
+                        </a>
+                        <a href="{% url 'directorates:visit-create' directorate.pk %}" class="btn-primary-premium" style="text-decoration: none;">
+                            <i data-lucide="plus"></i> Nova Visita
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="monitoring-main-card" style="display: flex; flex-direction: column; gap: 32px; padding: 32px;">
+            {% if is_subvencao_only %}
+            <!-- SVG Defs for Gradients -->
+            <svg width="0" height="0" style="position:absolute;">
+              <defs>
+                <linearGradient id="spark-gradient" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#34d399" stop-opacity="0.3"/>
+                  <stop offset="100%" stop-color="#34d399" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+            </svg>
+
+            {% comment %}
+            <div class="glass-action-cards">
+                <a href="{% url 'directorates:osc-list' directorate.pk %}" class="glass-card glass-blue">
+                    <div class="glass-bg-pattern"></div>
+                    <div class="glass-icon"><i data-lucide="building-2"></i></div>
+                    <span class="glass-label">Cadastrar OSC</span>
+                </a>
+                <a href="{% url 'directorates:visit-list' directorate.pk %}" class="glass-card glass-orange">
+                    <div class="glass-bg-pattern"></div>
+                    <div class="glass-icon"><i data-lucide="clipboard-list"></i></div>
+                    <span class="glass-label">Instrumental de Visita</span>
+                </a>
+                <a href="{% url 'directorates:plan-list' directorate.pk %}" class="glass-card glass-violet">
+                    <div class="glass-bg-pattern"></div>
+                    <div class="glass-icon"><i data-lucide="folder-cog"></i></div>
+                    <span class="glass-label">Plano de Trabalho</span>
+                </a>
+                <a href="{% url 'directorates:report-list' directorate.pk %}" class="glass-card glass-green">
+                    <div class="glass-bg-pattern"></div>
+                    <div class="glass-icon"><i data-lucide="file-check-2"></i></div>
+                    <span class="glass-label">Relatórios e Pareceres</span>
+                </a>
+            </div>
+
+            {% endcomment %}
+            {% if dashboard_tab == 'oscs' %}
+            <section class="subvention-inline-panel" id="subventionOscPanel">
+                <div class="inline-panel-header">
+                    <div>
+                        <p class="inline-eyebrow">Cadastro de OSCs</p>
+                        <h2>Organizações da Sociedade Civil</h2>
+                        <span>{{ oscs|length }} OSCs cadastradas nesta diretoria</span>
+                    </div>
+                    <button type="button" class="inline-primary-btn" data-open-osc-modal>
+                        <i data-lucide="plus"></i>
+                        Nova OSC
+                    </button>
+                </div>
+
+                <div class="inline-filter-row">
+                    <div class="inline-search">
+                        <i data-lucide="search"></i>
+                        <input type="text" id="inline-osc-search" placeholder="Buscar OSC pelo nome..." autocomplete="off">
+                    </div>
+                    <select id="inline-osc-type-filter" class="inline-filter-select">
+                        <option value="">Todas as atividades</option>
+                        {% for type in activity_types %}
+                        <option value="{{ type }}">{{ type }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="inline-table-card">
+                    <table class="inline-osc-table" id="inline-osc-table">
+                        <thead>
+                            <tr>
+                                <th>OSC</th>
+                                <th>Tipo de Atividade</th>
+                                <th>Endereço</th>
+                                <th>Telefone</th>
+                                <th>Subvencionados</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for osc in oscs %}
+                            <tr class="inline-osc-row" data-activity="{{ osc.activity_type|default:'' }}">
+                                <td>
+                                    <strong>{{ osc.name }}</strong>
+                                    {% if osc.objeto %}
+                                    <small>{{ osc.objeto|truncatechars:72 }}</small>
+                                    {% endif %}
+                                </td>
+                                <td><span class="inline-tag">{{ osc.activity_type|default:"-"|truncatechars:34 }}</span></td>
+                                <td>
+                                    <span>
+                                        {% if osc.address %}
+                                            {{ osc.address }}{% if osc.number %}, {{ osc.number }}{% endif %}
+                                            {% if osc.neighborhood %} - {{ osc.neighborhood }}{% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td><span>{{ osc.phone|default:"-" }}</span></td>
+                                <td>
+                                    {% if osc.subsidized_count == -1 %}
+                                    <span class="inline-demand-badge">Conforme demanda</span>
+                                    {% else %}
+                                    <strong class="inline-number">{{ osc.subsidized_count }}</strong>
+                                    {% endif %}
+                                </td>
+                                <td class="inline-actions">
+                                    <a href="{% url 'directorates:osc-update' osc.pk %}" title="Editar OSC">
+                                        <i data-lucide="pencil"></i>
+                                    </a>
+                                    {% if can_delete %}
+                                    <form action="{% url 'directorates:osc-delete' osc.pk %}" method="post" onsubmit="return confirm('Excluir OSC {{ osc.name }}?')">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{% url 'monitoramento:home' directorate.pk %}?tab=oscs&bimestre={{ selected_bimester }}&year={{ selected_year }}">
+                                        <button type="submit" title="Excluir OSC">
+                                            <i data-lucide="trash-2"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="inline-empty-cell">
+                                    <i data-lucide="building-x"></i>
+                                    <p>Nenhuma OSC cadastrada ainda.</p>
+                                    <button type="button" class="inline-primary-btn" data-open-osc-modal>
+                                        <i data-lucide="plus"></i>
+                                        Cadastrar primeira OSC
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <div class="inline-modal-backdrop" id="oscModal" aria-hidden="true">
+                <div class="inline-modal-card" role="dialog" aria-modal="true" aria-labelledby="oscModalTitle">
+                    <div class="inline-modal-header">
+                        <div>
+                            <p class="inline-eyebrow">Nova OSC</p>
+                            <h2 id="oscModalTitle">Cadastrar Organização</h2>
+                        </div>
+                        <button type="button" class="inline-modal-close" data-close-osc-modal aria-label="Fechar">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+
+                    <form method="post" action="{% url 'directorates:osc-create' directorate.pk %}" class="inline-osc-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{% url 'monitoramento:home' directorate.pk %}?tab=oscs&bimestre={{ selected_bimester }}&year={{ selected_year }}">
+
+                        <label>
+                            <span>Nome da Instituição</span>
+                            <input type="text" name="name" required>
+                        </label>
+
+                        <label>
+                            <span>Tipo de Atividade</span>
+                            <select name="activity_type" required>
+                                <option value="">Selecione o tipo de atividade</option>
+                                {% for value, label in osc_form.fields.activity_type.widget.choices %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+
+                        <div class="inline-form-grid">
+                            <label>
+                                <span>CEP</span>
+                                <input type="text" name="cep" id="inline_id_cep" required>
+                            </label>
+                            <label>
+                                <span>Telefone</span>
+                                <input type="text" name="phone">
+                            </label>
+                        </div>
+
+                        <div class="inline-form-grid wide-left">
+                            <label>
+                                <span>Rua / Logradouro</span>
+                                <input type="text" name="address" id="inline_id_address" required>
+                            </label>
+                            <label>
+                                <span>Número</span>
+                                <input type="text" name="number" required>
+                            </label>
+                        </div>
+
+                        <div class="inline-form-grid">
+                            <label>
+                                <span>Bairro</span>
+                                <input type="text" name="neighborhood" id="inline_id_neighborhood" required>
+                            </label>
+                            <div class="inline-subs-field">
+                                <span>Subvencionados</span>
+                                <label class="inline-radio">
+                                    <input type="radio" name="subsidized_type" value="number" checked>
+                                    Número
+                                </label>
+                                <label class="inline-radio">
+                                    <input type="radio" name="subsidized_type" value="demand">
+                                    Conforme demanda
+                                </label>
+                                <input type="number" name="subsidized_count" id="inline_subsidized_count" value="0">
+                            </div>
+                        </div>
+
+                        <div class="inline-modal-actions">
+                            <button type="button" class="inline-secondary-btn" data-close-osc-modal>Cancelar</button>
+                            <button type="submit" class="inline-primary-btn">
+                                <i data-lucide="save"></i>
+                                Salvar OSC
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% elif dashboard_tab == 'visits' %}
+            <section class="subvention-inline-panel" id="subventionVisitPanel">
+                <div class="inline-panel-header">
+                    <div>
+                        <p class="inline-eyebrow">Instrumental de Visita</p>
+                        <h2>Últimas Visitas Realizadas</h2>
+                        <span>{{ dashboard_visits|length }} visitas no período selecionado</span>
+                    </div>
+                    <a href="{% url 'directorates:visit-create' directorate.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-primary-btn inline-link-btn">
+                        <i data-lucide="plus"></i>
+                        Nova Visita
+                    </a>
+                </div>
+
+                <div class="inline-filter-row">
+                    <div class="inline-search">
+                        <i data-lucide="search"></i>
+                        <input type="text" id="inline-visit-search" placeholder="Filtrar por OSC..." autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="inline-table-card inline-visits-scroll">
+                    <table class="inline-visit-table" id="inline-visit-table">
+                        <thead>
+                            <tr>
+                                <th>Data e OSC</th>
+                                <th>Técnicos</th>
+                                <th>Status</th>
+                                <th>Registrado por</th>
+                                <th>Documentos</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for visit in dashboard_visits %}
+                            <tr class="inline-visit-row">
+                                <td>
+                                    <strong class="inline-visit-osc">{{ visit.osc.name }}</strong>
+                                    <small>{{ visit.visit_date|date:"d/m/Y" }} · salvo às {{ visit.visit_time|time:"H:i" }}</small>
+                                </td>
+                                <td>
+                                    <span class="inline-techs">
+                                        {% if visit.assinaturas.tecnico1_nome %}
+                                            {{ visit.tecnico1_display }}
+                                        {% endif %}
+                                        {% if visit.assinaturas.tecnico2_nome %}
+                                            {% if visit.assinaturas.tecnico1_nome %}<br>{% endif %}{{ visit.tecnico2_display }}
+                                        {% endif %}
+                                        {% if not visit.assinaturas.tecnico1_nome and not visit.assinaturas.tecnico2_nome %}
+                                            Não informado
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="inline-status-badge {% if visit.status == 'completed' or visit.status == 'finalized' %}is-finalized{% else %}is-draft{% endif %}">
+                                        <i data-lucide="{% if visit.status == 'completed' or visit.status == 'finalized' %}check-circle-2{% else %}clock-3{% endif %}"></i>
+                                        {% if visit.status == 'completed' or visit.status == 'finalized' %}Finalizado{% else %}Rascunho{% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="inline-registered">
+                                        <span>{{ visit.registered_by_name|first|default:"?" }}</span>
+                                        {{ visit.registered_by_name|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if visit.status == 'completed' or visit.status == 'finalized' %}
+                                    <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}" class="inline-doc-btn">
+                                        <i data-lucide="file-text"></i>
+                                        Relatório de Visita
+                                    </a>
+                                    {% else %}
+                                    <span class="inline-muted">Liberado ao finalizar</span>
+                                    {% endif %}
+                                </td>
+                                <td class="inline-actions inline-visit-actions">
+                                    {% if visit.status == 'completed' or visit.status == 'finalized' %}
+                                    <a href="{% url 'directorates:visit-instrumental' visit.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-view-action" title="Visualizar">
+                                        <i data-lucide="eye"></i>
+                                    </a>
+                                    <form action="{% url 'directorates:visit-revert' visit.pk %}" method="post" onsubmit="return confirm('Deseja reverter para rascunho?')">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{% url 'monitoramento:home' directorate.pk %}?tab=visits&bimestre={{ selected_bimester }}&year={{ selected_year }}">
+                                        <button type="submit" class="inline-revert-action" title="Reverter para rascunho">
+                                            <i data-lucide="undo-2"></i>
+                                        </button>
+                                    </form>
+                                    {% else %}
+                                    <a href="{% url 'directorates:visit-instrumental' visit.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-edit-action" title="Editar">
+                                        <i data-lucide="square-pen"></i>
+                                    </a>
+                                    {% endif %}
+
+                                    {% if can_delete %}
+                                    <form action="{% url 'directorates:visit-delete' visit.pk %}" method="post" onsubmit="return confirm('Tem certeza que deseja excluir esta visita?')">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{% url 'monitoramento:home' directorate.pk %}?tab=visits&bimestre={{ selected_bimester }}&year={{ selected_year }}">
+                                        <button type="submit" class="inline-delete-action" title="Excluir">
+                                            <i data-lucide="trash-2"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="inline-empty-cell">
+                                    <i data-lucide="clipboard-x"></i>
+                                    <p>Nenhuma visita registrada neste período.</p>
+                                    <a href="{% url 'directorates:visit-create' directorate.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-primary-btn inline-link-btn">
+                                        <i data-lucide="plus"></i>
+                                        Criar primeira visita
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            {% elif dashboard_tab == 'plans' %}
+            <section class="subvention-inline-panel" id="subventionPlanPanel">
+                <div class="inline-panel-header">
+                    <div>
+                        <p class="inline-eyebrow">Plano de Trabalho</p>
+                        <h2>Planos por OSC</h2>
+                        <span>{{ dashboard_plan_oscs|length }} OSCs disponíveis nesta diretoria</span>
+                    </div>
+                    <div class="inline-search inline-plan-search">
+                        <i data-lucide="search"></i>
+                        <input type="text" id="inline-plan-search" placeholder="Buscar OSC..." autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="inline-plan-grid-scroll">
+                    <div class="inline-plan-grid" id="inline-plan-grid">
+                        {% for osc in dashboard_plan_oscs %}
+                        <article class="inline-plan-card" data-osc-name="{{ osc.name|lower }}">
+                            <div class="inline-plan-card-head">
+                                <h3>{{ osc.name }}</h3>
+                            </div>
+
+                            <div class="inline-plan-card-body">
+                                {% with latest_plan=osc.work_plans.all|first %}
+                                    {% if latest_plan %}
+                                    <div class="inline-plan-file">
+                                        <div class="inline-plan-file-icon">
+                                            <i data-lucide="file-pen-line"></i>
+                                        </div>
+                                        <div>
+                                            <strong>{{ latest_plan.title }}</strong>
+                                            <span>{{ latest_plan.created_at|date:"d/m/Y"|default:"Sem data" }}</span>
+                                        </div>
+                                    </div>
+                                    {% else %}
+                                    <p class="inline-plan-empty">Nenhum plano criado.</p>
+                                    {% endif %}
+                                {% endwith %}
+                            </div>
+
+                            <div class="inline-plan-actions">
+                                <a href="{% url 'directorates:plan-create' directorate.pk %}?osc={{ osc.pk }}&next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dplans%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-plan-new-btn">
+                                    <i data-lucide="plus"></i>
+                                    Novo Plano
+                                </a>
+                                {% with latest_plan=osc.work_plans.all|first %}
+                                    {% if latest_plan %}
+                                    <button type="button" class="inline-plan-icon-btn" title="Visualizar plano" onclick="openInlinePlanPreview('{{ osc.pk }}')">
+                                        <i data-lucide="eye"></i>
+                                    </button>
+                                    <a href="{% url 'directorates:plan-update' latest_plan.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dplans%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-plan-icon-btn" title="Editar plano">
+                                        <i data-lucide="pencil"></i>
+                                    </a>
+                                    {% if can_delete %}
+                                    <form action="{% url 'directorates:plan-delete' latest_plan.pk %}" method="post" onsubmit="return confirm('Excluir plano {{ latest_plan.title }}?')">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{% url 'monitoramento:home' directorate.pk %}?tab=plans&bimestre={{ selected_bimester }}&year={{ selected_year }}">
+                                        <button type="submit" class="inline-plan-icon-btn is-danger" title="Excluir plano">
+                                            <i data-lucide="trash-2"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    {% endif %}
+                                {% endwith %}
+                            </div>
+                        </article>
+                        {% empty %}
+                        <div class="inline-empty-cell">
+                            <i data-lucide="building-x"></i>
+                            <p>Nenhuma OSC cadastrada para criar planos.</p>
+                            <a href="?tab=oscs&bimestre={{ selected_bimester }}&year={{ selected_year }}" class="inline-primary-btn inline-link-btn">
+                                <i data-lucide="plus"></i>
+                                Cadastrar OSC
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+
+            <div id="inlinePlanPreviewModal" class="plan-preview-modal" style="display:none;">
+                <div class="plan-preview-dialog">
+                    <div class="plan-preview-modal-header">
+                        <div>
+                            <span class="plan-preview-modal-eyebrow">Plano de trabalho</span>
+                            <h3 id="inlinePlanPreviewTitle">Visualização do documento</h3>
+                        </div>
+                        <button type="button" class="plan-preview-close" onclick="closeInlinePlanPreview()" aria-label="Fechar visualização">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <div id="inlinePlanPreviewBody" class="plan-preview-modal-body"></div>
+                    <div class="plan-preview-modal-actions">
+                        <button type="button" class="plan-action-btn" onclick="closeInlinePlanPreview()">Fechar</button>
+                        <a href="#" target="_blank" rel="noopener noreferrer" id="inlinePlanPreviewOpenLink" class="plan-primary-btn">Abrir em nova guia</a>
+                    </div>
+                </div>
+            </div>
+            {% elif dashboard_tab == 'reports' %}
+            <section class="subvention-inline-panel" id="subventionReportPanel">
+                <div class="inline-panel-header" style="display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 12px;">
+                    <p class="inline-eyebrow" style="margin: 0; white-space: nowrap;">Relatórios e Pareceres</p>
+                    
+                    <div class="inline-search" style="max-width: 400px; flex: 1;">
+                        <i data-lucide="search"></i>
+                        <input type="text" id="inline-report-search" placeholder="Buscar relatório por OSC..." autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="inline-table-card" style="margin-top: 16px; padding: 20px; background: rgba(255,255,255,0.4);">
+                    <div class="report-cards-grid" id="inline-report-grid">
+                    {% for visit in dashboard_visits %}
+                    {% if visit.status == 'finalized' or visit.status == 'completed' %}
+                    <div class="report-card" data-osc="{{ visit.osc.name|lower }}">
+                        <div class="report-card-header">
+                            <div class="report-card-icon">
+                                <i data-lucide="file-check-2"></i>
+                            </div>
+                            <div class="report-card-status">
+                                <span class="badge-finalized-sm">Finalizado</span>
+                            </div>
+                        </div>
+                        <div class="report-card-body">
+                            <h3 class="report-osc-name" title="{{ visit.osc.name }}">{{ visit.osc.name }}</h3>
+                            <div class="report-date-row">
+                                <i data-lucide="calendar"></i>
+                                <span>{{ visit.visit_date|date:"d/m/Y" }}</span>
+                            </div>
+                            {% if visit.assinaturas.tecnico1_nome %}
+                            <div class="report-tech-row">
+                                <i data-lucide="user"></i>
+                                <span>{{ visit.assinaturas.tecnico1_nome }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="report-card-actions">
+                            <a href="{% url 'directorates:visit-report' visit.pk 'relatorio_final' %}" class="report-action-btn {% if visit.relatorio_final.status == 'finalized' %}btn-green{% elif visit.relatorio_final.status == 'draft' %}btn-amber{% else %}btn-neutral{% endif %}">
+                                <i data-lucide="file-check"></i> Relatório Final
+                                {% if visit.relatorio_final.status == 'finalized' %}<span class="btn-badge">✓</span>{% elif visit.relatorio_final.status == 'draft' %}<span class="btn-badge-draft">Rascunho</span>{% endif %}
+                            </a>
+                            <a href="{% url 'directorates:visit-report' visit.pk 'parecer_conclusivo' %}" class="report-action-btn {% if visit.parecer_conclusivo.status == 'finalized' %}btn-green{% elif visit.parecer_conclusivo.status == 'draft' %}btn-amber{% else %}btn-neutral{% endif %}">
+                                <i data-lucide="check-circle-2"></i> Parecer Conclusivo
+                                {% if visit.parecer_conclusivo.status == 'finalized' %}<span class="btn-badge">✓</span>{% elif visit.parecer_conclusivo.status == 'draft' %}<span class="btn-badge-draft">Rascunho</span>{% endif %}
+                            </a>
+                            <a href="{% url 'directorates:visit-instrumental' visit.pk %}" class="report-action-btn btn-slate-light">
+                                <i data-lucide="clipboard-list"></i> Instrumental
+                            </a>
+                            {# Notificações (PDF) ── #}
+                            <div class="notif-section">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                    <span class="notif-label"><i data-lucide="paperclip"></i> Notificações (PDF)</span>
+                                    <div>
+                                        <input type="file" id="notif-input-{{ visit.pk }}" style="display: none;" accept=".pdf" onchange="uploadNotification('{{ visit.pk }}')">
+                                        <button type="button" class="btn-attach-pdf" onclick="document.getElementById('notif-input-{{ visit.pk }}').click()">
+                                            <i data-lucide="upload-cloud" style="width: 12px; height: 12px;"></i> Anexar PDF
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="notif-items-list" id="notif-list-{{ visit.pk }}">
+                                    {% if visit.notificacoes %}
+                                        {% for notif in visit.notificacoes %}
+                                        <div class="notif-item">
+                                            <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; flex: 1;">
+                                                <i data-lucide="file-text" style="color:#ef4444; width: 13px; height: 13px; flex-shrink: 0;"></i>
+                                                <a href="{{ notif.url }}" target="_blank" class="notif-name" title="{{ notif.name }}">{{ notif.name }}</a>
+                                            </div>
+                                            <div style="display: flex; gap: 4px; flex-shrink: 0;">
+                                                <a href="{{ notif.url }}" target="_blank" class="btn-notif-action" title="Visualizar"><i data-lucide="external-link"></i></a>
+                                                <button type="button" class="btn-notif-action btn-notif-delete" onclick="removeNotification('{{ visit.pk }}', {{ forloop.index0 }})" title="Excluir"><i data-lucide="trash-2"></i></button>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <p class="notif-empty-text">Nenhuma notificação anexada.</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+                <div id="inline-report-empty" style="display:none;" class="inline-empty-cell">
+                    <i data-lucide="file-x"></i>
+                    <p>Nenhum relatório encontrado para essa busca.</p>
+                </div>
+            </section>
+            {% else %}
+            <div class="glass-kpi-grid kpi-grid-4">
+                <!-- KPI 1: Total de OSCs -->
+                <article class="glass-kpi-card kpi-card-blue">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap blue"><i data-lucide="building-2"></i></div>
+                        <span class="gkpi-badge badge-blue">Cadastradas</span>
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Total de OSCs</p>
+                        <strong class="gkpi-value">{{ subvencao_stats.totalOSCs }}</strong>
+                    </div>
+                    <div class="gkpi-footer">
+                        <div class="gkpi-progress-track">
+                            <div class="gkpi-progress-fill" style="background: #3b82f6; width: 100%;"></div>
+                        </div>
+                        <span class="gkpi-footer-label">no bimestre</span>
+                    </div>
+                </article>
+
+                <!-- KPI 2: Visitas no Bimestre -->
+                <article class="glass-kpi-card kpi-card-amber">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap orange"><i data-lucide="clipboard-list"></i></div>
+                        <span class="gkpi-badge badge-amber">{{ subvencao_stats.draftVisits }} em andamento</span>
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Visitas no Bimestre</p>
+                        <strong class="gkpi-value">{{ subvencao_stats.totalVisits }}</strong>
+                    </div>
+                    <div class="gkpi-footer">
+                        <div class="gkpi-progress-track">
+                            <div class="gkpi-progress-fill" id="kpi-visits-bar" style="background: #f59e0b; width: {{ subvencao_stats.finalizationRate }}%;"></div>
+                        </div>
+                        <span class="gkpi-footer-label">{{ subvencao_stats.finalizationRate }}% concluídas</span>
+                    </div>
+                </article>
+
+                <!-- KPI 3: Visitas Finalizadas -->
+                <article class="glass-kpi-card kpi-card-emerald">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap green"><i data-lucide="shield-check"></i></div>
+                        <span class="gkpi-badge badge-emerald">Concluídas</span>
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Visitas Finalizadas</p>
+                        <strong class="gkpi-value">{{ subvencao_stats.finalizedVisits }}</strong>
+                    </div>
+                    <div class="gkpi-footer">
+                        <div class="gkpi-progress-track">
+                            <div class="gkpi-progress-fill" style="background: #10b981; width: {{ subvencao_stats.finalizationRate }}%;"></div>
+                        </div>
+                        <span class="gkpi-footer-label">de {{ subvencao_stats.totalVisits }} visitas</span>
+                    </div>
+                </article>
+
+                <!-- KPI 4: Taxa de Finalização -->
+                <article class="glass-kpi-card kpi-card-rate">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap purple"><i data-lucide="percent"></i></div>
+                        {% if subvencao_stats.finalizationRate == 100 %}
+                            <span class="gkpi-badge badge-success">Meta atingida</span>
+                        {% elif subvencao_stats.finalizationRate >= 70 %}
+                            <span class="gkpi-badge badge-emerald">No caminho certo</span>
+                        {% else %}
+                            <span class="gkpi-badge badge-amber">Em progresso</span>
+                        {% endif %}
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Taxa de Finalização</p>
+                        <strong class="gkpi-value" style="color: {% if subvencao_stats.finalizationRate == 100 %}#059669{% elif subvencao_stats.finalizationRate >= 70 %}#0284c7{% else %}#d97706{% endif %};">{{ subvencao_stats.finalizationRate }}%</strong>
+                    </div>
+                    <div class="gkpi-donut-wrap">
+                        <svg class="gkpi-donut-svg" viewBox="0 0 36 36">
+                            <path class="gkpi-donut-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <path class="gkpi-donut-fill" stroke-dasharray="{{ subvencao_stats.finalizationRate }}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                style="stroke: {% if subvencao_stats.finalizationRate == 100 %}#10b981{% elif subvencao_stats.finalizationRate >= 70 %}#3b82f6{% else %}#f59e0b{% endif %};" />
+                        </svg>
+                    </div>
+                </article>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <!-- KPI cards para Emendas, Fundos e Outros -->
+            <div class="glass-kpi-grid kpi-grid-4 {% if is_emendas %}kpi-theme-amber{% elif is_fundos %}kpi-theme-indigo{% else %}kpi-theme-blue{% endif %}">
+                <article class="glass-kpi-card kpi-card-blue">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap blue"><i data-lucide="building-2"></i></div>
+                        <span class="gkpi-badge badge-blue">Cadastradas</span>
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Total de OSCs</p>
+                        <strong class="gkpi-value">{{ subvencao_stats.totalOSCs }}</strong>
+                    </div>
+                    <div class="gkpi-footer">
+                        <div class="gkpi-progress-track"><div class="gkpi-progress-fill" style="background: #3b82f6; width: 100%;"></div></div>
+                        <span class="gkpi-footer-label">no bimestre</span>
+                    </div>
+                </article>
+                <article class="glass-kpi-card kpi-card-amber">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap orange"><i data-lucide="clipboard-list"></i></div>
+                        <span class="gkpi-badge badge-amber">{{ subvencao_stats.draftVisits }} em andamento</span>
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Visitas no Bimestre</p>
+                        <strong class="gkpi-value">{{ subvencao_stats.totalVisits }}</strong>
+                    </div>
+                    <div class="gkpi-footer">
+                        <div class="gkpi-progress-track"><div class="gkpi-progress-fill" style="background: #f59e0b; width: {{ subvencao_stats.finalizationRate }}%;"></div></div>
+                        <span class="gkpi-footer-label">{{ subvencao_stats.finalizationRate }}% concluídas</span>
+                    </div>
+                </article>
+                <article class="glass-kpi-card kpi-card-emerald">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap green"><i data-lucide="shield-check"></i></div>
+                        <span class="gkpi-badge badge-emerald">Concluídas</span>
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Visitas Finalizadas</p>
+                        <strong class="gkpi-value">{{ subvencao_stats.finalizedVisits }}</strong>
+                    </div>
+                    <div class="gkpi-footer">
+                        <div class="gkpi-progress-track"><div class="gkpi-progress-fill" style="background: #10b981; width: {{ subvencao_stats.finalizationRate }}%;"></div></div>
+                        <span class="gkpi-footer-label">de {{ subvencao_stats.totalVisits }} visitas</span>
+                    </div>
+                </article>
+                <article class="glass-kpi-card kpi-card-rate">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap purple"><i data-lucide="percent"></i></div>
+                        {% if subvencao_stats.finalizationRate == 100 %}
+                            <span class="gkpi-badge badge-success">Meta atingida</span>
+                        {% elif subvencao_stats.finalizationRate >= 70 %}
+                            <span class="gkpi-badge badge-emerald">No caminho certo</span>
+                        {% else %}
+                            <span class="gkpi-badge badge-amber">Em progresso</span>
+                        {% endif %}
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Taxa de Finalização</p>
+                        <strong class="gkpi-value" style="color: {% if subvencao_stats.finalizationRate == 100 %}#059669{% elif subvencao_stats.finalizationRate >= 70 %}#0284c7{% else %}#d97706{% endif %};">{{ subvencao_stats.finalizationRate }}%</strong>
+                    </div>
+                    <div class="gkpi-donut-wrap">
+                        <svg class="gkpi-donut-svg" viewBox="0 0 36 36">
+                            <path class="gkpi-donut-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <path class="gkpi-donut-fill" stroke-dasharray="{{ subvencao_stats.finalizationRate }}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                style="stroke: {% if subvencao_stats.finalizationRate == 100 %}#10b981{% elif subvencao_stats.finalizationRate >= 70 %}#3b82f6{% else %}#f59e0b{% endif %};" />
+                        </svg>
+                    </div>
+                </article>
+            </div>
+
+            <!-- Original Design para Outros, Fundos e Emendas -->
+            <div class="mon-action-cards">
+                <a href="{% url 'directorates:osc-list' directorate.pk %}" class="mon-action-card">
+                    <div class="mac-icon mac-icon-blue"><i data-lucide="building-2"></i></div>
+                    <span>Cadastrar OSC</span>
+                </a>
+                <a href="{% url 'directorates:visit-list' directorate.pk %}" class="mon-action-card">
+                    <div class="mac-icon mac-icon-orange"><i data-lucide="clipboard-list"></i></div>
+                    <span>Instrumental de Visita</span>
+                </a>
+                <a href="{% url 'directorates:plan-list' directorate.pk %}" class="mon-action-card">
+                    <div class="mac-icon mac-icon-violet"><i data-lucide="folder-open"></i></div>
+                    <span>Plano de Trabalho</span>
+                </a>
+                <a href="{% url 'directorates:report-list' directorate.pk %}" class="mon-action-card">
+                    <div class="mac-icon mac-icon-green"><i data-lucide="file-check-2"></i></div>
+                    <span>Relatórios e Pareceres</span>
+                </a>
+            </div>
+
+            {% if cards %}
+            <div class="monitoring-kpi-grid">
+                {% for card in cards %}
+                <article class="monitoring-kpi-card kpi-blue">
+                    <div class="kpi-icon-wrap"><i data-lucide="bar-chart-3"></i></div>
+                    <div class="kpi-body">
+                        <p>{{ card.label }}</p>
+                        <strong>{{ card.value }}</strong>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="monitoring-kpi-grid">
+                <article class="monitoring-kpi-card kpi-blue">
+                    <div class="kpi-icon-wrap"><i data-lucide="building-2"></i></div>
+                    <div class="kpi-body">
+                        <p>Total de OSCs</p>
+                        <strong>{{ subvencao_stats.totalOSCs }}</strong>
+                    </div>
+                </article>
+                <article class="monitoring-kpi-card kpi-indigo">
+                    <div class="kpi-icon-wrap"><i data-lucide="clipboard-list"></i></div>
+                    <div class="kpi-body">
+                        <p>Visitas no Bimestre</p>
+                        <strong>{{ subvencao_stats.totalVisits }}</strong>
+                    </div>
+                </article>
+                <article class="monitoring-kpi-card kpi-emerald">
+                    <div class="kpi-icon-wrap"><i data-lucide="check-circle-2"></i></div>
+                    <div class="kpi-body">
+                        <p>Visitas Finalizadas</p>
+                        <strong>{{ subvencao_stats.finalizedVisits }}</strong>
+                    </div>
+                </article>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+
+<style>
+.btn-attach-pdf {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: transparent;
+    border: 1px solid #3b82f6;
+    border-radius: 8px;
+    color: #3b82f6;
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-attach-pdf:hover {
+    background: #eff6ff;
+}
+.notif-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 6px;
+}
+.btn-notif-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+}
+.btn-notif-action i {
+    width: 12px;
+    height: 12px;
+}
+.btn-notif-action:hover {
+    color: #3b82f6;
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+.btn-notif-delete:hover {
+    color: #ef4444;
+    border-color: #fca5a5;
+    background: #fef2f2;
+}
+.notif-empty-text {
+    font-size: 10px;
+    color: #94a3b8;
+    font-style: italic;
+    text-align: center;
+    margin: 4px 0 0 0;
+    padding: 8px;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+}
+/* GLASS ACTION CARDS */
+.glass-action-cards {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
+}
+.glass-card {
+    position: relative;
+    background: linear-gradient(145deg, #ffffff, #f8fafc);
+    border-radius: 20px;
+    padding: 32px 24px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+    text-decoration: none; overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.03), inset 0 0 0 1.5px rgba(255,255,255,0.6);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glass-card:hover { transform: translateY(-4px); box-shadow: 0 14px 40px rgba(0,0,0,0.06); }
+.glass-bg-pattern {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    opacity: 0.08; z-index: 0; pointer-events: none;
+    background-size: 20px 20px;
+    background-image: 
+        linear-gradient(to right, #64748b 1px, transparent 1px),
+        linear-gradient(to bottom, #64748b 1px, transparent 1px);
+    mask-image: linear-gradient(to bottom, black 0%, transparent 80%);
+    -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 80%);
+}
+.glass-card .glass-icon { z-index: 1; font-size: 48px; display: flex; }
+.glass-card .glass-icon i { width: 48px; height: 48px; stroke-width: 1.5px; }
+.glass-card .glass-label { z-index: 1; font-size: 14px; font-weight: 800; color: #0f172a; text-align: center; }
+
+.glass-blue { border: 1.5px solid rgba(59, 130, 246, 0.3); }
+.glass-blue .glass-icon { color: #1d4ed8; filter: drop-shadow(0 8px 12px rgba(37,99,235,0.25)); }
+.glass-blue:hover { border-color: rgba(59, 130, 246, 0.6); }
+
+.glass-orange { border: 1.5px solid rgba(249, 115, 22, 0.3); }
+.glass-orange .glass-icon { color: #c2410c; filter: drop-shadow(0 8px 12px rgba(234,88,12,0.25)); }
+.glass-orange:hover { border-color: rgba(249, 115, 22, 0.6); }
+
+.glass-violet { border: 1.5px solid rgba(139, 92, 246, 0.3); }
+.glass-violet .glass-icon { color: #6d28d9; filter: drop-shadow(0 8px 12px rgba(124,58,237,0.25)); }
+.glass-violet:hover { border-color: rgba(139, 92, 246, 0.6); }
+
+.glass-green { border: 1.5px solid rgba(16, 185, 129, 0.3); }
+.glass-green .glass-icon { color: #047857; filter: drop-shadow(0 8px 12px rgba(5,150,105,0.25)); }
+.glass-green:hover { border-color: rgba(16, 185, 129, 0.6); }
+
+/* GLASS KPI CARDS — redesign */
+.glass-kpi-grid { display: grid; gap: 18px; }
+.kpi-grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+.glass-kpi-card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 20px 22px 16px;
+    display: flex; flex-direction: column; gap: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    border: 1px solid #e8edf5;
+    position: relative; overflow: hidden;
+    transition: transform .2s, box-shadow .2s;
+}
+.glass-kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,0.09); }
+
+.gkpi-top { display: flex; align-items: center; justify-content: space-between; }
+
+.gkpi-icon-wrap {
+    width: 46px; height: 46px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.gkpi-icon-wrap i { width: 22px; height: 22px; stroke-width: 2px; }
+.gkpi-icon-wrap.blue { background: #eff6ff; color: #2563eb; }
+.gkpi-icon-wrap.orange { background: #fff7ed; color: #c2410c; }
+.gkpi-icon-wrap.green { background: #ecfdf5; color: #059669; }
+.gkpi-icon-wrap.purple { background: #f5f3ff; color: #7c3aed; }
+
+.gkpi-badge {
+    font-size: 10px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .04em; padding: 3px 9px;
+    border-radius: 20px; white-space: nowrap;
+}
+.badge-blue { background: #eff6ff; color: #1d4ed8; }
+.badge-amber { background: #fffbeb; color: #b45309; }
+.badge-emerald { background: #ecfdf5; color: #065f46; }
+.badge-success { background: #dcfce7; color: #15803d; }
+
+.gkpi-body { display: flex; flex-direction: column; gap: 2px; }
+.gkpi-label {
+    font-size: 10.5px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .06em; color: #64748b; margin: 0;
+}
+.gkpi-value {
+    font-size: 42px; font-weight: 900; line-height: 1.1;
+    color: #0f172a; letter-spacing: -0.02em; display: block;
+}
+
+.gkpi-footer { display: flex; flex-direction: column; gap: 5px; }
+.gkpi-progress-track {
+    height: 5px; background: #f1f5f9;
+    border-radius: 99px; overflow: hidden;
+}
+.gkpi-progress-fill {
+    height: 100%; border-radius: 99px;
+    transition: width .6s ease;
+    min-width: 3px;
+}
+.gkpi-footer-label { font-size: 10px; font-weight: 700; color: #94a3b8; }
+
+/* Donut no 4º card */
+.gkpi-donut-wrap {
+    position: absolute; right: 18px; bottom: 14px;
+    width: 58px; height: 58px; opacity: .9;
+}
+.gkpi-donut-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.gkpi-donut-bg { fill: none; stroke: #f1f5f9; stroke-width: 4; }
+.gkpi-donut-fill { fill: none; stroke-width: 4; stroke-linecap: round; }
+
+/* Keep old spark-fill for backward compat */
+.spark-fill.green { fill: url(#spark-gradient); }
+
+@media (max-width: 1200px) {
+    .kpi-grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+    .kpi-grid-4 { grid-template-columns: 1fr; }
+}
+
+/* Original Legacy Styles */
+.mon-action-cards {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;
+}
+.mon-action-card {
+    background: white; border-radius: 20px; padding: 24px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    box-shadow: 0 4px 18px rgba(47,104,230,0.05); border: 1px solid #e8edf5;
+    text-decoration: none; transition: transform .2s, box-shadow .2s;
+}
+.mon-action-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(47,104,230,0.1); border-color: #3b82f6; }
+.mon-action-card span { font-size: 13px; font-weight: 800; color: #1e3a8a; text-align: center; }
+.mac-icon { width: 52px; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center; }
+.mac-icon i { width: 24px; height: 24px; }
+.mac-icon-blue { background: #eff6ff; color: #3b82f6; }
+.mac-icon-orange { background: #fff7ed; color: #f97316; }
+.mac-icon-violet { background: #f5f3ff; color: #8b5cf6; }
+.mac-icon-green { background: #ecfdf5; color: #10b981; }
+
+.monitoring-kpi-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;
+}
+.monitoring-kpi-card {
+    background: white; border-radius: 20px; padding: 22px 24px;
+    display: flex; align-items: center; gap: 18px;
+    box-shadow: 0 4px 18px rgba(47,104,230,0.07); border: 1px solid #e8edf5;
+    transition: transform .2s;
+}
+.monitoring-kpi-card:hover { transform: translateY(-2px); }
+.kpi-icon-wrap { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.kpi-icon-wrap i { width: 22px; height: 22px; }
+.kpi-body p { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #64748b; margin: 0 0 4px; }
+.kpi-body strong { font-size: 32px; font-weight: 900; line-height: 1; display: block; }
+
+.kpi-blue .kpi-icon-wrap { background: #eff6ff; color: #3b82f6; }
+.kpi-blue .kpi-body strong { color: #1d4ed8; }
+.kpi-indigo .kpi-icon-wrap { background: #eef2ff; color: #6366f1; }
+.kpi-indigo .kpi-body strong { color: #4338ca; }
+.kpi-emerald .kpi-icon-wrap { background: #ecfdf5; color: #10b981; }
+.kpi-emerald .kpi-body strong { color: #059669; }
+
+/* Subvenção minimalista conforme referência */
+.subvention-minimal-page .monitoring-header-container {
+    display: none;
+}
+
+.subvention-minimal-page .monitoring-main-card {
+    min-height: calc(100vh - 32px) !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 24px auto !important;
+    padding: 30px 30px 42px !important;
+    gap: 32px !important;
+    border-radius: 26px !important;
+    background:
+        linear-gradient(#ffffff, #ffffff) padding-box,
+        linear-gradient(135deg, #047857 0%, #ffffff 16%, #ffffff 84%, #10b981 100%) border-box !important;
+    border: 1px solid transparent !important;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.08) !important;
+    color: #08275a;
+}
+
+.subvention-minimal-page .glass-action-cards {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(160px, 1fr));
+    gap: 18px;
+    width: 100%;
+}
+
+.subvention-minimal-page .glass-card {
+    min-height: 128px;
+    padding: 22px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 12px;
+    border: 1px solid #dbe7f3;
+    border-radius: 18px;
+    background: #ffffff;
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
+    overflow: visible;
+    color: #08275a;
+    text-align: left;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.subvention-minimal-page .glass-card:hover {
+    transform: translateY(-2px);
+    border-color: #7dd3fc;
+    box-shadow: 0 18px 38px rgba(15, 23, 42, 0.09);
+}
+
+.subvention-minimal-page .glass-bg-pattern {
+    display: none;
+}
+
+.subvention-minimal-page .glass-card .glass-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: #eff6ff;
+    color: #08275a;
+    filter: none;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.subvention-minimal-page .glass-card .glass-icon i {
+    width: 22px;
+    height: 22px;
+    stroke-width: 2.1px;
+}
+
+.subvention-minimal-page .glass-card .glass-label {
+    color: #08275a;
+    font-size: 16px;
+    line-height: 1.25;
+    font-weight: 800;
+    text-align: left;
+    text-transform: none;
+}
+
+.subvention-minimal-page .glass-card:hover .glass-label {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.subvention-minimal-page .glass-kpi-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+    gap: 18px;
+}
+
+.subvention-minimal-page .glass-kpi-card {
+    min-height: 132px;
+    padding: 22px 22px;
+    display: flex;
+    border: 1px solid #dbe7f3;
+    border-radius: 18px;
+    background: #ffffff;
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
+    overflow: visible;
+}
+
+.subvention-minimal-page .gkpi-content {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 14px;
+}
+
+.subvention-minimal-page .gkpi-icon-wrap {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: #eff6ff !important;
+    color: #08275a !important;
+    box-shadow: none !important;
+    flex: 0 0 42px;
+}
+
+.subvention-minimal-page .gkpi-icon-wrap i {
+    width: 22px;
+    height: 22px;
+    stroke-width: 2.1px;
+}
+
+.subvention-minimal-page .gkpi-text p {
+    margin: 0;
+    color: #08275a;
+    font-size: 13px;
+    line-height: 1.2;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.subvention-minimal-page .gkpi-text strong {
+    margin-top: 12px;
+    color: #063a83;
+    font-size: 26px;
+    line-height: 1;
+    font-weight: 900;
+    letter-spacing: 0;
+}
+
+.subvention-minimal-page .gkpi-graphic {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .subvention-minimal-page .monitoring-main-card {
+        min-height: auto !important;
+        padding: 24px 22px 34px !important;
+    }
+
+    .subvention-minimal-page .glass-action-cards,
+    .subvention-minimal-page .glass-kpi-grid {
+        grid-template-columns: 1fr;
+    }
+}
+/* Subvencao: correcao final limitada ao bloco dos cards/graficos. */
+.subvention-minimal-page .monitoring-header-container {
+    display: block !important;
+}
+
+.subvention-minimal-page .monitoring-header-actions {
+    gap: 12px !important;
+    justify-content: flex-end;
+}
+
+.subvention-top-tabs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.14);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 12px 26px rgba(15, 23, 42, 0.12);
+    backdrop-filter: blur(14px);
+}
+
+.subvention-top-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 0 14px;
+    border-radius: 13px;
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.subvention-top-tab:hover {
+    transform: translateY(-1px);
+    background: #ffffff;
+    color: #064e3b;
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.14);
+}
+
+.subvention-top-tab.is-active {
+    background: #ffffff;
+    color: #064e3b;
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.14);
+}
+
+.subvention-top-tab i {
+    width: 17px;
+    height: 17px;
+    stroke-width: 2.2px;
+}
+
+.subvention-minimal-page .monitoring-main-card {
+    width: calc(100% - 64px) !important;
+    max-width: none !important;
+    min-height: auto !important;
+    margin: -18px auto 42px !important;
+    padding: 30px !important;
+    gap: 28px !important;
+    border: 1px solid rgba(199, 213, 229, 0.85) !important;
+    border-radius: 30px !important;
+    background:
+        radial-gradient(circle at 10% 8%, rgba(255, 255, 255, 0.92), transparent 26%),
+        radial-gradient(circle at 88% 18%, rgba(209, 250, 229, 0.62), transparent 28%),
+        linear-gradient(135deg, #e8f0f8 0%, #f8fbff 46%, #edf7f2 100%) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        0 26px 60px rgba(15, 23, 42, 0.12) !important;
+    color: #071b3a;
+}
+
+.subvention-minimal-page .glass-action-cards {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(180px, 1fr)) !important;
+    gap: 22px !important;
+    width: 100%;
+}
+
+.subvention-minimal-page .glass-card {
+    min-height: 158px !important;
+    padding: 24px 22px 22px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 16px !important;
+    overflow: hidden !important;
+    border-radius: 20px !important;
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(236, 242, 248, 0.62)),
+        radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.95), transparent 42%) !important;
+    border: 1.5px solid rgba(148, 163, 184, 0.4) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        0 16px 28px rgba(15, 23, 42, 0.12) !important;
+    color: #071b3a !important;
+    text-align: center !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+
+.subvention-minimal-page .glass-card:hover {
+    transform: translateY(-4px) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        0 24px 42px rgba(15, 23, 42, 0.16) !important;
+}
+
+.subvention-minimal-page .glass-bg-pattern {
+    display: block !important;
+    position: absolute;
+    inset: 0;
+    opacity: 0.22;
+    background:
+        linear-gradient(135deg, transparent 0 24%, rgba(255, 255, 255, 0.9) 24% 26%, transparent 26% 100%),
+        linear-gradient(45deg, transparent 0 34%, rgba(148, 163, 184, 0.18) 34% 36%, transparent 36% 100%),
+        radial-gradient(circle at 18% 80%, rgba(255, 255, 255, 0.75), transparent 24%);
+    background-size: 64px 64px, 54px 54px, 100% 100%;
+}
+
+.subvention-minimal-page .glass-card .glass-icon {
+    width: 72px !important;
+    height: 72px !important;
+    z-index: 1;
+    background: transparent !important;
+    border-radius: 22px !important;
+    filter: drop-shadow(0 12px 18px rgba(15, 23, 42, 0.22)) !important;
+}
+
+.subvention-minimal-page .glass-card .glass-icon i {
+    width: 62px !important;
+    height: 62px !important;
+    stroke-width: 1.8px !important;
+}
+
+.subvention-minimal-page .glass-card .glass-label {
+    z-index: 1;
+    color: #06172f !important;
+    font-size: 16px !important;
+    line-height: 1.18 !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.02em !important;
+    text-align: center !important;
+    text-transform: none !important;
+    text-decoration: none !important;
+}
+
+.subvention-minimal-page .glass-blue {
+    border-color: rgba(30, 64, 175, 0.42) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 16px 30px rgba(30,64,175,.18) !important;
+}
+.subvention-minimal-page .glass-blue .glass-icon { color: #143f8f !important; }
+
+.subvention-minimal-page .glass-orange {
+    border-color: rgba(234, 88, 12, 0.42) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 16px 30px rgba(234,88,12,.18) !important;
+}
+.subvention-minimal-page .glass-orange .glass-icon { color: #df7b34 !important; }
+
+.subvention-minimal-page .glass-purple {
+    border-color: rgba(109, 40, 217, 0.45) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 16px 30px rgba(109,40,217,.2) !important;
+}
+.subvention-minimal-page .glass-purple .glass-icon { color: #5b21b6 !important; }
+
+.subvention-minimal-page .glass-green {
+    border-color: rgba(22, 163, 74, 0.42) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 16px 30px rgba(22,163,74,.18) !important;
+}
+.subvention-minimal-page .glass-green .glass-icon { color: #55b77f !important; }
+
+.subvention-minimal-page .glass-kpi-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(220px, 1fr)) !important;
+    gap: 22px !important;
+    width: 100%;
+}
+
+.subvention-minimal-page .glass-kpi-card {
+    min-height: 118px !important;
+    padding: 22px 24px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    overflow: hidden !important;
+    border-radius: 18px !important;
+    border: 1px solid rgba(203, 213, 225, 0.72) !important;
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(241, 245, 249, 0.74)),
+        radial-gradient(circle at 10% 15%, rgba(255, 255, 255, 0.95), transparent 30%) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        0 18px 38px rgba(15, 23, 42, 0.10) !important;
+}
+
+.subvention-minimal-page .gkpi-content {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 16px !important;
+    z-index: 1;
+}
+
+.subvention-minimal-page .gkpi-icon-wrap {
+    width: 58px !important;
+    height: 58px !important;
+    border-radius: 17px !important;
+    flex: 0 0 58px !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.95),
+        0 10px 18px rgba(15, 23, 42, 0.12) !important;
+}
+
+.subvention-minimal-page .gkpi-icon-wrap i {
+    width: 32px !important;
+    height: 32px !important;
+    stroke-width: 1.9px !important;
+}
+
+.subvention-minimal-page .gkpi-text p {
+    margin: 0 0 6px !important;
+    color: #102448 !important;
+    font-size: 12px !important;
+    line-height: 1.1 !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.035em !important;
+    text-transform: uppercase !important;
+}
+
+.subvention-minimal-page .gkpi-text strong {
+    color: #06172f !important;
+    font-size: 38px !important;
+    line-height: 0.95 !important;
+    font-weight: 950 !important;
+    letter-spacing: -0.04em !important;
+}
+
+.subvention-minimal-page .gkpi-graphic {
+    display: block !important;
+    opacity: 0.82;
+    transform: translateX(8px);
+}
+
+.subvention-minimal-page .gkpi-blue .gkpi-icon-wrap { background: #eef5ff !important; color: #153f8f !important; }
+.subvention-minimal-page .gkpi-orange .gkpi-icon-wrap { background: #fff2e8 !important; color: #dc7b38 !important; }
+.subvention-minimal-page .gkpi-green .gkpi-icon-wrap { background: #e9f9ef !important; color: #1f9c62 !important; }
+
+.subvention-inline-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+}
+
+.inline-panel-header,
+.inline-filter-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.inline-eyebrow {
+    margin: 0 0 4px;
+    color: #0f766e;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.inline-panel-header h2,
+.inline-modal-header h2 {
+    margin: 0;
+    color: #06172f;
+    font-size: 24px;
+    font-weight: 950;
+    letter-spacing: -0.04em;
+}
+
+.inline-panel-header span {
+    display: block;
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.inline-primary-btn,
+.inline-secondary-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 16px;
+    border-radius: 13px;
+    border: 0;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.inline-primary-btn {
+    color: #fff;
+    background: linear-gradient(135deg, #059669, #10b981);
+    box-shadow: 0 12px 22px rgba(5, 150, 105, 0.22);
+}
+
+.inline-primary-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 16px 28px rgba(5, 150, 105, 0.28);
+}
+
+.inline-secondary-btn {
+    color: #475569;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.inline-primary-btn i,
+.inline-secondary-btn i {
+    width: 15px;
+    height: 15px;
+}
+
+.inline-link-btn {
+    text-decoration: none;
+}
+
+.inline-search {
+    position: relative;
+    flex: 1;
+    min-width: 260px;
+}
+
+.inline-search i {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    color: #94a3b8;
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+
+.inline-search input,
+.inline-filter-select {
+    width: 100%;
+    height: 36px;
+    border: 1px solid #dbe7f3;
+    border-radius: 11px;
+    background: rgba(255,255,255,.78);
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 700;
+    outline: none;
+}
+
+.inline-search input {
+    padding: 0 14px 0 38px;
+}
+
+.inline-filter-select {
+    max-width: 280px;
+    padding: 0 14px;
+}
+
+.inline-table-card {
+    border: 1px solid rgba(203, 213, 225, 0.72);
+    border-radius: 20px;
+    background: rgba(255,255,255,.82);
+    box-shadow: 0 18px 38px rgba(15,23,42,.08);
+    min-height: 500px;
+    margin-bottom: 40px;
+    overflow-x: auto;
+}
+
+.inline-table-card::-webkit-scrollbar {
+    width: 10px;
+}
+
+.inline-table-card::-webkit-scrollbar-track {
+    background: rgba(226, 232, 240, 0.62);
+    border-radius: 999px;
+}
+
+.inline-table-card::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #10b981, #047857);
+    border: 2px solid rgba(226, 232, 240, 0.62);
+    border-radius: 999px;
+}
+
+.inline-osc-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.inline-visit-table {
+    width: 100%;
+    min-width: 1040px;
+    border-collapse: collapse;
+}
+
+.inline-osc-table th,
+.inline-visit-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 14px 16px;
+    background: rgba(248, 252, 250, 0.96);
+    color: #8090aa;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .09em;
+    text-align: left;
+    text-transform: uppercase;
+    border-bottom: 1px solid #e8eef6;
+}
+
+.inline-osc-table td,
+.inline-visit-table td {
+    padding: 14px 16px;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 650;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.inline-osc-table tr:last-child td,
+.inline-visit-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.inline-osc-table tbody tr:hover td,
+.inline-visit-table tbody tr:hover td {
+    background: rgba(236, 253, 245, 0.42);
+}
+
+.inline-osc-table td strong,
+.inline-visit-table td strong {
+    display: block;
+    color: #08275a;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.inline-osc-table td small,
+.inline-visit-table td small {
+    display: block;
+    margin-top: 3px;
+    color: #94a3b8;
+    font-size: 11px;
+}
+
+.inline-visits-scroll {
+    max-height: clamp(380px, 50vh, 650px);
+    overflow-x: auto;
+}
+
+.inline-visit-table th:nth-child(1) { width: 28%; }
+.inline-visit-table th:nth-child(2) { width: 14%; }
+.inline-visit-table th:nth-child(3) { width: 11%; }
+.inline-visit-table th:nth-child(4) { width: 15%; }
+.inline-visit-table th:nth-child(5) { width: 16%; }
+.inline-visit-table th:nth-child(6) { width: 16%; text-align: right; }
+
+.inline-plan-search {
+    max-width: 320px;
+}
+
+.inline-plan-grid-scroll {
+    max-height: clamp(410px, 52vh, 680px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 4px;
+}
+
+.inline-plan-grid-scroll::-webkit-scrollbar {
+    width: 10px;
+}
+
+.inline-plan-grid-scroll::-webkit-scrollbar-track {
+    background: rgba(226, 232, 240, 0.62);
+    border-radius: 999px;
+}
+
+.inline-plan-grid-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #10b981, #047857);
+    border: 2px solid rgba(226, 232, 240, 0.62);
+    border-radius: 999px;
+}
+
+.inline-plan-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.inline-plan-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 120px;
+    padding: 14px 16px;
+    border: 1px solid rgba(203, 213, 225, 0.72);
+    border-radius: 18px;
+    background:
+        linear-gradient(135deg, rgba(255,255,255,.95), rgba(248,250,252,.85));
+    box-shadow: 0 8px 24px rgba(15,23,42,.05);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.inline-plan-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(15,23,42,.1);
+    border-color: #10b981;
+}
+
+.inline-plan-card-head h3 {
+    margin: 0;
+    color: #08275a;
+    font-size: 13px;
+    font-weight: 900;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.inline-plan-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.inline-plan-file {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+}
+
+.inline-plan-file-icon {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 11px;
+    color: #2563eb;
+    background: #eef5ff;
+}
+
+.inline-plan-file-icon i {
+    width: 17px;
+    height: 17px;
+}
+
+.inline-plan-file strong {
+    display: block;
+    overflow: hidden;
+    color: #1e293b;
+    font-size: 12px;
+    font-weight: 900;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.inline-plan-file span,
+.inline-plan-empty {
+    display: block;
+    margin: 3px 0 0;
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 750;
+}
+
+.inline-plan-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.inline-plan-actions form {
+    display: inline-flex;
+    margin: 0;
+}
+
+.inline-plan-new-btn,
+.plan-action-btn,
+.plan-primary-btn {
+    min-height: 36px;
+    padding: 0 13px;
+    border-radius: 12px;
+    border: 1px solid #dbe7f3;
+    background: #ffffff;
+    color: #0f172a;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.inline-plan-new-btn:hover,
+.plan-action-btn:hover,
+.plan-primary-btn:hover {
+    color: #047857;
+    border-color: #a7f3d0;
+    background: #ecfdf5;
+}
+
+.inline-plan-icon-btn,
+.plan-preview-close {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #dbe7f3;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.inline-plan-icon-btn:hover {
+    color: #2563eb;
+    border-color: #bfdbfe;
+    background: #eff6ff;
+}
+
+.inline-plan-icon-btn.is-danger:hover {
+    color: #dc2626;
+    border-color: #fecaca;
+    background: #fef2f2;
+}
+
+.inline-plan-icon-btn i,
+.inline-plan-new-btn i,
+.plan-action-btn i,
+.plan-primary-btn i,
+.plan-preview-close i {
+    width: 15px;
+    height: 15px;
+}
+
+.plan-preview-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 22px;
+    background: rgba(15, 23, 42, 0.48);
+    backdrop-filter: blur(8px);
+}
+
+.plan-preview-dialog {
+    width: min(980px, 100%);
+    max-height: min(88vh, 920px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #dbe4ee;
+    border-radius: 24px;
+    background: #ffffff;
+    box-shadow: 0 30px 60px rgba(15, 23, 42, 0.24);
+}
+
+.plan-preview-modal-header,
+.plan-preview-modal-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 22px;
+}
+
+.plan-preview-modal-header {
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.plan-preview-modal-actions {
+    border-top: 1px solid #e2e8f0;
+}
+
+.plan-preview-modal-eyebrow {
+    display: inline-block;
+    margin-bottom: 6px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.plan-preview-modal-header h3 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 20px;
+    font-weight: 950;
+}
+
+.plan-preview-modal-body {
+    flex: 1;
+    overflow: auto;
+    padding: 22px;
+    background: #f8fafc;
+}
+
+.plan-preview-loading,
+.plan-preview-empty-state {
+    min-height: 240px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: #64748b;
+    text-align: center;
+}
+
+.plan-preview-loading i,
+.plan-preview-empty-state i {
+    width: 28px;
+    height: 28px;
+}
+
+.inline-techs {
+    color: #1e293b;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.35;
+    text-transform: capitalize;
+}
+
+.inline-status-badge,
+.inline-registered,
+.inline-doc-btn,
+.inline-muted {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.inline-status-badge {
+    padding: 7px 10px;
+    text-transform: capitalize;
+}
+
+.inline-status-badge i,
+.inline-doc-btn i {
+    width: 14px;
+    height: 14px;
+}
+
+.inline-status-badge.is-finalized {
+    background: #dcfce7;
+    color: #059669;
+    border: 1px solid #bbf7d0;
+}
+
+.inline-status-badge.is-draft {
+    background: #fff7ed;
+    color: #ea580c;
+    border: 1px solid #fed7aa;
+}
+
+.inline-registered {
+    color: #334155;
+    text-transform: capitalize;
+}
+
+.inline-registered span {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: #eff6ff;
+    color: #2563eb;
+    font-size: 10px;
+    font-weight: 950;
+    text-transform: uppercase;
+}
+
+.inline-doc-btn {
+    padding: 7px 10px;
+    color: #0f172a;
+    text-decoration: none;
+    border: 1px solid #dbe7f3;
+    background: #ffffff;
+}
+
+.inline-doc-btn:hover {
+    color: #047857;
+    border-color: #a7f3d0;
+    background: #ecfdf5;
+}
+
+.inline-muted {
+    color: #94a3b8;
+}
+
+.inline-visit-actions {
+    justify-content: flex-end;
+}
+
+.inline-visit-actions a,
+.inline-visit-actions button {
+    width: 34px;
+    height: 34px;
+}
+
+.inline-view-action:hover {
+    color: #2563eb !important;
+    border-color: #bfdbfe !important;
+    background: #eff6ff !important;
+}
+
+.inline-edit-action:hover {
+    color: #f59e0b !important;
+    border-color: #fde68a !important;
+    background: #fffbeb !important;
+}
+
+.inline-revert-action:hover {
+    color: #2563eb !important;
+    border-color: #bfdbfe !important;
+    background: #eff6ff !important;
+}
+
+.inline-delete-action:hover {
+    color: #dc2626 !important;
+    border-color: #fecaca !important;
+    background: #fef2f2 !important;
+}
+
+.inline-tag,
+.inline-demand-badge {
+    display: inline-flex;
+    max-width: 230px;
+    padding: 4px 9px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #eef6ff;
+    color: #315a94;
+    font-size: 10px;
+    font-weight: 900;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.inline-demand-badge {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.inline-number {
+    color: #064e3b !important;
+}
+
+.inline-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 7px;
+    white-space: nowrap;
+}
+
+.inline-actions form {
+    display: inline-flex;
+    margin: 0;
+}
+
+.inline-actions a,
+.inline-actions button,
+.inline-modal-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid #dbe7f3;
+    border-radius: 10px;
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+    transition: color .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.inline-actions a:hover {
+    color: #2563eb;
+    border-color: #bfdbfe;
+    background: #eff6ff;
+}
+
+.inline-actions button:hover {
+    color: #dc2626;
+    border-color: #fecaca;
+    background: #fef2f2;
+}
+
+.inline-actions i,
+.inline-modal-close i {
+    width: 15px;
+    height: 15px;
+}
+
+.inline-empty-cell {
+    padding: 46px 20px !important;
+    text-align: center;
+}
+
+.inline-empty-cell i {
+    width: 38px;
+    height: 38px;
+    color: #94a3b8;
+}
+
+.inline-empty-cell p {
+    margin: 8px 0 14px;
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.inline-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.52);
+    backdrop-filter: blur(8px);
+}
+
+.inline-modal-backdrop.is-open {
+    display: flex;
+}
+
+.inline-modal-card {
+    width: min(860px, 100%);
+    max-height: min(86vh, 820px);
+    overflow: auto;
+    border: 1px solid rgba(255,255,255,.62);
+    border-radius: 26px;
+    background: linear-gradient(135deg, #ffffff, #f8fbff);
+    box-shadow: 0 34px 90px rgba(15,23,42,.28);
+}
+
+.inline-modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 24px 26px 18px;
+    background: rgba(255,255,255,.92);
+    border-bottom: 1px solid #eef2f7;
+    backdrop-filter: blur(12px);
+}
+
+.inline-osc-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px 26px 26px;
+}
+
+.inline-osc-form label,
+.inline-subs-field {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.inline-osc-form label span,
+.inline-subs-field > span {
+    color: #8a97ad;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+}
+
+.inline-osc-form input,
+.inline-osc-form select {
+    height: 44px;
+    border: 1px solid #dbe7f3;
+    border-radius: 12px;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 13px;
+    outline: none;
+}
+
+.inline-osc-form input:focus,
+.inline-osc-form select:focus {
+    border-color: #10b981;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(16,185,129,.11);
+}
+
+.inline-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.inline-form-grid.wide-left {
+    grid-template-columns: 2fr 1fr;
+}
+
+.inline-radio {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 8px !important;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.inline-radio input {
+    width: 16px;
+    height: 16px;
+    accent-color: #059669;
+}
+
+.inline-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #eef2f7;
+}
+
+@media (max-width: 1180px) {
+    .subvention-top-tabs {
+        width: 100%;
+        overflow-x: auto;
+        justify-content: flex-start;
+    }
+
+    .subvention-minimal-page .glass-action-cards {
+        grid-template-columns: repeat(2, minmax(180px, 1fr)) !important;
+    }
+
+    .subvention-minimal-page .glass-kpi-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .inline-plan-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 1024px) {
+    .inline-plan-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .inline-plan-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .subvention-minimal-page .monitoring-main-card {
+        width: calc(100% - 28px) !important;
+        margin: -12px auto 28px !important;
+        padding: 18px !important;
+        border-radius: 22px !important;
+    }
+
+    .subvention-minimal-page .glass-action-cards,
+    .subvention-minimal-page .glass-kpi-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .inline-form-grid,
+    .inline-form-grid.wide-left {
+        grid-template-columns: 1fr;
+    }
+
+    .inline-table-card {
+        overflow-x: auto;
+    }
+}
+
+/* Inline Reports Grid */
+.report-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 16px; }
+.report-card {
+    background: white; border-radius: 18px; padding: 16px;
+    box-shadow: 0 4px 18px rgba(47,104,230,.06); border: 1px solid #e8edf5;
+    display: flex; flex-direction: column; gap: 12px;
+    transition: transform .2s, box-shadow .2s;
+}
+.report-card:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(47,104,230,.12); border-color: #10b981; }
+.report-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: -4px; }
+.report-card-icon { width: 32px; height: 32px; border-radius: 8px; background: #ecfdf5; color: #10b981; display: flex; align-items: center; justify-content: center; }
+.report-card-icon i { width: 16px; height: 16px; }
+.badge-finalized-sm { font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; padding: 2px 6px; border-radius: 5px; background: #ecfdf5; color: #059669; border: 1px solid #d1fae5; }
+.report-osc-name { font-size: 12px; font-weight: 800; color: #1e3a8a; margin: 0 0 4px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; min-height: 31px; }
+.report-date-row, .report-tech-row { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #64748b; font-weight: 500; margin-bottom: 2px; }
+.report-date-row i, .report-tech-row i { width: 12px; height: 12px; color: #94a3b8; }
+.report-card-actions { display: flex; flex-direction: column; gap: 4px; margin-top: auto; }
+.report-action-btn {
+    display: flex; align-items: center; justify-content: flex-start; gap: 6px;
+    padding: 7px 12px; border-radius: 9px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    text-decoration: none; transition: all .2s;
+}
+.report-action-btn i { width: 14px; height: 14px; flex-shrink: 0; }
+.btn-badge { margin-left: auto; font-size: 10px; background: white; border-radius: 6px; padding: 1px 6px; color: #059669; font-weight: 900; }
+.btn-badge-draft { margin-left: auto; font-size: 9px; background: #fef3c7; border-radius: 6px; padding: 1px 6px; color: #92400e; font-weight: 900; }
+.btn-green { background: #ecfdf5; color: #059669; border: 1.5px solid #d1fae5; }
+.btn-green:hover { background: #059669; color: white; border-color: #059669; }
+.btn-amber { background: #fffbeb; color: #92400e; border: 1.5px solid #fef3c7; }
+.btn-amber:hover { background: #f59e0b; color: white; }
+.btn-neutral { background: #f8fafc; color: #475569; border: 1.5px solid #e2e8f0; }
+.btn-neutral:hover { background: #1e3a8a; color: white; border-color: #1e3a8a; }
+.btn-slate { background: #f1f5f9; color: #1e3a8a; border: 1.5px solid #e2e8f0; }
+.btn-slate:hover { background: #1e3a8a; color: white; border-color: #1e3a8a; }
+.btn-slate-light { background: #f8fafc; color: #64748b; border: 1.5px solid #e2e8f0; }
+.btn-slate-light:hover { background: #f1f5f9; color: #1e293b; }
+.notif-section { margin-top: 2px; padding: 8px 10px; background: #f8fafc; border-radius: 8px; border: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 4px; }
+.notif-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; display: flex; align-items: center; gap: 4px; }
+.notif-label i { width: 11px; height: 11px; }
+.notif-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; background: white; border: 1.5px solid #e2e8f0; border-radius: 12px; gap: 8px; }
+.notif-item i { width: 11px; height: 11px; flex-shrink: 0; }
+.notif-name { font-size: 10px; font-weight: 700; color: #475569; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notif-name:hover { color: #3b82f6; text-decoration: none; }
+
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        lucide.createIcons();
+
+        var oscModal = document.getElementById("oscModal");
+        document.querySelectorAll("[data-open-osc-modal]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                if (!oscModal) return;
+                oscModal.classList.add("is-open");
+                oscModal.setAttribute("aria-hidden", "false");
+                var firstInput = oscModal.querySelector('input[name="name"]');
+                if (firstInput) firstInput.focus();
+            });
+        });
+
+        document.querySelectorAll("[data-close-osc-modal]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                if (!oscModal) return;
+                oscModal.classList.remove("is-open");
+                oscModal.setAttribute("aria-hidden", "true");
+            });
+        });
+
+        if (oscModal) {
+            oscModal.addEventListener("click", function (event) {
+                if (event.target === oscModal) {
+                    oscModal.classList.remove("is-open");
+                    oscModal.setAttribute("aria-hidden", "true");
+                }
+            });
+        }
+
+        var searchInput = document.getElementById("inline-osc-search");
+        var typeFilter = document.getElementById("inline-osc-type-filter");
+        function filterInlineOscTable() {
+            var q = ((searchInput && searchInput.value) || "").toLowerCase();
+            var activity = ((typeFilter && typeFilter.value) || "").toLowerCase();
+            document.querySelectorAll("#inline-osc-table .inline-osc-row").forEach(function (row) {
+                var name = (row.querySelector("td strong")?.textContent || "").toLowerCase();
+                var rowActivity = (row.dataset.activity || "").toLowerCase();
+                var matchesName = !q || name.includes(q);
+                var matchesType = !activity || rowActivity === activity;
+                row.style.display = matchesName && matchesType ? "" : "none";
+            });
+        }
+        if (searchInput) searchInput.addEventListener("input", filterInlineOscTable);
+        if (typeFilter) typeFilter.addEventListener("change", filterInlineOscTable);
+
+        var visitSearchInput = document.getElementById("inline-visit-search");
+        function filterInlineVisitTable() {
+            var q = ((visitSearchInput && visitSearchInput.value) || "").toLowerCase();
+            document.querySelectorAll("#inline-visit-table .inline-visit-row").forEach(function (row) {
+                var name = (row.querySelector(".inline-visit-osc")?.textContent || "").toLowerCase();
+                row.style.display = !q || name.includes(q) ? "" : "none";
+            });
+        }
+        if (visitSearchInput) visitSearchInput.addEventListener("input", filterInlineVisitTable);
+
+        var planSearchInput = document.getElementById("inline-plan-search");
+        if (planSearchInput) {
+            planSearchInput.addEventListener("input", function () {
+                var q = this.value.toLowerCase();
+                document.querySelectorAll("#inline-plan-grid .inline-plan-card").forEach(function (card) {
+                    card.style.display = (card.dataset.oscName || "").includes(q) ? "" : "none";
+                });
+            });
+        }
+
+        var cepInput = document.getElementById("inline_id_cep");
+        if (cepInput) {
+            cepInput.addEventListener("blur", function () {
+                var cep = this.value.replace(/\D/g, "");
+                if (cep.length !== 8) return;
+                fetch("https://viacep.com.br/ws/" + cep + "/json/")
+                    .then(function (res) { return res.json(); })
+                    .then(function (data) {
+                        if (data.erro) return;
+                        var address = document.getElementById("inline_id_address");
+                        var neighborhood = document.getElementById("inline_id_neighborhood");
+                        if (address) address.value = data.logradouro || "";
+                        if (neighborhood) neighborhood.value = data.bairro || "";
+                    })
+                    .catch(function () {});
+            });
+        }
+
+        document.querySelectorAll('input[name="subsidized_type"]').forEach(function (radio) {
+            radio.addEventListener("change", function () {
+                var input = document.getElementById("inline_subsidized_count");
+                if (!input) return;
+                if (this.value === "demand") {
+                    input.style.display = "none";
+                    input.value = -1;
+                } else {
+                    input.style.display = "block";
+                    if (input.value === "-1") input.value = 0;
+                }
+            });
+        });
+    });
+
+    function openInlinePlanPreview(oscId) {
+        var modal = document.getElementById("inlinePlanPreviewModal");
+        var body = document.getElementById("inlinePlanPreviewBody");
+        var title = document.getElementById("inlinePlanPreviewTitle");
+        var openLink = document.getElementById("inlinePlanPreviewOpenLink");
+        var previewUrl = "{% url 'directorates:plan-preview' directorate.pk %}?osc=" + encodeURIComponent(oscId);
+        var openUrl = "{% url 'directorates:plan-document' directorate.pk %}?osc=" + encodeURIComponent(oscId);
+
+        if (!modal || !body || !title || !openLink) return;
+
+        title.textContent = "Carregando plano de trabalho...";
+        body.innerHTML = "<div class='plan-preview-loading'><i data-lucide='loader-circle'></i><span>Montando visualização do plano...</span></div>";
+        openLink.href = openUrl;
+        modal.style.display = "flex";
+        document.body.classList.add("modal-open");
+        lucide.createIcons();
+
+        fetch(previewUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function (result) {
+                if (!result.ok || !result.data.success) {
+                    throw new Error(result.data.error || "Não foi possível carregar o plano de trabalho.");
+                }
+
+                title.textContent = result.data.title;
+                body.innerHTML = result.data.html;
+                openLink.href = result.data.open_url;
+                lucide.createIcons();
+            })
+            .catch(function (error) {
+                title.textContent = "Plano de trabalho indisponível";
+                body.innerHTML = "<div class='plan-preview-empty-state'><i data-lucide='file-x2'></i><p>" + escapeHtml(error.message) + "</p></div>";
+                openLink.href = openUrl;
+                lucide.createIcons();
+            });
+    }
+
+    function closeInlinePlanPreview() {
+        var modal = document.getElementById("inlinePlanPreviewModal");
+        if (!modal) return;
+        modal.style.display = "none";
+        document.body.classList.remove("modal-open");
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    document.getElementById('inline-report-search')?.addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        let visible = 0;
+        document.querySelectorAll('#inline-report-grid .report-card').forEach(card => {
+            const show = !q || card.dataset.osc.includes(q);
+            card.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+        const emptyEl = document.getElementById('inline-report-empty');
+        if (emptyEl) {
+            emptyEl.style.display = visible === 0 ? 'flex' : 'none';
+        }
+    });
+
+    document.addEventListener("click", function (event) {
+        if (event.target && event.target.id === "inlinePlanPreviewModal") {
+            closeInlinePlanPreview();
+        }
+    });
+
+    window.uploadNotification = function(visitId) {
+        const input = document.getElementById('notif-input-' + visitId);
+        const file = input?.files?.[0];
+        if (!file) return;
+
+        if (file.type !== 'application/pdf') {
+            alert("Por favor, selecione apenas arquivos PDF.");
+            input.value = '';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+        // Show loading
+        const listContainer = document.getElementById('notif-list-' + visitId);
+        if (listContainer) {
+            listContainer.innerHTML = '<p style="text-align:center;font-size:10px;color:#64748b;margin:0;padding:8px;">Enviando...</p>';
+        }
+
+        fetch(`/directorias/visitas/${visitId}/upload-notification/`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(res => {
+            if (res.success) {
+                window.location.reload();
+            } else {
+                alert("Erro ao fazer upload da notificação: " + res.error);
+                window.location.reload();
+            }
+        })
+        .catch(err => {
+            alert("Erro de conexão ao enviar a notificação.");
+            window.location.reload();
+        });
+    }
+
+    window.removeNotification = function(visitId, index) {
+        if (!confirm("Tem certeza que deseja remover esta notificação?")) return;
+
+        const data = { index: index };
+
+        fetch(`/directorias/visitas/${visitId}/remove-notification/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(res => {
+            if (res.success) {
+                window.location.reload();
+            } else {
+                alert("Erro ao remover notificação: " + res.error);
+            }
+        })
+        .catch(err => {
+            alert("Erro de conexão ao remover a notificação.");
+        });
+    }
+</script>
+{% endblock %}

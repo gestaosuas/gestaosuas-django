@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Atualizar {{ module_title }} | {{ directorate.name }}{% endblock %}
+
+{% block content %}
+<section class="simple-shell benefits-shell">
+    <a class="back-link" href="{{ back_url }}">&larr; Voltar para o painel</a>
+
+    <div class="benefits-hero">
+        <div>
+            <p class="eyebrow">Formulario Mensal</p>
+            <h1>Atualizar Dados {{ module_title }}</h1>
+        </div>
+        <div class="benefits-filter-bar static-bar">
+            <span class="pill">Ano {{ selected_year }}</span>
+            <span class="pill">Mes {{ selected_month }}</span>
+            {% if existing_report %}
+                <span class="pill">Editando registro existente</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="post" class="report-form-shell">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="error-text">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="report-period-grid">
+            <div class="field-group">
+                <label for="{{ form.month.id_for_label }}">{{ form.month.label }}</label>
+                {{ form.month }}
+            </div>
+            <div class="field-group">
+                <label for="{{ form.year.id_for_label }}">{{ form.year.label }}</label>
+                {{ form.year }}
+            </div>
+        </div>
+
+        {% for section in section_items %}
+            <div class="report-section-card">
+                <div class="section-head">
+                    <div class="section-line"></div>
+                    <h2>{{ section.title }}</h2>
+                </div>
+                <div class="report-form-grid">
+                    {% for field in section.fields %}
+                        <div class="field-group">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}
+                                <small>{{ field.help_text }}</small>
+                            {% endif %}
+                            {% if field.errors %}
+                                <div class="error-text">{{ field.errors }}</div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+
+        <div class="form-actions-row">
+            <a class="secondary-button" href="{{ data_url }}">Ver Dados</a>
+            <button type="submit" class="primary-button">Salvar Preenchimento</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,887 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ directorate.name }} | {{ system_name }}{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+
+    <main class="dashboard-main">
+        {% if is_monitoramento %}
+        {# ============================================================ #}
+        {#  MONITORAMENTO DASHBOARD — Subvenção / Emendas / Outros      #}
+        {# ============================================================ #}
+        <section class="monitoring-detail-shell">
+            {% if is_subvencao_only %}
+            <div class="subvention-minimal-panel">
+                <nav class="subvention-minimal-menu" aria-label="Ações de Subvenção">
+                    <a href="{% url 'directorates:osc-list' directorate.pk %}" class="subvention-minimal-link">
+                        <i data-lucide="building-2"></i>
+                        <span>Cadastrar OSC</span>
+                    </a>
+                    <a href="{% url 'directorates:visit-list' directorate.pk %}" class="subvention-minimal-link">
+                        <i data-lucide="clipboard-list"></i>
+                        <span>Instrumental de Visita</span>
+                    </a>
+                    <a href="{% url 'directorates:plan-list' directorate.pk %}" class="subvention-minimal-link">
+                        <i data-lucide="folder-open"></i>
+                        <span>Plano de Trabalho</span>
+                    </a>
+                    <a href="{% url 'directorates:report-list' directorate.pk %}" class="subvention-minimal-link">
+                        <i data-lucide="file-input"></i>
+                        <span>Relatórios e Pareceres</span>
+                    </a>
+                </nav>
+
+                <div class="subvention-minimal-stats" aria-label="Resumo de Subvenção">
+                    <article class="subvention-minimal-stat">
+                        <i data-lucide="building-2"></i>
+                        <p>Total de OSCs</p>
+                        <strong>{{ subvencao_stats.totalOSCs }}</strong>
+                    </article>
+                    <article class="subvention-minimal-stat">
+                        <i data-lucide="clipboard-list"></i>
+                        <p>Visitas no Bimestre</p>
+                        <strong>{{ subvencao_stats.totalVisits }}</strong>
+                    </article>
+                    <article class="subvention-minimal-stat">
+                        <i data-lucide="circle-check"></i>
+                        <p>Visitas Finalizadas</p>
+                        <strong>{{ subvencao_stats.finalizedVisits }}</strong>
+                    </article>
+                </div>
+            </div>
+            {% else %}
+
+            {# ── Header ── #}
+            <header class="monitoring-detail-header">
+                <div class="monitoring-detail-title">
+                    <a href="{% url 'directorates:list' %}" class="back-link-modern">
+                        <i data-lucide="arrow-left"></i> Diretorias
+                    </a>
+                    <p class="eyebrow">Monitoramento e Avaliação</p>
+                    <h1>{{ directorate.name }}</h1>
+                    <p class="subtitle-muted">{{ bimester_label }} &mdash; Painel de acompanhamento de OSCs e visitas</p>
+                </div>
+
+                <div class="monitoring-detail-actions">
+                    {# ── Filtros ── #}
+                    <form method="get" class="filter-group-modern">
+                        <label class="pill-select">
+                            <span>Bimestre</span>
+                            <select name="bimestre">
+                                <option value="all" {% if selected_bimester == 'all' %}selected{% endif %}>Todo o Periodo</option>
+                                {% for b_num, b_label in bimester_options %}
+                                    <option value="{{ b_num }}" {% if selected_bimester == b_num|stringformat:"s" %}selected{% endif %}>{{ b_label }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label class="pill-select">
+                            <span>Ano</span>
+                            <select name="year">
+                                {% for y in years_range %}
+                                    <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <button type="submit" class="btn-icon-apply">
+                            <i data-lucide="filter"></i>
+                        </button>
+                    </form>
+
+                    <a href="{% url 'directorates:visit-create' directorate.pk %}" class="btn-primary-premium">
+                        <i data-lucide="plus"></i> Nova Visita
+                    </a>
+                    <a href="{% url 'directorates:visit-list' directorate.pk %}" class="btn-outline-monitoring-detail">
+                        <i data-lucide="clipboard-list"></i> Ver Visitas
+                    </a>
+                    <a href="{% url 'directorates:osc-list' directorate.pk %}" class="btn-outline-monitoring-detail">
+                        <i data-lucide="building"></i> OSCs
+                    </a>
+                </div>
+            </header>
+
+            {# ── 4 Action Cards ── #}
+            <div class="mon-action-cards">
+                <a href="{% url 'directorates:osc-list' directorate.pk %}" class="mon-action-card">
+                    <div class="mac-icon mac-icon-blue">
+                        <i data-lucide="building-2"></i>
+                    </div>
+                    <span>Cadastrar OSC</span>
+                </a>
+                <a href="{% url 'directorates:visit-list' directorate.pk %}" class="mon-action-card">
+                    <div class="mac-icon mac-icon-orange">
+                        <i data-lucide="clipboard-list"></i>
+                    </div>
+                    <span>Instrumental de Visita</span>
+                </a>
+                <a href="{% url 'directorates:plan-list' directorate.pk %}" class="mon-action-card">
+                    <div class="mac-icon mac-icon-violet">
+                        <i data-lucide="folder-open"></i>
+                    </div>
+                    <span>Plano de Trabalho</span>
+                </a>
+                <a href="{% url 'directorates:report-list' directorate.pk %}" class="mon-action-card">
+                    <div class="mac-icon mac-icon-green">
+                        <i data-lucide="file-check-2"></i>
+                    </div>
+                    <span>Relatórios e Pareceres</span>
+                </a>
+            </div>
+
+            {# ── KPI Cards ── #}
+            <div class="monitoring-kpi-grid">
+
+                <article class="monitoring-kpi-card kpi-blue">
+                    <div class="kpi-icon-wrap">
+                        <i data-lucide="building-2"></i>
+                    </div>
+                    <div class="kpi-body">
+                        <p>Total de OSCs</p>
+                        <strong>{{ subvencao_stats.totalOSCs }}</strong>
+                    </div>
+                </article>
+
+                <article class="monitoring-kpi-card kpi-indigo">
+                    <div class="kpi-icon-wrap">
+                        <i data-lucide="clipboard-list"></i>
+                    </div>
+                    <div class="kpi-body">
+                        <p>Visitas no Bimestre</p>
+                        <strong>{{ subvencao_stats.totalVisits }}</strong>
+                    </div>
+                </article>
+
+                <article class="monitoring-kpi-card kpi-emerald">
+                    <div class="kpi-icon-wrap">
+                        <i data-lucide="check-circle-2"></i>
+                    </div>
+                    <div class="kpi-body">
+                        <p>Visitas Finalizadas</p>
+                        <strong>{{ subvencao_stats.finalizedVisits }}</strong>
+                    </div>
+                </article>
+
+                {% if is_subvencao_mode %}
+                <article class="monitoring-kpi-card kpi-violet">
+                    <div class="kpi-icon-wrap">
+                        <i data-lucide="file-text"></i>
+                    </div>
+                    <div class="kpi-body">
+                        <p>Pareceres Técnicos</p>
+                        <strong>{{ subvencao_stats.finalizedReports }}</strong>
+                    </div>
+                </article>
+
+                <article class="monitoring-kpi-card kpi-amber">
+                    <div class="kpi-icon-wrap">
+                        <i data-lucide="scroll-text"></i>
+                    </div>
+                    <div class="kpi-body">
+                        <p>Relatórios Finais</p>
+                        <strong>{{ subvencao_stats.finalizedFinalReports }}</strong>
+                    </div>
+                </article>
+
+                <article class="monitoring-kpi-card kpi-rose">
+                    <div class="kpi-icon-wrap">
+                        <i data-lucide="gavel"></i>
+                    </div>
+                    <div class="kpi-body">
+                        <p>Pareceres Conclusivos</p>
+                        <strong>{{ subvencao_stats.finalizedConclusiveOpinions }}</strong>
+                    </div>
+                </article>
+                {% endif %}
+
+            </div>
+
+            {# ── Progress bars ── #}
+            {% if is_subvencao_mode and subvencao_stats.totalVisits > 0 %}
+            <div class="monitoring-progress-panel">
+                <h2 class="panel-section-title">
+                    <i data-lucide="bar-chart-2"></i> Progresso do Bimestre
+                </h2>
+                <div class="progress-bars-grid">
+
+                    <div class="progress-row">
+                        <div class="progress-label-row">
+                            <span>Visitas Finalizadas</span>
+                            <span class="progress-pct">
+                                {% widthratio subvencao_stats.finalizedVisits subvencao_stats.totalVisits 100 %}%
+                            </span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill fill-emerald"
+                                style="width: {% widthratio subvencao_stats.finalizedVisits subvencao_stats.totalVisits 100 %}%">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="progress-row">
+                        <div class="progress-label-row">
+                            <span>Pareceres Técnicos</span>
+                            <span class="progress-pct">
+                                {% widthratio subvencao_stats.finalizedReports subvencao_stats.totalVisits 100 %}%
+                            </span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill fill-violet"
+                                style="width: {% widthratio subvencao_stats.finalizedReports subvencao_stats.totalVisits 100 %}%">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="progress-row">
+                        <div class="progress-label-row">
+                            <span>Relatórios Finais</span>
+                            <span class="progress-pct">
+                                {% widthratio subvencao_stats.finalizedFinalReports subvencao_stats.totalVisits 100 %}%
+                            </span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill fill-amber"
+                                style="width: {% widthratio subvencao_stats.finalizedFinalReports subvencao_stats.totalVisits 100 %}%">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="progress-row">
+                        <div class="progress-label-row">
+                            <span>Pareceres Conclusivos</span>
+                            <span class="progress-pct">
+                                {% widthratio subvencao_stats.finalizedConclusiveOpinions subvencao_stats.totalVisits 100 %}%
+                            </span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill fill-rose"
+                                style="width: {% widthratio subvencao_stats.finalizedConclusiveOpinions subvencao_stats.totalVisits 100 %}%">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            {% endif %}
+
+            {% endif %}
+        </section>
+
+        {% else %}
+        {# ============================================================ #}
+        {#  GENERIC — Outras diretorias sem painel específico            #}
+        {# ============================================================ #}
+        <section class="simple-shell">
+            <a class="back-link" href="{% url 'directorates:list' %}">&larr; Voltar para diretorias</a>
+            <div class="simple-header">
+                <p class="eyebrow">Diretoria</p>
+                <h1>{{ directorate.name }}</h1>
+                <p>Esta diretoria ainda não recebeu um painel específico na nova aplicação Django.</p>
+            </div>
+
+            <div class="panel">
+                <h2>Módulo em migração</h2>
+                <p>OSCs, planos e visitas não fazem parte desta etapa da nova aplicação. Vamos portar cada diretoria para seus formulários, tabelas e dashboards próprios.</p>
+            </div>
+        </section>
+        {% endif %}
+
+    </main>
+</div>
+
+<style>
+.subvention-minimal-panel {
+    min-height: calc(100vh - 76px);
+    width: 100%;
+    border-radius: 26px;
+    background:
+        linear-gradient(#ffffff, #ffffff) padding-box,
+        linear-gradient(135deg, #047857 0%, #ffffff 18%, #ffffff 82%, #10b981 100%) border-box;
+    border: 1px solid transparent;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
+    padding: 30px 30px 42px;
+    color: #08275a;
+}
+
+.subvention-minimal-menu,
+.subvention-minimal-stats {
+    width: 220px;
+}
+
+.subvention-minimal-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.subvention-minimal-link {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    align-items: start;
+    min-height: 48px;
+    text-decoration: none;
+    color: #08275a;
+    font-size: 16px;
+    line-height: 1.18;
+    font-weight: 500;
+}
+
+.subvention-minimal-link i,
+.subvention-minimal-stat i {
+    width: 22px;
+    height: 22px;
+    color: #08275a;
+    stroke-width: 2.1;
+}
+
+.subvention-minimal-link span {
+    grid-column: 1 / -1;
+    padding-top: 4px;
+}
+
+.subvention-minimal-link:hover span {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.subvention-minimal-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    margin-top: 32px;
+}
+
+.subvention-minimal-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.subvention-minimal-stat p {
+    margin: 0;
+    color: #08275a;
+    font-size: 16px;
+    line-height: 1.2;
+    font-weight: 500;
+}
+
+.subvention-minimal-stat strong {
+    color: #063a83;
+    font-size: 17px;
+    line-height: 1;
+    font-weight: 900;
+}
+
+@media (max-width: 768px) {
+    .subvention-minimal-panel {
+        min-height: auto;
+        padding: 24px 22px 34px;
+    }
+
+    .subvention-minimal-menu,
+    .subvention-minimal-stats {
+        width: 100%;
+    }
+}
+/* ─── Shell ────────────────────────────────────────────── */
+.monitoring-detail-shell {
+    width: 96%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+
+/* ─── Header ───────────────────────────────────────────── */
+.monitoring-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    flex-wrap: wrap;
+    background: white;
+    border-radius: 24px;
+    padding: 28px 32px;
+    box-shadow: 0 4px 24px rgba(47, 104, 230, 0.08);
+    border: 1px solid #e8edf5;
+}
+
+.back-link-modern {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+    transition: color 0.2s;
+}
+.back-link-modern:hover { color: #3b82f6; }
+.back-link-modern i { width: 14px; height: 14px; }
+
+.monitoring-detail-title h1 {
+    margin: 4px 0 6px;
+    font-size: 26px;
+    font-weight: 800;
+    color: #1e3a8a;
+    line-height: 1.1;
+}
+
+.subtitle-muted {
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 500;
+    margin: 0;
+}
+
+.monitoring-detail-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-outline-monitoring-detail {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: 1.5px solid #e2e8f0;
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    background: white;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.btn-outline-monitoring-detail:hover {
+    border-color: #3b82f6;
+    color: #3b82f6;
+    background: #eff6ff;
+}
+.btn-outline-monitoring-detail i { width: 14px; height: 14px; }
+
+/* Filter group (reuse from sinecp) */
+.filter-group-modern {
+    display: flex;
+    gap: 8px;
+    background: #f8fafc;
+    padding: 4px;
+    border-radius: 14px;
+    border: 1px solid #f1f5f9;
+}
+.pill-select {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    border-right: 1px solid #f1f5f9;
+}
+.pill-select:last-of-type { border-right: none; }
+.pill-select span {
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+.pill-select select {
+    border: none;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+    background: transparent;
+    cursor: pointer;
+    padding: 4px 0;
+}
+.btn-icon-apply {
+    background: white;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-icon-apply:hover { background: #eff6ff; color: #3b82f6; }
+.btn-icon-apply i { width: 14px; height: 14px; }
+
+/* ─── Action Cards (Top 4) ─────────────────────────────── */
+.mon-action-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+}
+.mon-action-card {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    box-shadow: 0 4px 18px rgba(47, 104, 230, 0.05);
+    border: 1px solid #e8edf5;
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+.mon-action-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(47, 104, 230, 0.1);
+    border-color: #3b82f6;
+}
+.mon-action-card span {
+    font-size: 13px;
+    font-weight: 800;
+    color: #1e3a8a;
+    text-align: center;
+}
+.mac-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.mac-icon i { width: 24px; height: 24px; }
+.mac-icon-blue { background: #eff6ff; color: #3b82f6; }
+.mac-icon-orange { background: #fff7ed; color: #f97316; }
+.mac-icon-violet { background: #f5f3ff; color: #8b5cf6; }
+.mac-icon-green { background: #ecfdf5; color: #10b981; }
+
+/* ─── KPI Grid ─────────────────────────────────────────── */
+.monitoring-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.monitoring-kpi-card {
+    background: white;
+    border-radius: 20px;
+    padding: 22px 24px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    box-shadow: 0 4px 18px rgba(47, 104, 230, 0.07);
+    border: 1px solid #e8edf5;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.monitoring-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(47, 104, 230, 0.13);
+}
+
+.kpi-icon-wrap {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.kpi-icon-wrap i { width: 22px; height: 22px; }
+
+.kpi-body p {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
+    margin: 0 0 4px;
+}
+.kpi-body strong {
+    font-size: 32px;
+    font-weight: 900;
+    line-height: 1;
+    display: block;
+}
+
+/* Color variants */
+.kpi-blue .kpi-icon-wrap { background: #eff6ff; color: #3b82f6; }
+.kpi-blue .kpi-body strong { color: #1d4ed8; }
+
+.kpi-indigo .kpi-icon-wrap { background: #eef2ff; color: #6366f1; }
+.kpi-indigo .kpi-body strong { color: #4338ca; }
+
+.kpi-emerald .kpi-icon-wrap { background: #ecfdf5; color: #10b981; }
+.kpi-emerald .kpi-body strong { color: #059669; }
+
+.kpi-violet .kpi-icon-wrap { background: #f5f3ff; color: #8b5cf6; }
+.kpi-violet .kpi-body strong { color: #7c3aed; }
+
+.kpi-amber .kpi-icon-wrap { background: #fffbeb; color: #f59e0b; }
+.kpi-amber .kpi-body strong { color: #d97706; }
+
+.kpi-rose .kpi-icon-wrap { background: #fff1f2; color: #f43f5e; }
+.kpi-rose .kpi-body strong { color: #e11d48; }
+
+/* ─── Progress Panel ───────────────────────────────────── */
+.monitoring-progress-panel {
+    background: white;
+    border-radius: 20px;
+    padding: 28px 32px;
+    box-shadow: 0 4px 18px rgba(47, 104, 230, 0.07);
+    border: 1px solid #e8edf5;
+}
+
+.panel-section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 800;
+    color: #1e3a8a;
+    margin: 0 0 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.panel-section-title i { width: 18px; height: 18px; color: #3b82f6; }
+
+.progress-bars-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.progress-row { display: flex; flex-direction: column; gap: 8px; }
+
+.progress-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.progress-label-row span:first-child {
+    font-size: 13px;
+    font-weight: 700;
+    color: #334155;
+}
+.progress-pct {
+    font-size: 12px;
+    font-weight: 800;
+    color: #64748b;
+}
+
+.progress-track {
+    height: 10px;
+    background: #f1f5f9;
+    border-radius: 999px;
+    overflow: hidden;
+}
+.progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.6s ease;
+}
+.fill-emerald { background: linear-gradient(90deg, #34d399, #10b981); }
+.fill-violet  { background: linear-gradient(90deg, #a78bfa, #7c3aed); }
+.fill-amber   { background: linear-gradient(90deg, #fbbf24, #d97706); }
+.fill-rose    { background: linear-gradient(90deg, #fb7185, #e11d48); }
+
+/* ─── Visits Panel ─────────────────────────────────────── */
+.monitoring-visits-panel {
+    background: white;
+    border-radius: 20px;
+    padding: 28px 32px;
+    box-shadow: 0 4px 18px rgba(47, 104, 230, 0.07);
+    border: 1px solid #e8edf5;
+}
+
+.panel-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.see-all-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #3b82f6;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: gap 0.2s;
+}
+.see-all-link:hover { gap: 10px; }
+.see-all-link i { width: 14px; height: 14px; }
+
+.detail-visits-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.detail-visits-table th {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #94a3b8;
+    padding: 0 12px 12px;
+    border-bottom: 2px solid #f1f5f9;
+    text-align: left;
+}
+.detail-visits-table td {
+    padding: 14px 12px;
+    border-bottom: 1px solid #f8fafc;
+    vertical-align: middle;
+}
+.detail-visits-table tr:last-child td { border-bottom: none; }
+.detail-visits-table tr:hover td { background: #fafbff; }
+
+.osc-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: #eff6ff;
+    color: #3b82f6;
+    font-size: 13px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+.osc-name-cell {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+}
+.date-cell {
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.status-badge i { width: 12px; height: 12px; }
+.badge-finalized { background: #ecfdf5; color: #059669; }
+.badge-draft { background: #fef9c3; color: #92400e; }
+
+.action-link-detail {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #64748b;
+    transition: all 0.2s;
+}
+.action-link-detail:hover { background: #eff6ff; color: #3b82f6; }
+.action-link-detail i { width: 15px; height: 15px; }
+
+/* ─── Empty State ──────────────────────────────────────── */
+.empty-state-compact {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 24px;
+    color: #94a3b8;
+    gap: 8px;
+}
+.empty-state-compact i { width: 40px; height: 40px; opacity: 0.4; }
+.empty-state-compact p { font-size: 14px; font-weight: 600; margin: 0; }
+
+/* ─── Shared btn-primary-premium ───────────────────────── */
+.btn-primary-premium {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.25);
+    transition: all 0.2s;
+}
+.btn-primary-premium:hover {
+    background: #2563eb;
+    box-shadow: 0 12px 28px rgba(59, 130, 246, 0.35);
+    transform: translateY(-1px);
+}
+.btn-primary-premium i { width: 14px; height: 14px; }
+@media (max-width: 1024px) {
+    .monitoring-detail-shell { width: 100%; padding: 0 16px; }
+    
+    .monitoring-detail-header {
+        padding: 20px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 20px;
+    }
+
+    .monitoring-detail-actions {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        width: 100%;
+    }
+
+    .filter-group-modern {
+        grid-column: span 2;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+    .btn-primary-premium, 
+    .btn-outline-monitoring-detail {
+        width: 100%;
+        justify-content: center;
+        padding: 12px 10px;
+        font-size: 11px;
+    }
+
+    .mon-action-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .monitoring-detail-actions {
+        grid-template-columns: 1fr;
+    }
+    .filter-group-modern {
+        grid-column: span 1;
+        flex-direction: column;
+    }
+    .pill-select {
+        border-right: none;
+        border-bottom: 1px solid #f1f5f9;
+        padding: 8px 12px;
+    }
+}
+</style>
+{% endblock %}

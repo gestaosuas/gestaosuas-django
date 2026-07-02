@@ -1,0 +1,342 @@
+<nav class="navbar{% if request.GET.tv %} tv-hidden{% endif %}" id="main-navbar">
+    {% if request.GET.tv %}{% else %}
+    <a href="{% url 'core:map' %}" class="nav-brand">
+        <img src="{{ logo_url }}" alt="Logo" style="height: 48px; width: auto; object-fit: contain;">
+        <span class="nav-emphasis">Vigilância Socioassistencial</span>
+    </a>
+
+    <div class="nav-main">
+        <a href="{% url 'core:tv-dashboard' %}" class="nav-link {% if '/tv' in request.path %}active{% endif %}">
+            <i data-lucide="monitor-play"></i>
+            <span>Dashboard Diretorias</span>
+        </a>
+
+        <div class="nav-group">
+            <button class="nav-btn">
+                <i data-lucide="building-2"></i>
+                <span>Diretorias</span>
+                <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
+            </button>
+            <div class="nav-dropdown">
+                {% for dir in main_directorates %}
+                    <a href="{% url 'directorates:detail' dir.pk %}" class="dropdown-item">
+                        <span>{{ dir.name }}</span>
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="nav-group">
+            <button class="nav-btn">
+                <i data-lucide="bar-chart-3"></i>
+                <span>Monitoramento</span>
+                <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
+            </button>
+            <div class="nav-dropdown">
+                {% for dir in monitoring_directorates %}
+                    <a href="{% url 'directorates:detail' dir.pk %}" class="dropdown-item">
+                        <span>{{ dir.name }}</span>
+                    </a>
+                {% endfor %}
+                {% for dir in outros_directorates %}
+                    <a href="{% url 'directorates:detail' dir.pk %}" class="dropdown-item">
+                        <span>{{ dir.name }}</span>
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <a href="{% url 'accounts:user_list' %}" class="nav-link {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}">
+            <i data-lucide="users"></i>
+            <span>Usuários</span>
+        </a>
+
+        <a href="{% url 'core:settings' %}" class="nav-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}">
+            <i data-lucide="settings"></i>
+            <span>Configurações</span>
+        </a>
+
+        <div class="nav-group">
+            <button class="nav-btn">
+                <i data-lucide="map-pin"></i>
+                <span>Mapas</span>
+                <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
+            </button>
+            <div class="nav-dropdown">
+                <a href="{% url 'core:map' %}" class="dropdown-item">
+                    <span>Unidades SMDS</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="nav-right">
+        <div class="user-profile-mini">
+            <div class="user-info-mini">
+                <span class="user-name-mini">{% if profile and profile.full_name %}{{ profile.full_name }}{% else %}{{ request.user.username }}{% endif %}</span>
+                <span class="user-role-mini">{% if profile %}{{ profile.get_role_display }}{% else %}Agente{% endif %}</span>
+            </div>
+        </div>
+        <form action="{% url 'accounts:logout' %}" method="post" class="no-mobile">
+            {% csrf_token %}
+            <button type="submit" class="logout-icon-btn" title="Sair">
+                <i data-lucide="log-out"></i>
+            </button>
+        </form>
+        <button type="button" class="mobile-toggle" onclick="toggleMobileMenu()">
+            <i data-lucide="menu"></i>
+        </button>
+    </div>
+</nav>
+
+<style>
+    .tv-hidden { display: none !important; }
+    /* Reset Global para evitar rolagem lateral */
+    * { box-sizing: border-box; }
+
+    /* Otimização para Tablets e Mobile */
+    @media (max-width: 1024px) {
+        .navbar {
+            padding: 0 16px;
+            background: white !important;
+            border-bottom: 1px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            height: 70px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 1;
+            text-decoration: none;
+            min-width: 0;
+        }
+
+        .nav-brand img {
+            height: 34px !important;
+            width: auto;
+            flex-shrink: 0;
+        }
+
+        .nav-emphasis {
+            display: block !important;
+            font-size: 14px !important;
+            font-weight: 800;
+            color: #1e3a8a !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border-left: 2px solid #e2e8f0;
+            padding-left: 12px;
+        }
+
+        .nav-main {
+            display: none; 
+            position: absolute;
+            top: 70px;
+            left: 0;
+            width: 100%;
+            max-height: calc(100vh - 70px);
+            overflow-y: auto;
+            background: white;
+            flex-direction: column;
+            padding: 0;
+            border-bottom: 1px solid #e2e8f0;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+
+        .nav-main.show {
+            display: flex;
+        }
+
+        .nav-link, .nav-btn {
+            width: 100%;
+            padding: 18px 24px;
+            color: #334155 !important;
+            border-bottom: 1px solid #f1f5f9;
+            border-radius: 0;
+            justify-content: flex-start;
+            margin: 0;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .nav-link.active {
+            background: #f0f7ff !important;
+            color: #2563eb !important;
+        }
+
+        .nav-dropdown {
+            position: static;
+            background: #f8fafc;
+            width: 100%;
+            display: none;
+            padding: 0;
+        }
+
+        .nav-group.open .nav-dropdown {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 12px 40px;
+            border-bottom: 1px solid #f1f5f9;
+            display: block;
+            text-decoration: none;
+            color: #475569;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .user-profile-mini {
+            display: flex;
+            align-items: center;
+            padding-right: 12px;
+        }
+
+        .user-info-mini {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            line-height: 1.2;
+        }
+
+        .user-name-mini {
+            font-size: 12px;
+            font-weight: 700;
+            color: #1e293b !important;
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .user-role-mini {
+            font-size: 10px;
+            color: #64748b !important;
+            text-transform: uppercase;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+        }
+
+        .no-mobile { display: none; }
+
+        .mobile-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            background: #f1f5f9;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            color: #1e3a8a;
+            transition: all 0.2s;
+        }
+    }
+
+    @media (min-width: 1025px) {
+        .mobile-toggle { display: none; }
+        #main-navbar {
+            background: transparent;
+            border-bottom: none;
+            box-shadow: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 100;
+        }
+        
+        #main-navbar .nav-brand {
+            background: linear-gradient(90deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.7) 60%, rgba(255,255,255,0) 100%);
+            padding: 8px 30px 8px 16px;
+            border-radius: 12px;
+            margin-left: 10px;
+        }
+
+        #main-navbar .nav-link,
+        #main-navbar .nav-btn,
+        #main-navbar .user-info-mini span,
+        #main-navbar .logout-icon-btn {
+            color: rgba(255, 255, 255, 0.9) !important;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
+        #main-navbar .nav-link:hover,
+        #main-navbar .nav-btn:hover,
+        #main-navbar .logout-icon-btn:hover {
+            background: rgba(255, 255, 255, 0.15) !important;
+            color: #fff !important;
+        }
+        
+        #main-navbar .nav-link.active {
+            background: rgba(255, 255, 255, 0.25) !important;
+            color: #fff !important;
+        }
+        
+        .dashboard-main.beneficios-main,
+        .dashboard-main {
+            padding-top: 0 !important;
+        }
+        
+        .monitoring-header-container {
+            padding-top: 80px !important;
+        }
+    }
+</style>
+
+<script>
+    function toggleMobileMenu() {
+        const nav = document.querySelector('.nav-main');
+        const icon = document.querySelector('.mobile-toggle i');
+        nav.classList.toggle('show');
+        
+        if (nav.classList.contains('show')) {
+            icon.setAttribute('data-lucide', 'x');
+        } else {
+            icon.setAttribute('data-lucide', 'menu');
+        }
+        lucide.createIcons();
+    }
+
+    document.addEventListener('click', (e) => {
+        const nav = document.querySelector('.nav-main');
+        const toggle = document.querySelector('.mobile-toggle');
+        if (nav && nav.classList.contains('show') && !nav.contains(e.target) && !toggle.contains(e.target)) {
+            toggleMobileMenu();
+        }
+    });
+
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            if (window.innerWidth <= 1024) {
+                e.preventDefault();
+                const group = btn.closest('.nav-group');
+                group.classList.toggle('open');
+                
+                const chevron = btn.querySelector('[data-lucide="chevron-down"]');
+                if (chevron) {
+                    chevron.style.transform = group.classList.contains('open') ? 'rotate(180deg)' : 'rotate(0)';
+                }
+            }
+        });
+    });
+</script>
+{% endif %}

@@ -1,0 +1,71 @@
+{% extends "base_tv.html" %}
+
+{% block title %}Benefícios{% endblock %}
+{% block header_bg %}linear-gradient(100deg,#1e3a8a,#2563eb){% endblock %}
+{% block module_name %}Benefícios Sociais{% endblock %}
+{% block module_sub %}{{ system_name }} • {{ selected_year }}{% endblock %}
+
+{% block kpis %}
+{% for card in cards %}
+<div class="tv-kpi" style="--accent:{{ card.color|default:'#3b82f6' }}">
+    <div class="tv-kpi-label">{{ card.label }}</div>
+    <div class="tv-kpi-value">{{ card.value }}</div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block charts %}
+<div class="tv-panel">
+    <h2>Famílias CadÚnico</h2>
+    <div class="tv-panel-body"><canvas id="c-familias"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Pessoas no CadÚnico</h2>
+    <div class="tv-panel-body"><canvas id="c-pessoas"></canvas></div>
+</div>
+<div class="tv-panel" style="grid-column: span 2;">
+    <h2>Distribuição de Benefícios</h2>
+    <div class="tv-panel-body"><canvas id="c-donut"></canvas></div>
+</div>
+{% endblock %}
+
+{% block charts_style %}style="grid-template-rows: 1fr 1fr; grid-template-columns: 1fr 1fr;"{% endblock %}
+
+{{ line_chart_familias|json_script:"d-fam" }}
+{{ line_chart_pessoas|json_script:"d-pes" }}
+{{ visits_breakdown|json_script:"d-visits" }}
+
+{% block extra_js %}
+<script>
+(function () {
+    var fam    = JSON.parse(document.getElementById('d-fam').textContent);
+    var pes    = JSON.parse(document.getElementById('d-pes').textContent);
+    var visits = JSON.parse(document.getElementById('d-visits').textContent);
+
+    TV.makeLine('c-familias', fam, '#2563eb', 'Famílias');
+    TV.makeLine('c-pessoas', pes, '#7c3aed', 'Pessoas');
+
+    /* Donut horizontal legend */
+    var elD = document.getElementById('c-donut');
+    if (elD && visits && visits.length) {
+        new Chart(elD, {
+            type: 'doughnut',
+            data: {
+                labels: visits.map(i => i.label),
+                datasets: [{ data: visits.map(i => i.value), backgroundColor: visits.map(i => i.color), borderWidth: 2, borderColor: '#fff' }]
+            },
+            options: {
+                maintainAspectRatio: false, animation: false, cutout: '55%',
+                plugins: {
+                    legend: { position: 'right', labels: { font: { size: 11, weight: '600' }, color: '#334155', padding: 10, boxWidth: 12 } },
+                    datalabels: {
+                        color: '#fff', font: { size: 10, weight: '800' },
+                        formatter: (v, ctx) => { var t = ctx.dataset.data.reduce((a,b)=>a+b,0); return t > 0 ? Math.round(v/t*100)+'%' : ''; }
+                    }
+                }
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

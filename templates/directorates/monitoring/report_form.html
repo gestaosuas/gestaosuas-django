@@ -1,0 +1,1563 @@
+{% extends "base.html" %}
+{% load directorate_extras %}
+
+{% block title %}{{ report_label }} | {{ system_name }}{% endblock %}
+
+{% block content %}
+<div class="monitoring-header-container no-print" style="padding-bottom: 24px; margin-bottom: 30px;">
+    <div class="monitoring-header-content" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; background: linear-gradient(135deg, #1e3a8a, #3b82f6); padding: 24px; border-radius: 20px; color: white; box-shadow: 0 10px 25px rgba(30, 58, 138, 0.15);">
+        <div class="monitoring-title-area">
+            <span style="background: rgba(255, 255, 255, 0.2); padding: 4px 12px; border-radius: 20px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; display: inline-block;">Monitoramento Socioassistencial</span>
+            <h1 style="font-size: 24px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: -0.02em;">{{ report_label }}</h1>
+            <p style="margin: 6px 0 0 0; font-size: 13px; color: rgba(255, 255, 255, 0.85); font-weight: 500;">
+                OSC: <strong style="color: white;">{{ visit.osc.name }}</strong> | Data da Visita: <strong style="color: white;">{{ visit.visit_date|date:"d/m/Y" }}</strong>
+            </p>
+        </div>
+        <div class="monitoring-header-actions" style="display: flex; gap: 10px; align-items: center;">
+            <a href="{{ return_url }}" class="btn-premium-secondary" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: white; border: 1px solid rgba(255, 255, 255, 0.3); background: transparent; text-decoration: none; transition: all 0.2s;">
+                <i data-lucide="arrow-left" style="width: 16px; height: 16px;"></i> Voltar
+            </a>
+            
+            <button type="button" class="btn-premium-secondary" id="previewBtn" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #1e3a8a; border: none; background: white; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+                <i data-lucide="eye" style="width: 16px; height: 16px;"></i> Visualizar
+            </button>
+
+            <button type="button" class="btn-premium-secondary" onclick="window.print()" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: white; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.1); cursor: pointer; transition: all 0.2s;">
+                <i data-lucide="printer" style="width: 16px; height: 16px;"></i> Imprimir
+            </button>
+
+            {% if report_data.status != 'finalized' %}
+                <button type="button" class="btn-premium-primary" id="saveDraftBtn" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: white; border: none; background: #eab308; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(234, 179, 8, 0.2);">
+                    <i data-lucide="save" style="width: 16px; height: 16px;"></i> Salvar Rascunho
+                </button>
+                <button type="button" class="btn-premium-primary" id="finalizeBtn" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 24px; border-radius: 12px; font-size: 12px; font-weight: 800; text-transform: uppercase; color: white; border: none; background: #16a34a; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);">
+                    <i data-lucide="check-circle" style="width: 16px; height: 16px;"></i> Finalizar
+                </button>
+            {% else %}
+                <div style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 11px; font-weight: 800; text-transform: uppercase; color: #15803d; background: #dcfce7; border: 1px solid #bbf7d0; letter-spacing: 0.05em;">
+                    <i data-lucide="lock" style="width: 14px; height: 14px;"></i> Relatório Finalizado & Bloqueado
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="report-wrapper" id="print-root">
+    <div class="report-card" style="max-width: 900px; margin: 0 auto; background: white; border-radius: 32px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.03); border: 1px solid #e2e8f0; overflow: hidden; padding: 50px 60px;">
+        
+        <!-- Official Document Header -->
+        <div style="display: flex; flex-direction: column; align-items: center; text-align: center; border-bottom: 3px double #0f172a; padding-bottom: 24px; margin-bottom: 35px;">
+            <img src="{{ logo_url }}" alt="Logo Prefeitura" style="height: 70px; margin-bottom: 12px; object-fit: contain;">
+            <p style="font-size: 11px; font-weight: 900; color: #64748b; text-transform: uppercase; margin: 0 0 4px 0; letter-spacing: 0.1em;">Secretaria Municipal de Desenvolvimento Social</p>
+            <h2 style="font-size: 22px; font-weight: 950; color: #1e3a8a; text-transform: uppercase; margin: 0 0 2px 0; letter-spacing: -0.01em;">{{ report_label }}</h2>
+            <p style="font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.15em; font-style: italic; margin: 0;">Sistema Vigilância Socioassistencial 2026</p>
+        </div>
+
+        <!-- Meta Information Block -->
+        <div style="background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 35px; display: grid; grid-template-columns: 1fr; gap: 12px;">
+            <div style="display: flex; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">
+                <span style="font-size: 11px; font-weight: 800; color: #475569; text-transform: uppercase; width: 180px; shrink-0;">OSC:</span>
+                <span style="font-size: 13px; font-weight: 700; color: #0f172a;" id="osc-name-label">{{ visit.osc.name }}</span>
+            </div>
+            <div style="display: flex;">
+                <span style="font-size: 11px; font-weight: 800; color: #475569; text-transform: uppercase; width: 180px; shrink-0;">Data de Preenchimento:</span>
+                <span style="font-size: 13px; font-weight: 700; color: #0f172a;">{{ report_data.date|default:'' }}</span>
+            </div>
+        </div>
+
+        <!-- Interactive Form -->
+        <form id="monitoringReportForm">
+            {% csrf_token %}
+            <div style="display: flex; flex-direction: column; gap: 35px;">
+                {% if report_type == 'relatorio_final' %}
+                    <!-- Section 1: DADOS DA PARCERIA -->
+                    <section class="space-y-6">
+                        <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">1. DADOS DA PARCERIA</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                            <div style="grid-column: span 2;">
+                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">OSC parceira</label>
+                                <input type="text" id="osc_name" value="{{ report_data.osc_name }}" readonly style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; background-color: #f8fafc; color: #0f172a;">
+                            </div>
+                            <div>
+                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">CNPJ</label>
+                                <input type="text" id="cnpj" value="{{ report_data.cnpj|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                            </div>
+                            <div>
+                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Recurso</label>
+                                <input type="text" id="emenda" value="{{ report_data.emenda|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                            </div>
+                            <div>
+                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Nº Termo</label>
+                                <input type="text" id="termo_fomento" value="{{ report_data.termo_fomento|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                            </div>
+                            <div>
+                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Vigência</label>
+                                <input type="text" id="vigencia" value="{{ report_data.vigencia|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                            </div>
+                            <div style="grid-column: span 2;">
+                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Valor autorizado por lei e repassado</label>
+                                <input type="text" id="valor_autorizado" value="{{ report_data.valor_autorizado|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Section 2: OBJETO DO RELATÓRIO -->
+                    <section>
+                        <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">2. OBJETO DO RELATÓRIO</h3>
+                        <textarea id="objeto_relatorio" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.objeto_relatorio }}</textarea>
+                    </section>
+
+                    <!-- Section 3: REFERÊNCIAS -->
+                    <section>
+                        <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">3. REFERÊNCIAS</h3>
+                        <textarea id="referencias" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 80px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.referencias }}</textarea>
+                    </section>
+
+                    <!-- Section 4: DESCRIÇÃO DOS OBJETIVOS, METAS PREVISTAS E EXECUÇÃO FINANCEIRA -->
+                    <section style="display: flex; flex-direction: column; gap: 20px;">
+                        <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 0px; letter-spacing: 0.05em;">4. DESCRIÇÃO DOS OBJETIVOS, METAS PREVISTAS E EXECUÇÃO FINANCEIRA</h3>
+                        <div>
+                            <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">a) Dos objetivos:</label>
+                            <textarea id="objetivos" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.objetivos }}</textarea>
+                        </div>
+                        <div>
+                            <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">b) Das metas estabelecidas:</label>
+                            <textarea id="metas" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.metas }}</textarea>
+                        </div>
+                        <div style="margin-left: 20px;">
+                            <label style="font-size: 11px; font-weight: 800; color: #475569; display: block; margin-bottom: 6px;">Quantitativas:</label>
+                            <textarea id="metas_quantitativas" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 80px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.metas_quantitativas }}</textarea>
+                        </div>
+                        <div>
+                            <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">c) Dos resultados:</label>
+                            <textarea id="resultados" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.resultados }}</textarea>
+                        </div>
+                        <div>
+                            <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">e) Da execução financeira e análise dos documentos comprobatórios das despesas:</label>
+                            <textarea id="execucao_financeira" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 120px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.execucao_financeira }}</textarea>
+                        </div>
+                    </section>
+
+                    <!-- Section 5: CUMPRIMENTO DO OBJETO -->
+                    <section>
+                        <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">5. CUMPRIMENTO DO OBJETO</h3>
+                        <textarea id="cumprimento_objeto_final" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.cumprimento_objeto_final }}</textarea>
+                    </section>
+
+                    <!-- Date and Signatures flow -->
+                    <div style="border-top: 1px solid #cbd5e1; padding-top: 24px; margin-top: 20px;">
+                        <div style="text-align: right; margin-bottom: 30px;">
+                            <input type="text" id="local_data" value="{{ report_data.local_data }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="text-align: right; border: none; font-size: 14px; font-weight: 700; color: #0f172a; width: 100%; background: transparent;">
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px;">
+                            <!-- Técnico -->
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                {% if report_data.status != 'finalized' %}
+                                    <span style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Assinatura do Técnico</span>
+                                    <div class="signature-pad-container" id="pad-tecnico">
+                                        <canvas></canvas>
+                                    </div>
+                                    <input type="hidden" id="val-tecnico" value="{{ report_data.signature_tecnico|default:'' }}">
+                                    <div style="display: flex; gap: 10px; justify-content: center; width: 100%;">
+                                        <button type="button" onclick="clearSignature('tecnico')" style="background: transparent; border: none; color: #ef4444; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Limpar</button>
+                                        <button type="button" onclick="saveIndividualSignature('tecnico')" style="background: transparent; border: none; color: #2563eb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="save" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Salvar Assinatura</button>
+                                    </div>
+                                    <input type="text" id="tecnico-nome" value="{{ report_data.tecnico_nome|default:'' }}" placeholder="NOME DO TÉCNICO" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 11.5px; font-weight: 700; text-align: center; text-transform: uppercase;">
+                                {% else %}
+                                    <div style="height: 100px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #0f172a; width: 100%; margin-bottom: 6px;">
+                                        {% if report_data.signature_tecnico %}
+                                            <img src="{{ report_data.signature_tecnico }}" alt="Assinatura Técnico" style="max-height: 90px; max-width: 100%; object-fit: contain;">
+                                        {% else %}
+                                            <span style="font-size: 11px; color: #94a3b8; font-style: italic;">Sem assinatura</span>
+                                        {% endif %}
+                                    </div>
+                                    <p style="font-size: 12.5px; font-weight: 800; color: #0f172a; margin: 0; text-transform: uppercase;">{{ report_data.tecnico_nome|default:"_______________________________________" }}</p>
+                                {% endif %}
+                                <p style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin: 0; letter-spacing: 0.05em;">Assinatura do Técnico</p>
+                            </div>
+
+                            <!-- Técnico Financeiro -->
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                {% if report_data.status != 'finalized' %}
+                                    <span style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Assinatura do Técnico Financeiro</span>
+                                    <div class="signature-pad-container" id="pad-financeiro">
+                                        <canvas></canvas>
+                                    </div>
+                                    <input type="hidden" id="val-financeiro" value="{{ report_data.signature_financeiro|default:'' }}">
+                                    <div style="display: flex; gap: 10px; justify-content: center; width: 100%;">
+                                        <button type="button" onclick="clearSignature('financeiro')" style="background: transparent; border: none; color: #ef4444; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Limpar</button>
+                                        <button type="button" onclick="saveIndividualSignature('financeiro')" style="background: transparent; border: none; color: #2563eb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="save" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Salvar Assinatura</button>
+                                    </div>
+                                    <input type="text" id="financeiro-nome" value="{{ report_data.financeiro_nome|default:'' }}" placeholder="NOME DO TÉCNICO FINANCEIRO" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 11.5px; font-weight: 700; text-align: center; text-transform: uppercase;">
+                                {% else %}
+                                    <div style="height: 100px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #0f172a; width: 100%; margin-bottom: 6px;">
+                                        {% if report_data.signature_financeiro %}
+                                            <img src="{{ report_data.signature_financeiro }}" alt="Assinatura Técnico Financeiro" style="max-height: 90px; max-width: 100%; object-fit: contain;">
+                                        {% else %}
+                                            <span style="font-size: 11px; color: #94a3b8; font-style: italic;">Sem assinatura</span>
+                                        {% endif %}
+                                    </div>
+                                    <p style="font-size: 12.5px; font-weight: 800; color: #0f172a; margin: 0; text-transform: uppercase;">{{ report_data.financeiro_nome|default:"_______________________________________" }}</p>
+                                {% endif %}
+                                <p style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin: 0; letter-spacing: 0.05em;">Assinatura do Técnico Financeiro</p>
+                            </div>
+                        </div>
+
+                        <!-- Homologação da Comissão -->
+                        <div style="border-top: 2px dashed #cbd5e1; padding-top: 30px; margin-top: 40px; display: flex; flex-direction: column; gap: 20px;">
+                            <h3 style="font-size: 14px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; text-align: center; margin-bottom: 15px;">Homologação da Comissão de Monitoramento e Avaliação</h3>
+                            <textarea id="texto_homologacao" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 80px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; text-align: center; font-style: italic;">{{ report_data.texto_homologacao }}</textarea>
+                            
+                            <div style="text-align: right; margin-bottom: 20px;">
+                                <input type="text" id="homologacao_local_data" value="{{ report_data.homologacao_local_data }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="text-align: right; border: none; font-size: 14px; font-weight: 700; color: #0f172a; width: 100%; background: transparent;">
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+                                <!-- Comissão Técnico -->
+                                <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                    {% if report_data.status != 'finalized' %}
+                                        <span style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Comissão de Monitoramento e Avaliação - Técnico</span>
+                                        <div class="signature-pad-container" id="pad-comissao_tecnico">
+                                            <canvas></canvas>
+                                        </div>
+                                        <input type="hidden" id="val-comissao_tecnico" value="{{ report_data.signature_comissao_tecnico|default:'' }}">
+                                        <div style="display: flex; gap: 10px; justify-content: center; width: 100%;">
+                                            <button type="button" onclick="clearSignature('comissao_tecnico')" style="background: transparent; border: none; color: #ef4444; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Limpar</button>
+                                            <button type="button" onclick="saveIndividualSignature('comissao_tecnico')" style="background: transparent; border: none; color: #2563eb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="save" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Salvar Assinatura</button>
+                                        </div>
+                                        <input type="text" id="comissao_tecnico-nome" value="{{ report_data.comissao_tecnico_nome|default:'' }}" placeholder="Nome do Técnico da Comissão" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 11.5px; font-weight: 700; text-align: center; text-transform: uppercase;">
+                                    {% else %}
+                                        <div style="height: 100px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #0f172a; width: 100%; margin-bottom: 6px;">
+                                            {% if report_data.signature_comissao_tecnico %}
+                                                <img src="{{ report_data.signature_comissao_tecnico }}" alt="Assinatura Comissão Técnico" style="max-height: 90px; max-width: 100%; object-fit: contain;">
+                                            {% else %}
+                                                <span style="font-size: 11px; color: #94a3b8; font-style: italic;">Sem assinatura</span>
+                                            {% endif %}
+                                        </div>
+                                        <p style="font-size: 12.5px; font-weight: 800; color: #0f172a; margin: 0; text-transform: uppercase;">{{ report_data.comissao_tecnico_nome|default:"_______________________________________" }}</p>
+                                    {% endif %}
+                                    <div style="text-align: center; font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; line-height: 1.2;">
+                                        Comissão de Monitoramento e Avaliação<br><span style="font-weight: 600; color: #94a3b8; font-style: italic;">Técnico</span>
+                                    </div>
+                                </div>
+
+                                <!-- Comissão Financeiro -->
+                                <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                    {% if report_data.status != 'finalized' %}
+                                        <span style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Comissão de Monitoramento e Avaliação - Financeiro</span>
+                                        <div class="signature-pad-container" id="pad-comissao_financeiro">
+                                            <canvas></canvas>
+                                        </div>
+                                        <input type="hidden" id="val-comissao_financeiro" value="{{ report_data.signature_comissao_financeiro|default:'' }}">
+                                        <div style="display: flex; gap: 10px; justify-content: center; width: 100%;">
+                                            <button type="button" onclick="clearSignature('comissao_financeiro')" style="background: transparent; border: none; color: #ef4444; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Limpar</button>
+                                            <button type="button" onclick="saveIndividualSignature('comissao_financeiro')" style="background: transparent; border: none; color: #2563eb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="save" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Salvar Assinatura</button>
+                                        </div>
+                                        <input type="text" id="comissao_financeiro-nome" value="{{ report_data.comissao_financeiro_nome|default:'' }}" placeholder="Nome do Financeiro da Comissão" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 11.5px; font-weight: 700; text-align: center; text-transform: uppercase;">
+                                    {% else %}
+                                        <div style="height: 100px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #0f172a; width: 100%; margin-bottom: 6px;">
+                                            {% if report_data.signature_comissao_financeiro %}
+                                                <img src="{{ report_data.signature_comissao_financeiro }}" alt="Assinatura Comissão Financeiro" style="max-height: 90px; max-width: 100%; object-fit: contain;">
+                                            {% else %}
+                                                <span style="font-size: 11px; color: #94a3b8; font-style: italic;">Sem assinatura</span>
+                                            {% endif %}
+                                        </div>
+                                        <p style="font-size: 12.5px; font-weight: 800; color: #0f172a; margin: 0; text-transform: uppercase;">{{ report_data.comissao_financeiro_nome|default:"_______________________________________" }}</p>
+                                    {% endif %}
+                                    <div style="text-align: center; font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; line-height: 1.2;">
+                                        Comissão de Monitoramento e Avaliação<br><span style="font-weight: 600; color: #94a3b8; font-style: italic;">Financeiro</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% elif report_type == 'parecer_conclusivo' %}
+                    <!-- Section 1: DADOS DA PARCERIA -->
+                    <section class="space-y-6">
+                        <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">1. DADOS DA PARCERIA</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                            <div style="grid-column: span 2;">
+                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">OSC parceira</label>
+                                <input type="text" id="osc_name" value="{{ report_data.osc_name }}" readonly style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; background-color: #f8fafc; color: #0f172a;">
+                            </div>
+                            <div>
+                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">CNPJ</label>
+                                <input type="text" id="cnpj" value="{{ report_data.cnpj|default:'00.000.000/0000-00' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                            </div>
+                            <div>
+                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Recurso</label>
+                                <input type="text" id="emenda" value="{{ report_data.emenda|default:'Ex: 1430/2023' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                            </div>
+                            <div>
+                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Nº Termo</label>
+                                <input type="text" id="termo_fomento" value="{{ report_data.termo_fomento|default:'Ex: 629/2024' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                            </div>
+                            <div>
+                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Vigência</label>
+                                <input type="text" id="vigencia" value="{{ report_data.vigencia|default:'Ex: 04/12/2024 a 30/06/2025' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                            </div>
+                            <div style="grid-column: span 2;">
+                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Valor autorizado por lei e repassado</label>
+                                <input type="text" id="valor_autorizado" value="{{ report_data.valor_autorizado|default:'R$ 0,00' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Section 2: FUNDAMENTAÇÃO -->
+                    <section style="display: flex; flex-direction: column; gap: 20px;">
+                        <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 0px; letter-spacing: 0.05em;">2. FUNDAMENTAÇÃO</h3>
+                        <div>
+                            <textarea id="fundamentacao" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 120px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;" placeholder="Digite a fundamentação técnica...">{{ report_data.fundamentacao }}</textarea>
+                        </div>
+                        <div>
+                            <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">a) Quanto ao cumprimento do objeto:</label>
+                            <textarea id="cumprimento_objeto" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;" placeholder="Descreva o cumprimento do objeto...">{{ report_data.cumprimento_objeto }}</textarea>
+                        </div>
+                        <div>
+                            <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">b) Quanto aos benefícios e impactos da parceria:</label>
+                            <textarea id="beneficios_impactos" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;" placeholder="Descreva os benefícios e impactos...">{{ report_data.beneficios_impactos }}</textarea>
+                        </div>
+                    </section>
+
+                    <!-- Section 3: CONCLUSÃO -->
+                    <section>
+                        <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">3. CONCLUSÃO</h3>
+                        <textarea id="conclusao" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 120px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;" placeholder="Digite a conclusão final...">{{ report_data.conclusao }}</textarea>
+                    </section>
+
+                    <!-- Date and Signatures flow -->
+                    <div style="border-top: 1px solid #cbd5e1; padding-top: 24px; margin-top: 20px;">
+                        <div style="text-align: right; margin-bottom: 30px;">
+                            <input type="text" id="local_data" value="{{ report_data.local_data }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="text-align: right; border: none; font-size: 14px; font-weight: 700; color: #0f172a; width: 100%; background: transparent;">
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px;">
+                            <!-- Técnico -->
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                {% if report_data.status != 'finalized' %}
+                                    <span style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Assinatura Técnico</span>
+                                    <div class="signature-pad-container" id="pad-tecnico">
+                                        <canvas></canvas>
+                                    </div>
+                                    <input type="hidden" id="val-tecnico" value="{{ report_data.signature_tecnico|default:'' }}">
+                                    <div style="display: flex; gap: 10px; justify-content: center; width: 100%;">
+                                        <button type="button" onclick="clearSignature('tecnico')" style="background: transparent; border: none; color: #ef4444; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Limpar</button>
+                                        <button type="button" onclick="saveIndividualSignature('tecnico')" style="background: transparent; border: none; color: #2563eb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="save" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Salvar Assinatura Técnico</button>
+                                    </div>
+                                    <input type="text" id="tecnico-nome" value="{{ report_data.tecnico_nome|default:'' }}" placeholder="NOME DO TÉCNICO" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 11.5px; font-weight: 700; text-align: center; text-transform: uppercase;">
+                                {% else %}
+                                    <div style="height: 100px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #0f172a; width: 100%; margin-bottom: 6px;">
+                                        {% if report_data.signature_tecnico %}
+                                            <img src="{{ report_data.signature_tecnico }}" alt="Assinatura Técnico" style="max-height: 90px; max-width: 100%; object-fit: contain;">
+                                        {% else %}
+                                            <span style="font-size: 11px; color: #94a3b8; font-style: italic;">Sem assinatura</span>
+                                        {% endif %}
+                                    </div>
+                                    <p style="font-size: 12.5px; font-weight: 800; color: #0f172a; margin: 0; text-transform: uppercase;">{{ report_data.tecnico_nome|default:"_______________________________________" }}</p>
+                                {% endif %}
+                                <p style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin: 0; letter-spacing: 0.05em;">Gestor da Parceria Técnico</p>
+                            </div>
+
+                            <!-- Financeiro -->
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                {% if report_data.status != 'finalized' %}
+                                    <span style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Assinatura Financeiro</span>
+                                    <div class="signature-pad-container" id="pad-financeiro">
+                                        <canvas></canvas>
+                                    </div>
+                                    <input type="hidden" id="val-financeiro" value="{{ report_data.signature_financeiro|default:'' }}">
+                                    <div style="display: flex; gap: 10px; justify-content: center; width: 100%;">
+                                        <button type="button" onclick="clearSignature('financeiro')" style="background: transparent; border: none; color: #ef4444; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Limpar</button>
+                                        <button type="button" onclick="saveIndividualSignature('financeiro')" style="background: transparent; border: none; color: #2563eb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="save" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Salvar Assinatura Financeiro</button>
+                                    </div>
+                                    <input type="text" id="financeiro-nome" value="{{ report_data.financeiro_nome|default:'' }}" placeholder="NOME DO FINANCEIRO" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 11.5px; font-weight: 700; text-align: center; text-transform: uppercase;">
+                                {% else %}
+                                    <div style="height: 100px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #0f172a; width: 100%; margin-bottom: 6px;">
+                                        {% if report_data.signature_financeiro %}
+                                            <img src="{{ report_data.signature_financeiro }}" alt="Assinatura Financeiro" style="max-height: 90px; max-width: 100%; object-fit: contain;">
+                                        {% else %}
+                                            <span style="font-size: 11px; color: #94a3b8; font-style: italic;">Sem assinatura</span>
+                                        {% endif %}
+                                    </div>
+                                    <p style="font-size: 12.5px; font-weight: 800; color: #0f172a; margin: 0; text-transform: uppercase;">{{ report_data.financeiro_nome|default:"_______________________________________" }}</p>
+                                {% endif %}
+                                <p style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin: 0; letter-spacing: 0.05em;">Gestor da Parceria Financeiro</p>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <!-- Section 1: Objeto do Relatório -->
+                    <section>
+                        <h3 class="section-title" style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">1. Objeto do Relatório</h3>
+                        <p style="font-size: 10px; color: #64748b; font-style: italic; margin-top: -6px; margin-bottom: 10px;">Colocar o mesmo objeto do Plano de Trabalho (Objetivo e especificação do nome do projeto)</p>
+                        {% if report_data.status != 'finalized' %}
+                            <textarea id="pt-objeto-relatorio" style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.objeto_relatorio }}</textarea>
+                        {% else %}
+                            <div style="min-height: 60px; border-bottom: 1px dashed #94a3b8; font-size: 13px; line-height: 1.6; white-space: pre-wrap; font-weight: 600; color: #334155; text-align: justify; padding-bottom: 12px;">{{ report_data.objeto_relatorio }}</div>
+                        {% endif %}
+                    </section>
+
+                    <!-- Section 2: Descrição dos objetivos, metas, atividades previstas -->
+                    <section>
+                        <h3 class="section-title" style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 16px; letter-spacing: 0.05em;">2. Descrição dos objetivos, metas, atividades previstas</h3>
+
+                        <div style="display: flex; flex-direction: column; gap: 16px;">
+                            <div style="border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; background: #ffffff;">
+                                <h4 style="font-size: 11px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; margin: 0 0 8px 0; border-left: 3px solid #1e3a8a; padding-left: 8px;">A) - Dos Objetivos</h4>
+                                {% if report_data.status != 'finalized' %}
+                                    <textarea id="pt-item2-objetivos" style="width: 100%; min-height: 100px; border-radius: 10px; border: 1.5px solid #cbd5e1; padding: 12px; font-size: 12.5px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.item2_a_objetivos }}</textarea>
+                                {% else %}
+                                    <div style="font-size: 12.5px; color: #334155; line-height: 1.6; font-weight: 600; text-align: justify; white-space: pre-wrap;">{{ report_data.item2_a_objetivos }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div style="border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; background: #ffffff;">
+                                <h4 style="font-size: 11px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; margin: 0 0 8px 0; border-left: 3px solid #1e3a8a; padding-left: 8px;">B) - Das Metas Estabelecidas</h4>
+                                <p style="font-size: 10.5px; font-weight: 800; color: #475569; text-transform: uppercase; margin: 0 0 6px 0;">Qualitativas</p>
+                                {% if report_data.status != 'finalized' %}
+                                    <textarea id="pt-item2-metas-qual" style="width: 100%; min-height: 80px; border-radius: 10px; border: 1.5px solid #cbd5e1; padding: 12px; font-size: 12.5px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical; margin-bottom: 12px;">{{ report_data.item2_b_metas }}</textarea>
+                                {% else %}
+                                    <div style="font-size: 12.5px; color: #334155; line-height: 1.6; font-weight: 600; text-align: justify; white-space: pre-wrap; margin-bottom: 12px;">{{ report_data.item2_b_metas }}</div>
+                                {% endif %}
+                                <p style="font-size: 10.5px; font-weight: 800; color: #475569; text-transform: uppercase; margin: 0 0 6px 0; border-top: 1px dashed #cbd5e1; padding-top: 12px;">Quantitativas</p>
+                                {% if report_data.status != 'finalized' %}
+                                    <textarea id="pt-item2-metas-quant" style="width: 100%; min-height: 60px; border-radius: 10px; border: 1.5px solid #cbd5e1; padding: 12px; font-size: 12.5px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.item2_b_metas_quant }}</textarea>
+                                {% else %}
+                                    <div style="font-size: 12.5px; color: #334155; line-height: 1.6; font-weight: 600; text-align: justify; white-space: pre-wrap;">{{ report_data.item2_b_metas_quant }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div style="border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; background: #ffffff;">
+                                <h4 style="font-size: 11px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; margin: 0 0 8px 0; border-left: 3px solid #1e3a8a; padding-left: 8px;">C) - Das Atividades</h4>
+                                {% if report_data.status != 'finalized' %}
+                                    <textarea id="pt-item2-atividades" style="width: 100%; min-height: 120px; border-radius: 10px; border: 1.5px solid #cbd5e1; padding: 12px; font-size: 12.5px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.item2_c_atividades }}</textarea>
+                                {% else %}
+                                    <div style="font-size: 12.5px; color: #334155; line-height: 1.6; font-weight: 600; text-align: justify; white-space: pre-wrap;">{{ report_data.item2_c_atividades }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Section 3: Resultados -->
+                    <section>
+                        <h3 class="section-title" style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 8px; letter-spacing: 0.05em;">3. Resultados</h3>
+                        <p style="font-size: 10px; color: #64748b; font-style: italic; margin-top: -4px; margin-bottom: 10px;">Explicitar os resultados detectados na visita em relação os objetivos, metas e atividades.</p>
+                        
+                        {% if report_data.status != 'finalized' %}
+                            <textarea id="item3-resultados" style="width: 100%; min-height: 150px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); transition: border-color 0.2s;" placeholder="Descreva os resultados constatados na visita técnica...">{{ report_data.item3_resultados }}</textarea>
+                        {% else %}
+                            <div style="min-height: 100px; border-bottom: 1px dashed #94a3b8; font-size: 13px; line-height: 1.6; white-space: pre-wrap; font-weight: 700; color: #0f172a; text-align: justify; padding-bottom: 15px;">
+                                {{ report_data.item3_resultados }}
+                            </div>
+                        {% endif %}
+                    </section>
+
+                    <!-- Toggle Button for PSE Section -->
+                    {% if report_data.status != 'finalized' %}
+                        <div class="no-print" style="margin: 15px 0;">
+                            <button type="button" id="togglePseBtn" class="btn-premium-toggle" style="width: 100%; border: 2px dashed #cbd5e1; background: #f8fafc; border-radius: 12px; padding: 12px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #475569; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
+                                <i data-lucide="sliders" style="width: 16px; height: 16px;"></i>
+                                <span id="togglePseText">Habilitar PSE</span>
+                            </button>
+                        </div>
+                    {% endif %}
+
+                    <!-- Section 4: DADOS (Conditionally Rendered/Toggled Section) -->
+                    <section id="pse-data-section" style="display: {% if report_data.item5_enabled %}flex{% else %}none{% endif %}; flex-direction: column; gap: 30px;">
+                        <h3 class="section-title" style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 0px; letter-spacing: 0.05em;">4. Dados</h3>
+                        
+                        <!-- a) Qualitativos -->
+                        <div>
+                            <h4 style="font-size: 12px; font-weight: 800; color: #334155; margin: 0 0 10px 0;">a) Qualitativos (preencher referente ao trimestre)</h4>
+                            
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                                <span style="font-size: 12px; font-weight: 800; color: #475569; text-transform: uppercase;">Período:</span>
+                                {% if report_data.status != 'finalized' %}
+                                    <input type="text" id="item5-periodo" value="{{ report_data.item5_periodo }}" style="padding: 6px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 12.5px; font-weight: 700; color: #0f172a; width: 300px;">
+                                {% else %}
+                                    <span style="font-size: 12.5px; font-weight: 700; color: #0f172a; border-bottom: 1.5px solid #0f172a;">{{ report_data.item5_periodo }}</span>
+                                {% endif %}
+                            </div>
+
+                            <!-- Qualitative Table -->
+                            <div style="overflow-x: auto; border: 1.5px solid #0f172a; border-radius: 4px;">
+                                <table style="width: 100%; border-collapse: collapse; font-size: 11.5px; text-align: left;">
+                                    <thead>
+                                        <tr style="background: #1e3a8a; color: white; border-bottom: 1.5px solid #0f172a;">
+                                            <th style="padding: 10px; font-weight: 900; text-transform: uppercase; border-right: 1.5px solid #0f172a; width: 120px; text-align: center;">Data</th>
+                                            <th style="padding: 10px; font-weight: 900; text-transform: uppercase; border-right: 1.5px solid #0f172a;">Situação Encontrada</th>
+                                            <th style="padding: 10px; font-weight: 900; text-transform: uppercase; border-right: 1.5px solid #0f172a;">Recomendações</th>
+                                            <th style="padding: 10px; font-weight: 900; text-transform: uppercase;">Observação</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in report_data.item5_qualitativos %}
+                                            <tr style="border-bottom: 1.5px solid #0f172a;">
+                                                <td style="padding: 0; border-right: 1.5px solid #0f172a; background: #f8fafc;">
+                                                    {% if report_data.status != 'finalized' %}
+                                                        <input type="text" id="qual-data-{{ forloop.index0 }}" value="{{ row.data }}" style="width: 100%; border: none; background: transparent; padding: 12px 8px; font-size: 11.5px; font-weight: 700; text-align: center; font-family: inherit;">
+                                                    {% else %}
+                                                        <div style="padding: 12px 8px; font-weight: 700; text-align: center; color: #0f172a;">{{ row.data }}</div>
+                                                    {% endif %}
+                                                </td>
+                                                <td style="padding: 0; border-right: 1.5px solid #0f172a;">
+                                                    {% if report_data.status != 'finalized' %}
+                                                        <textarea id="qual-situacao-{{ forloop.index0 }}" style="width: 100%; border: none; background: transparent; padding: 10px 8px; font-size: 11.5px; font-weight: 600; font-family: inherit; resize: none; min-height: 50px; line-height: 1.4;">{{ row.situacao }}</textarea>
+                                                    {% else %}
+                                                        <div style="padding: 10px 8px; font-weight: 700; color: #0f172a; white-space: pre-wrap; text-align: justify;">{{ row.situacao }}</div>
+                                                    {% endif %}
+                                                </td>
+                                                <td style="padding: 0; border-right: 1.5px solid #0f172a;">
+                                                    {% if report_data.status != 'finalized' %}
+                                                        <textarea id="qual-recomendacoes-{{ forloop.index0 }}" style="width: 100%; border: none; background: transparent; padding: 10px 8px; font-size: 11.5px; font-weight: 600; font-family: inherit; resize: none; min-height: 50px; line-height: 1.4;">{{ row.recomendacoes }}</textarea>
+                                                    {% else %}
+                                                        <div style="padding: 10px 8px; font-weight: 700; color: #0f172a; white-space: pre-wrap; text-align: justify;">{{ row.recomendacoes }}</div>
+                                                    {% endif %}
+                                                </td>
+                                                <td style="padding: 0;">
+                                                    {% if report_data.status != 'finalized' %}
+                                                        <textarea id="qual-observacao-{{ forloop.index0 }}" style="width: 100%; border: none; background: transparent; padding: 10px 8px; font-size: 11.5px; font-weight: 600; font-family: inherit; resize: none; min-height: 50px; line-height: 1.4;">{{ row.observacao }}</textarea>
+                                                    {% else %}
+                                                        <div style="padding: 10px 8px; font-weight: 700; color: #0f172a; white-space: pre-wrap; text-align: justify;">{{ row.observacao }}</div>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- b) Quantitativos -->
+                        <div>
+                            <h4 style="font-size: 12px; font-weight: 800; color: #334155; margin: 0 0 10px 0;">b) Quantitativos:</h4>
+                            
+                            <div style="overflow-x: auto; border: 1.5px solid #0f172a; border-radius: 4px; margin-bottom: 8px;">
+                                <table style="width: 100%; border-collapse: collapse; font-size: 9px; text-align: center;">
+                                    <thead>
+                                        <tr style="background: #1e3a8a; color: white; border-bottom: 1.5px solid #0f172a;">
+                                            <th colspan="13" style="padding: 8px; font-size: 10.5px; font-weight: 900; text-transform: uppercase;">Acompanhamento do número de (crianças/adolescentes, idosos ou mulheres acolhidas)</th>
+                                        </tr>
+                                        <tr style="background: #f8fafc; border-bottom: 1.5px solid #0f172a; font-weight: 900; color: #0f172a;">
+                                            <th style="padding: 6px; text-align: left; border-right: 1.5px solid #0f172a; width: 170px; font-size: 9.5px; text-transform: uppercase;">Indicador</th>
+                                            <th style="padding: 6px; border-right: 1.5px solid #0f172a; width: 45px;">JAN</th>
+                                            <th style="padding: 6px; border-right: 1.5px solid #0f172a; width: 45px;">FEV</th>
+                                            <th style="padding: 6px; border-right: 1.5px solid #0f172a; width: 45px;">MAR</th>
+                                            <th style="padding: 6px; border-right: 1.5px solid #0f172a; width: 45px;">ABR</th>
+                                            <th style="padding: 6px; border-right: 1.5px solid #0f172a; width: 45px;">MAI</th>
+                                            <th style="padding: 6px; border-right: 1.5px solid #0f172a; width: 45px;">JUN</th>
+                                            <th style="padding: 6px; border-right: 1.5px solid #0f172a; width: 45px;">JUL</th>
+                                            <th style="padding: 6px; border-right: 1.5px solid #0f172a; width: 45px;">AGO</th>
+                                            <th style="padding: 6px; border-right: 1.5px solid #0f172a; width: 45px;">SET</th>
+                                            <th style="padding: 6px; border-right: 1.5px solid #0f172a; width: 45px;">OUT</th>
+                                            <th style="padding: 6px; border-right: 1.5px solid #0f172a; width: 45px;">NOV</th>
+                                            <th style="padding: 6px;">DEZ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Row 1: Total no 1º dia -->
+                                        <tr style="border-bottom: 1.5px solid #0f172a;">
+                                            <td style="padding: 6px; text-align: left; border-right: 1.5px solid #0f172a; font-weight: 800; background: #f8fafc; font-size: 9.5px;">Total no 1º dia do mês</td>
+                                            {% for m in "jan,fev,mar,abr,mai,jun,jul,ago,set,out,nov,dez"|split:"," %}
+                                                <td style="padding: 0; border-right: {% if not forloop.last %}1.5px solid #0f172a{% else %}none{% endif %};">
+                                                    {% if report_data.status != 'finalized' %}
+                                                        <input type="text" id="quant-total_1dia-{{ m }}" value="{{ report_data.item5_quantitativos.total_1dia|get_item:m }}" style="width: 100%; border: none; text-align: center; font-size: 11px; font-weight: 700; padding: 6px 2px; font-family: inherit;">
+                                                    {% else %}
+                                                        <div style="font-size: 11px; font-weight: 700; color: #0f172a;">{{ report_data.item5_quantitativos.total_1dia|get_item:m }}</div>
+                                                    {% endif %}
+                                                </td>
+                                            {% endfor %}
+                                        </tr>
+                                        <!-- Row 2: Usuários inseridos -->
+                                        <tr style="border-bottom: 1.5px solid #0f172a;">
+                                            <td style="padding: 6px; text-align: left; border-right: 1.5px solid #0f172a; font-weight: 800; background: #f8fafc; font-size: 9.5px;">Usuários inseridos</td>
+                                            {% for m in "jan,fev,mar,abr,mai,jun,jul,ago,set,out,nov,dez"|split:"," %}
+                                                <td style="padding: 0; border-right: {% if not forloop.last %}1.5px solid #0f172a{% else %}none{% endif %};">
+                                                    {% if report_data.status != 'finalized' %}
+                                                        <input type="text" id="quant-inseridos-{{ m }}" value="{{ report_data.item5_quantitativos.inseridos|get_item:m }}" style="width: 100%; border: none; text-align: center; font-size: 11px; font-weight: 700; padding: 6px 2px; font-family: inherit;">
+                                                    {% else %}
+                                                        <div style="font-size: 11px; font-weight: 700; color: #0f172a;">{{ report_data.item5_quantitativos.inseridos|get_item:m }}</div>
+                                                    {% endif %}
+                                                </td>
+                                            {% endfor %}
+                                        </tr>
+                                        <!-- Row 3: Usuários desligados -->
+                                        <tr style="border-bottom: 1.5px solid #0f172a;">
+                                            <td style="padding: 6px; text-align: left; border-right: 1.5px solid #0f172a; font-weight: 800; background: #f8fafc; font-size: 9.5px;">Usuários desligados</td>
+                                            {% for m in "jan,fev,mar,abr,mai,jun,jul,ago,set,out,nov,dez"|split:"," %}
+                                                <td style="padding: 0; border-right: {% if not forloop.last %}1.5px solid #0f172a{% else %}none{% endif %};">
+                                                    {% if report_data.status != 'finalized' %}
+                                                        <input type="text" id="quant-desligados-{{ m }}" value="{{ report_data.item5_quantitativos.desligados|get_item:m }}" style="width: 100%; border: none; text-align: center; font-size: 11px; font-weight: 700; padding: 6px 2px; font-family: inherit;">
+                                                    {% else %}
+                                                        <div style="font-size: 11px; font-weight: 700; color: #0f172a;">{{ report_data.item5_quantitativos.desligados|get_item:m }}</div>
+                                                    {% endif %}
+                                                </td>
+                                            {% endfor %}
+                                        </tr>
+                                        <!-- Row 4: Total no último dia -->
+                                        <tr style="border-bottom: none;">
+                                            <td style="padding: 6px; text-align: left; border-right: 1.5px solid #0f172a; font-weight: 800; background: #f8fafc; font-size: 9.5px;">Total no último dia do mês</td>
+                                            {% for m in "jan,fev,mar,abr,mai,jun,jul,ago,set,out,nov,dez"|split:"," %}
+                                                <td style="padding: 0; border-right: {% if not forloop.last %}1.5px solid #0f172a{% else %}none{% endif %};">
+                                                    {% if report_data.status != 'finalized' %}
+                                                        <input type="text" id="quant-total_ultimo-{{ m }}" value="{{ report_data.item5_quantitativos.total_ultimo|get_item:m }}" style="width: 100%; border: none; text-align: center; font-size: 11px; font-weight: 700; padding: 6px 2px; font-family: inherit;">
+                                                    {% else %}
+                                                        <div style="font-size: 11px; font-weight: 700; color: #0f172a;">{{ report_data.item5_quantitativos.total_ultimo|get_item:m }}</div>
+                                                    {% endif %}
+                                                </td>
+                                            {% endfor %}
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p style="font-size: 9px; text-align: justify; line-height: 1.4; color: #475569; margin: 4px 0 0 0;">
+                                <strong>Obs.:</strong> Para <span style="text-decoration: underline dotted; font-weight: 700;">Instituições</span> de acolhimento para população em situação de rua o quadro acima não deve ser preenchido. Continuar com a planilha que é enviada mensalmente à Vigilância Socioassistencial.
+                            </p>
+                        </div>
+                    </section>
+
+                    <!-- Section 5: Cumprimento do Objeto -->
+                    <section>
+                        <h3 class="section-title" style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 16px; letter-spacing: 0.05em;">5. CUMPRIMENTO DO OBJETO{% if not is_emendas %} ATÉ A PRESENTE DATA{% endif %}</h3>
+                        
+                        {% if report_data.status != 'finalized' %}
+                            {% if is_emendas %}
+                                <!-- Term Type Switcher (only for emendas / funds) -->
+                                <div style="display: flex; gap: 15px; padding: 12px; background: #f8fafc; border-radius: 12px; border: 1.5px solid #e2e8f0; margin-bottom: 16px; align-items: center; justify-content: center;">
+                                    <span style="font-size: 10.5px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Tipo de Termo:</span>
+                                    <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #334155; cursor: pointer;">
+                                        <input type="radio" name="term_type_radio" value="colaboracao" {% if report_data.term_type == 'colaboracao' %}checked{% endif %} style="accent-color: #1e3a8a;"> Termo de Colaboração
+                                    </label>
+                                    <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #334155; cursor: pointer;">
+                                        <input type="radio" name="term_type_radio" value="fomento" {% if report_data.term_type == 'fomento' %}checked{% endif %} style="accent-color: #1e3a8a;"> Termo de Fomento
+                                    </label>
+                                </div>
+                            {% endif %}
+
+                            <!-- Radio Options Grid -->
+                            <div style="display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 20px;">
+                                <div style="border: 1.5px solid #cbd5e1; border-radius: 14px; padding: 14px; background: #ffffff; cursor: pointer; transition: all 0.2s; display: flex; gap: 14px; align-items: flex-start;" onclick="selectRadioOption('fully')">
+                                    <input type="radio" name="cumprimento_tipo" value="fully" id="opt-fully" {% if report_data.item4_type == 'fully' %}checked{% endif %} style="margin-top: 4px; accent-color: #1e3a8a;">
+                                    <div style="display: flex; flex-direction: column;">
+                                        <label for="opt-fully" style="font-size: 12px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; cursor: pointer; margin-bottom: 2px;">Cumprimento Integral</label>
+                                        <span style="font-size: 11px; color: #64748b;">Conforme Plano de Trabalho, atividades coerentes e metas atingidas.</span>
+                                    </div>
+                                </div>
+                                
+                                {% if is_subvencao or is_emendas %}
+                                    <div style="border: 1.5px solid #cbd5e1; border-radius: 14px; padding: 14px; background: #ffffff; cursor: pointer; transition: all 0.2s; display: flex; gap: 14px; align-items: flex-start;" onclick="selectRadioOption('partially_quant')">
+                                        <input type="radio" name="cumprimento_tipo" value="partially_quant" id="opt-partially-quant" {% if report_data.item4_type == 'partially_quant' or report_data.item4_type == 'partially' %}checked{% endif %} style="margin-top: 4px; accent-color: #d97706;">
+                                        <div style="display: flex; flex-direction: column;">
+                                            <label for="opt-partially-quant" style="font-size: 12px; font-weight: 800; color: #d97706; text-transform: uppercase; cursor: pointer; margin-bottom: 2px;">Cumprimento Parcial – Meta Quantitativa</label>
+                                            <span style="font-size: 11px; color: #64748b;">Coerente nas atividades, mas meta quantitativa não alcançada.</span>
+                                        </div>
+                                    </div>
+
+                                    <div style="border: 1.5px solid #cbd5e1; border-radius: 14px; padding: 14px; background: #ffffff; cursor: pointer; transition: all 0.2s; display: flex; gap: 14px; align-items: flex-start;" onclick="selectRadioOption('partially_qual')">
+                                        <input type="radio" name="cumprimento_tipo" value="partially_qual" id="opt-partially-qual" {% if report_data.item4_type == 'partially_qual' %}checked{% endif %} style="margin-top: 4px; accent-color: #d97706;">
+                                        <div style="display: flex; flex-direction: column;">
+                                            <label for="opt-partially-qual" style="font-size: 12px; font-weight: 800; color: #d97706; text-transform: uppercase; cursor: pointer; margin-bottom: 2px;">Cumprimento Parcial – Meta Qualitativa</label>
+                                            <span style="font-size: 11px; color: #64748b;">Coerente nas atividades, mas meta qualitativa não alcançada.</span>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <div style="border: 1.5px solid #cbd5e1; border-radius: 14px; padding: 14px; background: #ffffff; cursor: pointer; transition: all 0.2s; display: flex; gap: 14px; align-items: flex-start;" onclick="selectRadioOption('partially')">
+                                        <input type="radio" name="cumprimento_tipo" value="partially" id="opt-partially" {% if report_data.item4_type == 'partially' or report_data.item4_type == 'partially_quant' %}checked{% endif %} style="margin-top: 4px; accent-color: #d97706;">
+                                        <div style="display: flex; flex-direction: column;">
+                                            <label for="opt-partially" style="font-size: 12px; font-weight: 800; color: #d97706; text-transform: uppercase; cursor: pointer; margin-bottom: 2px;">Cumprimento Parcial</label>
+                                            <span style="font-size: 11px; color: #64748b;">Coerente nas atividades, mas meta quantitativa não alcançada.</span>
+                                        </div>
+                                    </div>
+                                {% endif %}
+
+                                <div style="border: 1.5px solid #cbd5e1; border-radius: 14px; padding: 14px; background: #ffffff; cursor: pointer; transition: all 0.2s; display: flex; gap: 14px; align-items: flex-start;" onclick="selectRadioOption('custom')">
+                                    <input type="radio" name="cumprimento_tipo" value="custom" id="opt-custom" {% if report_data.item4_type == 'custom' %}checked{% endif %} style="margin-top: 4px; accent-color: #334155;">
+                                    <div style="display: flex; flex-direction: column; width: 100%;">
+                                        <label for="opt-custom" style="font-size: 12px; font-weight: 800; color: #334155; text-transform: uppercase; cursor: pointer; margin-bottom: 2px;">Outro / Ressalvas</label>
+                                        <span style="font-size: 11px; color: #64748b; margin-bottom: 10px;">Houve problemas ou desvios em relação ao objeto pactuado.</span>
+                                        
+                                        <div id="customWordingBox" style="{% if report_data.item4_type != 'custom' %}display: none;{% endif %} margin-top: 5px;">
+                                            <span style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #475569; margin-bottom: 4px; display: block;">Descreva a situação (complemento do texto):</span>
+                                            <textarea id="item4-custom" style="width: 100%; min-height: 80px; border-radius: 8px; border: 1.5px solid #cbd5e1; padding: 10px; font-size: 12px; font-weight: 600; font-family: inherit; line-height: 1.4; resize: vertical;" placeholder="ex: apresentou desvio no cumprimento do cronograma de visitas...">{{ report_data.item4_custom }}</textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        <!-- Wording Narrative Paragraph (Real-time Updated) -->
+                        <div style="background: #eff6ff; border-radius: 16px; border: 1.5px solid #bfdbfe; padding: 22px; text-align: justify; font-size: 13.5px; line-height: 1.7; font-weight: 500; color: #1e3a8a;">
+                            <span style="font-size: 10px; font-weight: 900; text-transform: uppercase; color: #2563eb; display: block; margin-bottom: 6px; letter-spacing: 0.05em;"><i data-lucide="info" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px; margin-top: -2px;"></i> Texto parecer técnico conclusivo</span>
+                            <p id="parecerNarrativeText" style="margin: 0; font-style: italic; font-weight: 600; color: #1e293b;">
+                                Com base nas descrições relatadas e análises realizadas do monitoramento e avaliação desenvolvido por meio de Visita Técnica in loco, constatou-se que a parceria com a entidade {{ visit.osc.name }} ...
+                            </p>
+                        </div>
+                    </section>
+
+                    <!-- Section 6: Assinaturas -->
+                    <section style="margin-top: 20px; break-inside: avoid; page-break-inside: avoid;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; text-align: center;">
+                            
+                            <!-- Técnico 1 Signature Pad -->
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                {% if report_data.status != 'finalized' %}
+                                    <span style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Assinatura do Técnico 1</span>
+                                    <div class="signature-pad-container" id="pad-tecnico1">
+                                        <canvas></canvas>
+                                    </div>
+                                    <input type="hidden" id="val-tecnico1" value="{{ report_data.assinaturas.tecnico1 }}">
+                                    <div style="display: flex; gap: 10px; justify-content: center; width: 100%;">
+                                        <button type="button" onclick="clearSignature('tecnico1')" style="background: transparent; border: none; color: #ef4444; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer; transition: color 0.15s;"><i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px; margin-top: -2px;"></i> Limpar</button>
+                                        <button type="button" onclick="saveIndividualSignature('tecnico1')" style="background: transparent; border: none; color: #2563eb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer; transition: color 0.15s;"><i data-lucide="save" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px; margin-top: -2px;"></i> Salvar Assinatura</button>
+                                    </div>
+                                    <input type="text" id="tecnico1-nome" value="{{ report_data.assinaturas.tecnico1_nome }}" placeholder="Nome do Técnico 1" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 11.5px; font-weight: 700; text-align: center; text-transform: uppercase;">
+                                {% else %}
+                                    <div style="height: 100px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #0f172a; width: 100%; margin-bottom: 6px;">
+                                        {% if report_data.assinaturas.tecnico1 %}
+                                            <img src="{{ report_data.assinaturas.tecnico1 }}" alt="Assinatura Técnico 1" style="max-height: 90px; max-width: 100%; object-fit: contain;">
+                                        {% else %}
+                                            <span style="font-size: 11px; color: #94a3b8; font-style: italic;">Sem assinatura</span>
+                                        {% endif %}
+                                    </div>
+                                    <p style="font-size: 12.5px; font-weight: 800; color: #0f172a; margin: 0; text-transform: uppercase;">{{ report_data.assinaturas.tecnico1_nome|default:"_______________________________________" }}</p>
+                                {% endif %}
+                                <p style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin: 0; letter-spacing: 0.05em;">Técnico Responsável</p>
+                            </div>
+
+                            <!-- Técnico 2 Signature Pad -->
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                {% if report_data.status != 'finalized' %}
+                                    <span style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Assinatura do Técnico 2</span>
+                                    <div class="signature-pad-container" id="pad-tecnico2">
+                                        <canvas></canvas>
+                                    </div>
+                                    <input type="hidden" id="val-tecnico2" value="{{ report_data.assinaturas.tecnico2 }}">
+                                    <div style="display: flex; gap: 10px; justify-content: center; width: 100%;">
+                                        <button type="button" onclick="clearSignature('tecnico2')" style="background: transparent; border: none; color: #ef4444; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer; transition: color 0.15s;"><i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px; margin-top: -2px;"></i> Limpar</button>
+                                        <button type="button" onclick="saveIndividualSignature('tecnico2')" style="background: transparent; border: none; color: #2563eb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer; transition: color 0.15s;"><i data-lucide="save" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px; margin-top: -2px;"></i> Salvar Assinatura</button>
+                                    </div>
+                                    <input type="text" id="tecnico2-nome" value="{{ report_data.assinaturas.tecnico2_nome }}" placeholder="Nome do Técnico 2" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 11.5px; font-weight: 700; text-align: center; text-transform: uppercase;">
+                                {% else %}
+                                    <div style="height: 100px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #0f172a; width: 100%; margin-bottom: 6px;">
+                                        {% if report_data.assinaturas.tecnico2 %}
+                                            <img src="{{ report_data.assinaturas.tecnico2 }}" alt="Assinatura Técnico 2" style="max-height: 90px; max-width: 100%; object-fit: contain;">
+                                        {% else %}
+                                            <span style="font-size: 11px; color: #94a3b8; font-style: italic;">Sem assinatura</span>
+                                        {% endif %}
+                                    </div>
+                                    <p style="font-size: 12.5px; font-weight: 800; color: #0f172a; margin: 0; text-transform: uppercase;">{{ report_data.assinaturas.tecnico2_nome|default:"_______________________________________" }}</p>
+                                {% endif %}
+                                <p style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin: 0; letter-spacing: 0.05em;">Técnico Responsável</p>
+                            </div>
+
+                        </div>
+                    </section>
+                {% endif %}
+            </div>
+        </form>
+
+        <!-- Official Print Footer Block -->
+        <div class="hidden print-footer-block" style="display: none; border-top: 1px solid #cbd5e1; margin-top: 40px; padding-top: 8px; text-align: center; font-size: 8.5px; color: #64748b; font-style: italic;">
+            Documento gerado eletronicamente em {% now "d/m/Y H:i:s" %} • Sistema de Vigilância Socioassistencial Uberlândia
+        </div>
+    </div>
+</div>
+
+<!-- Modal Confirmation -->
+<div id="saveConfirmModal" class="no-print" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: white; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); width: 100%; max-width: 480px; overflow: hidden; border: 1px solid #e2e8f0; animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);">
+        <div style="background: linear-gradient(135deg, #1e3a8a, #1e40af); padding: 20px; color: white; display: flex; align-items: center; gap: 12px;">
+            <i data-lucide="alert-circle" style="width: 28px; height: 28px;"></i>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em;">Finalizar Relatório?</h3>
+        </div>
+        <div style="padding: 24px; font-size: 13.5px; color: #475569; line-height: 1.6; display: flex; flex-direction: column; gap: 14px;">
+            <p style="margin: 0; font-weight: 700; color: #0f172a;">Você está finalizando e bloqueando o parecer técnico definitivo.</p>
+            <p style="margin: 0;">Após a finalização, este relatório ficará **totalmente bloqueado** e não admitirá novas edições ou alterações.</p>
+            <div style="background: #fef3c7; border-left: 4px solid #d97706; padding: 12px; border-radius: 8px; font-size: 12px; font-weight: 600; color: #92400e;">
+                Por favor, verifique se preencheu todos os dados e obteve as assinaturas e nomes dos técnicos necessários.
+            </div>
+        </div>
+        <div style="display: flex; gap: 12px; padding: 20px; border-top: 1px solid #f1f5f9; background: #f8fafc;">
+            <button type="button" class="btn-modal-cancel" onclick="closeConfirmModal()" style="flex: 1; padding: 12px; border-radius: 10px; border: 1.5px solid #cbd5e1; background: white; font-size: 11.5px; font-weight: 700; text-transform: uppercase; color: #475569; cursor: pointer;">Cancelar</button>
+            <button type="button" class="btn-modal-confirm" onclick="executeFinalize()" style="flex: 1; padding: 12px; border-radius: 10px; border: none; background: #16a34a; font-size: 11.5px; font-weight: 800; text-transform: uppercase; color: white; cursor: pointer; box-shadow: 0 4px 12px rgba(22,163,74,0.2);">Confirmar Finalização</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    
+    body {
+        font-family: 'Inter', sans-serif !important;
+        background-color: #f1f5f9 !important;
+    }
+
+    /* Signature Pad Styling */
+    .signature-pad-container {
+        width: 100%;
+        height: 130px;
+        border: 2px dashed #cbd5e1;
+        border-radius: 16px;
+        background: #f8fafc;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .signature-pad-container canvas {
+        display: block !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        touch-action: none !important;
+        user-select: none !important;
+        object-fit: fill !important;
+        z-index: 5;
+    }
+
+    /* Interactive CSS Buttons */
+    .btn-premium-toggle:hover {
+        background: #f1f5f9 !important;
+        border-color: #94a3b8 !important;
+        color: #1e293b !important;
+    }
+    
+    /* Responsive custom tables styling */
+    table input:focus, table textarea:focus {
+        outline: none;
+        background: #eff6ff !important;
+    }
+
+    @keyframes modalPop {
+        from { transform: scale(0.95); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+
+    /* Rich Print CSS System */
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+        body, html {
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            height: auto !important;
+            overflow: visible !important;
+        }
+        .report-wrapper {
+            padding: 0 !important;
+            margin: 0 !important;
+            background: white !important;
+            box-shadow: none !important;
+            border: none !important;
+            display: block !important;
+        }
+        .report-card {
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        .print-footer-block {
+            display: block !important;
+        }
+        #pse-data-section {
+            page-break-before: always;
+        }
+        input, textarea, select {
+            border: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+            font-weight: 700 !important;
+            color: black !important;
+            resize: none !important;
+        }
+    }
+</style>
+
+<!-- JSON Data Store from Python -->
+{{ report_data|json_script:"report-data-json" }}
+
+<script>
+    var report = JSON.parse(document.getElementById('report-data-json').textContent);
+    var oscName = "{{ visit.osc.name }}";
+    var isSubvencao = {% if is_subvencao %}true{% else %}false{% endif %};
+    var isEmendas = {% if is_emendas %}true{% else %}false{% endif %};
+    var reportType = "{{ report_type }}";
+    
+    var pads = {};
+    var signatureSnapshots = {};
+    var signatureResizeTimer = null;
+    
+    // Set initial values from report model depending on reportType
+    var initialSignatures = {};
+    if (reportType === 'relatorio_final') {
+        initialSignatures = {
+            tecnico: report.signature_tecnico || "",
+            financeiro: report.signature_financeiro || "",
+            comissao_tecnico: report.signature_comissao_tecnico || "",
+            comissao_financeiro: report.signature_comissao_financeiro || ""
+        };
+    } else if (reportType === 'parecer_conclusivo') {
+        initialSignatures = {
+            tecnico: report.signature_tecnico || "",
+            financeiro: report.signature_financeiro || ""
+        };
+    } else {
+        initialSignatures = {
+            tecnico1: report.assinaturas ? report.assinaturas.tecnico1 : "",
+            tecnico2: report.assinaturas ? report.assinaturas.tecnico2 : ""
+        };
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        // Initial setup of narrative text (only for legacy parecer_tecnico)
+        if (reportType === 'parecer_tecnico') {
+            updateNarrativeText();
+            
+            // Add listeners to radio button changes and text changes to keep dynamic narration accurate in real-time
+            var termRadios = document.querySelectorAll('input[name="term_type_radio"]');
+            termRadios.forEach(function(radio) {
+                radio.addEventListener('change', function() {
+                    report.term_type = this.value;
+                    updateNarrativeText();
+                });
+            });
+
+            var customTxt = document.getElementById('item4-custom');
+            if (customTxt) {
+                customTxt.addEventListener('input', function() {
+                    report.item4_custom = this.value;
+                    updateNarrativeText();
+                });
+            }
+
+            // Toggle PSE Button handler
+            var togglePseBtn = document.getElementById('togglePseBtn');
+            if (togglePseBtn) {
+                togglePseBtn.addEventListener('click', function() {
+                    report.item5_enabled = !report.item5_enabled;
+                    var dataSec = document.getElementById('pse-data-section');
+                    var textEl = document.getElementById('togglePseText');
+                    var quantContainer = document.getElementById('quantitativas-meta-container');
+                    
+                    if (report.item5_enabled) {
+                        dataSec.style.display = 'flex';
+                        if (quantContainer) {
+                            quantContainer.style.display = 'block';
+                        }
+                        textEl.textContent = "Remover PSE";
+                        this.style.color = '#ef4444';
+                        this.style.borderColor = '#fca5a5';
+                        this.style.background = '#fef2f2';
+                        // Reinitialize signature canvases since elements are shown
+                        resizeSignaturePads();
+                    } else {
+                        dataSec.style.display = 'none';
+                        if (quantContainer) {
+                            quantContainer.style.display = 'none';
+                        }
+                        textEl.textContent = "Habilitar PSE";
+                        this.style.color = '#475569';
+                        this.style.borderColor = '#cbd5e1';
+                        this.style.background = '#f8fafc';
+                    }
+                });
+                
+                // Set initial state styling
+                if (report.item5_enabled) {
+                    togglePseBtn.style.color = '#ef4444';
+                    togglePseBtn.style.borderColor = '#fca5a5';
+                    togglePseBtn.style.background = '#fef2f2';
+                    document.getElementById('togglePseText').textContent = "Remover PSE";
+                    var quantContainer = document.getElementById('quantitativas-meta-container');
+                    if (quantContainer) {
+                        quantContainer.style.display = 'block';
+                    }
+                }
+            }
+        }
+
+        // Setup signature pads dynamically
+        if (report.status !== 'finalized') {
+            Object.keys(initialSignatures).forEach(function(id) {
+                setupSignaturePad(id);
+            });
+            window.addEventListener("resize", queueSignaturePadResize);
+        }
+
+        // Add save listeners
+        var saveDraftBtn = document.getElementById('saveDraftBtn');
+        if (saveDraftBtn) {
+            saveDraftBtn.addEventListener('click', function() {
+                saveReport('draft');
+            });
+        }
+
+        var finalizeBtn = document.getElementById('finalizeBtn');
+        if (finalizeBtn) {
+            finalizeBtn.addEventListener('click', function() {
+                openConfirmModal();
+            });
+        }
+
+        // Add print preview button toggle
+        var previewBtn = document.getElementById('previewBtn');
+        if (previewBtn) {
+            previewBtn.addEventListener('click', function() {
+                window.print();
+            });
+        }
+    });
+
+    // Dynamic narration constructor (only used for legacy parecer_tecnico)
+    function updateNarrativeText() {
+        var termText = report.term_type === 'fomento' ? "Termo de Fomento" : "Termo de Colaboração";
+        var executionVerb = isEmendas ? "foi executada" : "está sendo executada";
+        var dateSuffix = (isSubvencao || isEmendas) ? "" : " até a presente data";
+        
+        var narrative = "";
+        var type = report.item4_type;
+        
+        if (type === 'fully') {
+            narrative = "constatou-se que a parceria com a entidade " + oscName + " " + executionVerb + " de maneira coerente com o Plano de Trabalho – Anexo I parte integrante do " + termText + ", desenvolvendo as atividades e atingindo tanto os objetivos quanto as metas qualitativas e quantitativas estabelecidas, logo, cumprindo o objeto pactuado.";
+        } else if (type === 'partially' || type === 'partially_quant') {
+            narrative = "constatou-se que a parceria com a entidade " + oscName + " " + executionVerb + " de maneira coerente com o Plano de Trabalho – Anexo I parte integrante do " + termText + " no que se refere ao desenvolvimento das atividades, alcance dos objetivos e metas qualitativas. Entretanto, a meta quantitativa não foi alcançada plenamente, logo, cumprindo parcialmente o objeto pactuado" + dateSuffix + ".";
+        } else if (type === 'partially_qual') {
+            narrative = "constatou-se que a parceria com a entidade " + oscName + " " + executionVerb + " de maneira coerente com o Plano de Trabalho – Anexo I parte integrante do " + termText + " no que se refere ao desenvolvimento das atividades, alcance dos objetivos e metas quantitativas. Entretanto, a meta qualitativa não foi alcançada plenamente, logo, cumprindo parcialmente o objeto pactuado" + dateSuffix + ".";
+        } else if (type === 'custom') {
+            narrative = "constatou-se que a parceria com a entidade " + oscName + " " + (report.item4_custom || "________________________________________________________________________________");
+        }
+        
+        document.getElementById('parecerNarrativeText').textContent = "Com base nas descrições relatadas e análises realizadas do monitoramento e avaliação desenvolvido por meio de Visita Técnica in loco, " + narrative;
+    }
+
+    function selectRadioOption(type) {
+        var radio = document.getElementById('opt-' + type.replace(/_/g, '-'));
+        if (radio) {
+            radio.checked = true;
+            report.item4_type = type;
+            
+            var customBox = document.getElementById('customWordingBox');
+            if (customBox) {
+                customBox.style.display = (type === 'custom') ? 'block' : 'none';
+            }
+            updateNarrativeText();
+        }
+    }
+
+    // Modal Confirmation controls
+    function openConfirmModal() {
+        document.getElementById('saveConfirmModal').style.display = 'flex';
+    }
+
+    // Modal close
+    function closeConfirmModal() {
+        document.getElementById('saveConfirmModal').style.display = 'none';
+    }
+
+    function executeFinalize() {
+        closeConfirmModal();
+        saveReport('finalized');
+    }
+
+    // Signature Canvas operations
+    function drawExistingSignature(pad, dataUrl) {
+        if (!dataUrl) return;
+        var image = new Image();
+        image.onload = function() {
+            pad.context.clearRect(0, 0, pad.width, pad.height);
+            pad.context.drawImage(image, 0, 0, pad.width, pad.height);
+            pad.hasDrawing = true;
+        };
+        image.src = dataUrl;
+    }
+
+    function getCanvasPoint(canvas, event) {
+        var rect = canvas.getBoundingClientRect();
+        var clientX = event.clientX || (event.touches && event.touches[0] ? event.touches[0].clientX : 0);
+        var clientY = event.clientY || (event.touches && event.touches[0] ? event.touches[0].clientY : 0);
+        var scaleX = canvas.width / rect.width;
+        var scaleY = canvas.height / rect.height;
+        return {
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY
+        };
+    }
+
+    function createSignaturePad(canvas, width, height, ratio) {
+        var context = canvas.getContext("2d");
+        var pad = {
+            canvas: canvas,
+            context: context,
+            width: width,
+            height: height,
+            drawing: false,
+            hasDrawing: false,
+            clear: function() {
+                this.context.clearRect(0, 0, this.width, this.height);
+                this.hasDrawing = false;
+            },
+            isEmpty: function() {
+                return !this.hasDrawing;
+            },
+            toDataURL: function() {
+                return this.canvas.toDataURL("image/png");
+            },
+            persist: function(id) {
+                if (this.hasDrawing || canvasHasInk(this.canvas)) {
+                    var dataUrl = this.toDataURL();
+                    document.getElementById("val-" + id).value = dataUrl;
+                    signatureSnapshots[id] = dataUrl;
+                }
+            }
+        };
+
+        context.lineWidth = 2.5 * (ratio || 1);
+        context.lineCap = "round";
+        context.lineJoin = "round";
+        context.strokeStyle = "#0f172a";
+
+        canvas.onpointerdown = function(event) {
+            event.preventDefault();
+            canvas.setPointerCapture(event.pointerId);
+            var point = getCanvasPoint(canvas, event);
+            pad.drawing = true;
+            pad.hasDrawing = true;
+            context.beginPath();
+            context.moveTo(point.x, point.y);
+        };
+
+        canvas.onpointermove = function(event) {
+            if (!pad.drawing) return;
+            event.preventDefault();
+            var point = getCanvasPoint(canvas, event);
+            context.lineTo(point.x, point.y);
+            context.stroke();
+        };
+
+        canvas.onpointerup = canvas.onpointercancel = canvas.onpointerleave = function(event) {
+            if (!pad.drawing) return;
+            pad.drawing = false;
+            pad.persist(canvas.dataset.signatureId);
+            try {
+                canvas.releasePointerCapture(event.pointerId);
+            } catch (error) {
+                // Pointer may already be released by the browser.
+            }
+        };
+
+        return pad;
+    }
+
+    function setupSignaturePad(id) {
+        var canvas = document.querySelector("#pad-" + id + " canvas");
+        if (!canvas) return;
+
+        var container = canvas.parentElement;
+        var existingPad = pads[id];
+        
+        if (existingPad && !existingPad.isEmpty()) {
+            signatureSnapshots[id] = existingPad.toDataURL();
+        } else if (document.getElementById("val-" + id).value) {
+            signatureSnapshots[id] = document.getElementById("val-" + id).value;
+        } else if (initialSignatures[id]) {
+            signatureSnapshots[id] = initialSignatures[id];
+        }
+
+        var rect = container.getBoundingClientRect();
+        var cssWidth = Math.max(Math.floor(rect.width), 1);
+        var cssHeight = Math.max(Math.floor(rect.height), 1);
+
+        if (cssWidth <= 1 || cssHeight <= 1) {
+            window.requestAnimationFrame(function() {
+                setupSignaturePad(id);
+            });
+            return;
+        }
+
+        if (canvas.dataset.lastCssWidth === String(cssWidth) && canvas.dataset.lastCssHeight === String(cssHeight)) {
+            return;
+        }
+        canvas.dataset.lastCssWidth = cssWidth;
+        canvas.dataset.lastCssHeight = cssHeight;
+
+        var ratio = Math.max(window.devicePixelRatio || 1, 1);
+        var physicalWidth = Math.round(cssWidth * ratio);
+        var physicalHeight = Math.round(cssHeight * ratio);
+
+        canvas.width = physicalWidth;
+        canvas.height = physicalHeight;
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+        canvas.style.touchAction = "none";
+        canvas.dataset.signatureId = id;
+        
+        var context = canvas.getContext("2d");
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, physicalWidth, physicalHeight);
+
+        pads[id] = createSignaturePad(canvas, physicalWidth, physicalHeight, ratio);
+        drawExistingSignature(pads[id], signatureSnapshots[id]);
+    }
+
+    function resizeSignaturePads() {
+        Object.keys(initialSignatures).forEach(function(id) {
+            setupSignaturePad(id);
+        });
+    }
+
+    function queueSignaturePadResize() {
+        window.clearTimeout(signatureResizeTimer);
+        signatureResizeTimer = window.setTimeout(resizeSignaturePads, 120);
+    }
+
+    function clearSignature(id) {
+        if (pads[id]) {
+            pads[id].clear();
+            document.getElementById("val-" + id).value = "";
+            signatureSnapshots[id] = "";
+        }
+    }
+
+    function canvasHasInk(canvas) {
+        var context = canvas.getContext("2d");
+        var pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        for (var index = 3; index < pixels.length; index += 4) {
+            if (pixels[index] > 0) return true;
+        }
+        return false;
+    }
+
+    function saveIndividualSignature(type) {
+        var roleLabel = type;
+        if (reportType === 'relatorio_final') {
+            var roleMap = {
+                tecnico: "Técnico",
+                financeiro: "Técnico Financeiro",
+                comissao_tecnico: "Comissão Técnico",
+                comissao_financeiro: "Comissão Financeiro"
+            };
+            roleLabel = roleMap[type] || type;
+        } else if (reportType === 'parecer_conclusivo') {
+            var roleMap = {
+                tecnico: "Gestor Técnico",
+                financeiro: "Gestor Financeiro"
+            };
+            roleLabel = roleMap[type] || type;
+        } else {
+            var roleMap = {
+                tecnico1: "Técnico 1",
+                tecnico2: "Técnico 2"
+            };
+            roleLabel = roleMap[type] || type;
+        }
+
+        var nameInput = document.getElementById(type + '-nome');
+        if (!nameInput || !nameInput.value.trim()) {
+            alert("Preencha o nome do " + roleLabel + " antes de salvar a assinatura!");
+            return;
+        }
+        
+        // Sync values
+        if (pads[type]) {
+            pads[type].persist(type);
+        }
+        
+        var sigVal = document.getElementById("val-" + type).value;
+        if (!sigVal) {
+            alert("Por favor, faça a assinatura antes de salvar!");
+            return;
+        }
+        
+        if (reportType === 'relatorio_final' || reportType === 'parecer_conclusivo') {
+            report[type + '_nome'] = nameInput.value.toUpperCase();
+            report['signature_' + type] = sigVal;
+        } else {
+            if (!report.assinaturas) report.assinaturas = {};
+            report.assinaturas[type + '_nome'] = nameInput.value.toUpperCase();
+            report.assinaturas[type] = sigVal;
+        }
+        
+        // Save dynamically as draft and keep on page
+        saveReport('draft', true);
+    }
+
+    // Save report to Backend Database JSONField
+    function saveReport(status, keepOnPage) {
+        if (reportType === 'relatorio_final') {
+            // Collect fields
+            report.cnpj = document.getElementById('cnpj') ? document.getElementById('cnpj').value : "";
+            report.emenda = document.getElementById('emenda') ? document.getElementById('emenda').value : "";
+            report.termo_fomento = document.getElementById('termo_fomento') ? document.getElementById('termo_fomento').value : "";
+            report.vigencia = document.getElementById('vigencia') ? document.getElementById('vigencia').value : "";
+            report.valor_autorizado = document.getElementById('valor_autorizado') ? document.getElementById('valor_autorizado').value : "";
+            
+            report.objeto_relatorio = document.getElementById('objeto_relatorio') ? document.getElementById('objeto_relatorio').value : "";
+            report.referencias = document.getElementById('referencias') ? document.getElementById('referencias').value : "";
+            
+            report.objetivos = document.getElementById('objetivos') ? document.getElementById('objetivos').value : "";
+            report.metas = document.getElementById('metas') ? document.getElementById('metas').value : "";
+            report.metas_quantitativas = document.getElementById('metas_quantitativas') ? document.getElementById('metas_quantitativas').value : "";
+            report.resultados = document.getElementById('resultados') ? document.getElementById('resultados').value : "";
+            report.execucao_financeira = document.getElementById('execucao_financeira') ? document.getElementById('execucao_financeira').value : "";
+            
+            report.cumprimento_objeto_final = document.getElementById('cumprimento_objeto_final') ? document.getElementById('cumprimento_objeto_final').value : "";
+            report.local_data = document.getElementById('local_data') ? document.getElementById('local_data').value : "";
+            
+            report.texto_homologacao = document.getElementById('texto_homologacao') ? document.getElementById('texto_homologacao').value : "";
+            report.homologacao_local_data = document.getElementById('homologacao_local_data') ? document.getElementById('homologacao_local_data').value : "";
+
+            // Collect names and signatures
+            ["tecnico", "financeiro", "comissao_tecnico", "comissao_financeiro"].forEach(function(type) {
+                var nameInput = document.getElementById(type + '-nome');
+                if (nameInput) report[type + '_nome'] = nameInput.value.toUpperCase();
+                if (pads[type]) pads[type].persist(type);
+                var hiddenInput = document.getElementById("val-" + type);
+                if (hiddenInput) report['signature_' + type] = hiddenInput.value;
+            });
+
+            // Finalized check requirements
+            if (status === 'finalized') {
+                if (!report.resultados.trim()) {
+                    alert("Por favor, preencha o campo de Resultados antes de finalizar!");
+                    return;
+                }
+                
+                var roles = {
+                    tecnico: "Técnico",
+                    financeiro: "Técnico Financeiro",
+                    comissao_tecnico: "Comissão Técnico",
+                    comissao_financeiro: "Comissão Financeiro"
+                };
+                var missing = [];
+                Object.keys(roles).forEach(function(r) {
+                    var nameVal = report[r + '_nome'] || "";
+                    var sigVal = report['signature_' + r] || "";
+                    if (!nameVal.trim()) {
+                        missing.push("Nome do " + roles[r]);
+                    }
+                    if (!sigVal) {
+                        missing.push("Assinatura do " + roles[r]);
+                    }
+                });
+                if (missing.length > 0) {
+                    alert("Por favor, preencha todas as assinaturas e nomes obrigatórios antes de finalizar:\n- " + missing.join("\n- "));
+                    return;
+                }
+                report.status = 'finalized';
+            } else {
+                report.status = 'draft';
+            }
+
+        } else if (reportType === 'parecer_conclusivo') {
+            // Collect fields
+            report.cnpj = document.getElementById('cnpj') ? document.getElementById('cnpj').value : "";
+            report.emenda = document.getElementById('emenda') ? document.getElementById('emenda').value : "";
+            report.termo_fomento = document.getElementById('termo_fomento') ? document.getElementById('termo_fomento').value : "";
+            report.vigencia = document.getElementById('vigencia') ? document.getElementById('vigencia').value : "";
+            report.valor_autorizado = document.getElementById('valor_autorizado') ? document.getElementById('valor_autorizado').value : "";
+            
+            report.fundamentacao = document.getElementById('fundamentacao') ? document.getElementById('fundamentacao').value : "";
+            report.cumprimento_objeto = document.getElementById('cumprimento_objeto') ? document.getElementById('cumprimento_objeto').value : "";
+            report.beneficios_impactos = document.getElementById('beneficios_impactos') ? document.getElementById('beneficios_impactos').value : "";
+            report.conclusao = document.getElementById('conclusao') ? document.getElementById('conclusao').value : "";
+            report.local_data = document.getElementById('local_data') ? document.getElementById('local_data').value : "";
+
+            // Collect names and signatures
+            ["tecnico", "financeiro"].forEach(function(type) {
+                var nameInput = document.getElementById(type + '-nome');
+                if (nameInput) report[type + '_nome'] = nameInput.value.toUpperCase();
+                if (pads[type]) pads[type].persist(type);
+                var hiddenInput = document.getElementById("val-" + type);
+                if (hiddenInput) report['signature_' + type] = hiddenInput.value;
+            });
+
+            // Finalized check requirements
+            if (status === 'finalized') {
+                if (!report.conclusao.trim()) {
+                    alert("Por favor, preencha o campo de Conclusão antes de finalizar!");
+                    return;
+                }
+                
+                var roles = {
+                    tecnico: "Gestor Técnico",
+                    financeiro: "Gestor Financeiro"
+                };
+                var missing = [];
+                Object.keys(roles).forEach(function(r) {
+                    var nameVal = report[r + '_nome'] || "";
+                    var sigVal = report['signature_' + r] || "";
+                    if (!nameVal.trim()) {
+                        missing.push("Nome do " + roles[r]);
+                    }
+                    if (!sigVal) {
+                        missing.push("Assinatura do " + roles[r]);
+                    }
+                });
+                if (missing.length > 0) {
+                    alert("Por favor, preencha todas as assinaturas e nomes obrigatórios antes de finalizar:\n- " + missing.join("\n- "));
+                    return;
+                }
+                report.status = 'finalized';
+            } else {
+                report.status = 'draft';
+            }
+
+        } else {
+            // parecer_tecnico (Relatório do Monitoramento)
+            var ptObjeto = document.getElementById('pt-objeto-relatorio');
+            if (ptObjeto) report.objeto_relatorio = ptObjeto.value;
+            var ptObjetivos = document.getElementById('pt-item2-objetivos');
+            if (ptObjetivos) report.item2_a_objetivos = ptObjetivos.value;
+            var ptMetasQual = document.getElementById('pt-item2-metas-qual');
+            if (ptMetasQual) report.item2_b_metas = ptMetasQual.value;
+            var ptMetasQuant = document.getElementById('pt-item2-metas-quant');
+            if (ptMetasQuant) report.item2_b_metas_quant = ptMetasQuant.value;
+            var ptAtividades = document.getElementById('pt-item2-atividades');
+            if (ptAtividades) report.item2_c_atividades = ptAtividades.value;
+            report.date = "{{ report_data.date|default:'' }}";
+            
+            var resTxt = document.getElementById('item3-resultados');
+            if (resTxt) {
+                report.item3_resultados = resTxt.value;
+            }
+
+            // Collect PSE data if enabled
+            if (report.item5_enabled) {
+                var periodEl = document.getElementById('item5-periodo');
+                if (periodEl) {
+                    report.item5_periodo = periodEl.value;
+                }
+
+                if (!report.item5_qualitativos || !Array.isArray(report.item5_qualitativos)) {
+                    report.item5_qualitativos = [];
+                }
+
+                for (var i = 0; i < 4; i++) {
+                    if (!report.item5_qualitativos[i] || typeof report.item5_qualitativos[i] !== 'object') {
+                        report.item5_qualitativos[i] = { data: "", situacao: "", recomendacoes: "", observacao: "" };
+                    }
+                    var elData = document.getElementById('qual-data-' + i);
+                    var elSit = document.getElementById('qual-situacao-' + i);
+                    var elRec = document.getElementById('qual-recomendacoes-' + i);
+                    var elObs = document.getElementById('qual-observacao-' + i);
+                    
+                    if (elData) report.item5_qualitativos[i].data = elData.value;
+                    if (elSit) report.item5_qualitativos[i].situacao = elSit.value;
+                    if (elRec) report.item5_qualitativos[i].recomendacoes = elRec.value;
+                    if (elObs) report.item5_qualitativos[i].observacao = elObs.value;
+                }
+
+                if (!report.item5_quantitativos || typeof report.item5_quantitativos !== 'object') {
+                    report.item5_quantitativos = {};
+                }
+
+                var rows = ['total_1dia', 'inseridos', 'desligados', 'total_ultimo'];
+                var months = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+                rows.forEach(function(rowKey) {
+                    if (!report.item5_quantitativos[rowKey] || typeof report.item5_quantitativos[rowKey] !== 'object') {
+                        report.item5_quantitativos[rowKey] = {};
+                    }
+                    months.forEach(function(monthKey) {
+                        var inputEl = document.getElementById('quant-' + rowKey + '-' + monthKey);
+                        if (inputEl) {
+                            report.item5_quantitativos[rowKey][monthKey] = inputEl.value;
+                        }
+                    });
+                });
+            }
+
+            // Collect radio option
+            var typeRadio = document.querySelector('input[name="cumprimento_tipo"]:checked');
+            if (typeRadio) {
+                report.item4_type = typeRadio.value;
+            }
+            
+            var customWording = document.getElementById('item4-custom');
+            if (customWording) {
+                report.item4_custom = customWording.value;
+            }
+
+            // Collect signatures names and base64 URLs
+            var t1Name = document.getElementById('tecnico1-nome');
+            if (t1Name) report.assinaturas.tecnico1_nome = t1Name.value.toUpperCase();
+            
+            var t2Name = document.getElementById('tecnico2-nome');
+            if (t2Name) report.assinaturas.tecnico2_nome = t2Name.value.toUpperCase();
+
+            if (pads.tecnico1) pads.tecnico1.persist('tecnico1');
+            if (pads.tecnico2) pads.tecnico2.persist('tecnico2');
+
+            report.assinaturas.tecnico1 = document.getElementById("val-tecnico1") ? document.getElementById("val-tecnico1").value : "";
+            report.assinaturas.tecnico2 = document.getElementById("val-tecnico2") ? document.getElementById("val-tecnico2").value : "";
+
+            // Finalized check requirements
+            if (status === 'finalized') {
+                if (!report.item3_resultados.trim()) {
+                    alert("Por favor, preencha o campo de Resultados antes de finalizar!");
+                    return;
+                }
+                if (!report.assinaturas.tecnico1_nome.trim()) {
+                    alert("Por favor, preencha o nome do Técnico 1 antes de finalizar!");
+                    return;
+                }
+                if (!report.assinaturas.tecnico1) {
+                    alert("Por favor, assine no campo do Técnico 1 antes de finalizar!");
+                    return;
+                }
+                
+                report.status = 'finalized';
+            } else {
+                report.status = 'draft';
+            }
+        }
+
+        // AJAX POST request to backend view
+        var formData = new FormData();
+        formData.append('data', JSON.stringify(report));
+        formData.append('csrfmiddlewaretoken', document.querySelector('input[name="csrfmiddlewaretoken"]').value);
+
+        fetch(window.location.href, {
+            method: 'POST',
+            body: formData
+        })
+        .then(function(response) {
+            return response.json();
+        })
+        .then(function(res) {
+            if (res.success) {
+                if (keepOnPage) {
+                    alert('Assinatura e nome salvos com sucesso!');
+                    window.location.reload();
+                } else {
+                    alert(status === 'finalized' ? 'Relatório FINALIZADO e bloqueado!' : 'Rascunho salvo com sucesso!');
+                    if (status === 'finalized') {
+                        window.location.reload();
+                    } else {
+                        window.location.href = "{{ return_url }}";
+                    }
+                }
+            } else {
+                alert('Erro ao salvar relatório: ' + res.error);
+            }
+        })
+        .catch(function(err) {
+            alert('Erro de conexão ao salvar relatório.');
+        });
+    }
+</script>
+{% endblock %}

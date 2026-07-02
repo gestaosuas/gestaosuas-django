@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Gerenciamento de Mapas | {{ system_name }}{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+    
+    <main class="dashboard-main">
+        <header class="mgmt-header">
+            <div class="mgmt-title-copy">
+                <h1>Gerenciamento de Mapas</h1>
+                <p>Cadastre e edite as unidades e categorias exibidas no mapa interativo</p>
+            </div>
+            <div class="mgmt-actions">
+                <button class="btn-primary-action" id="btnAddItem">
+                    <i data-lucide="plus"></i> <span id="btnLabel">Nova Unidade</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="mgmt-tabs-container">
+            <div class="mgmt-tabs">
+                <button class="tab-btn active" data-tab="unidades">
+                    <i data-lucide="map-pin"></i> Unidades
+                </button>
+                <button class="tab-btn" data-tab="categorias">
+                    <i data-lucide="palette"></i> Categorias (Cores)
+                </button>
+            </div>
+
+            <div class="tab-content active" id="tab-unidades">
+                <div class="data-table-wrapper">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>NOME</th>
+                                <th>CATEGORIA</th>
+                                <th>REGIÃO</th>
+                                <th class="text-right">AÇÕES</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for unit in map_units %}
+                            <tr>
+                                <td class="font-bold">{{ unit.name }}</td>
+                                <td>
+                                    <span class="cat-pill">
+                                        <span class="pill-dot" style="background: {{ unit.category.color }};"></span>
+                                        {{ unit.category.name }}
+                                    </span>
+                                </td>
+                                <td>{{ unit.region|default:"-" }}</td>
+                                <td class="text-right">
+                                        <button type="button" onclick="openUnitModal('{{ unit.id }}', '{{ unit.name|escapejs }}', '{{ unit.category.id|default_if_none:"" }}', '{{ unit.region|escapejs }}', '{{ unit.address|escapejs }}', '{{ unit.phone|escapejs }}', '{{ unit.latitude|default_if_none:"" }}', '{{ unit.longitude|default_if_none:"" }}')" class="btn-icon-edit" style="background:none;border:none;cursor:pointer;"><i data-lucide="edit-3"></i></button>
+                                        <button type="button" onclick="deleteUnit('{{ unit.id }}')" class="btn-icon-delete" style="background:none;border:none;cursor:pointer;"><i data-lucide="trash-2"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center py-8 text-slate-400">Nenhuma unidade cadastrada.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-categorias">
+                <div class="data-table-wrapper">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>NOME</th>
+                                <th>COR (ID NA WEB)</th>
+                                <th class="text-right">AÇÕES</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cat in categories %}
+                            <tr>
+                                <td class="font-bold">{{ cat.name }}</td>
+                                <td>
+                                    <div class="color-display">
+                                        <span class="color-circle" style="background: {{ cat.color }};"></span>
+                                        <code>{{ cat.color }}</code>
+                                    </div>
+                                </td>
+                                <td class="text-right">
+                                        <button type="button" onclick="openCategoryModal('{{ cat.id }}', '{{ cat.name|escapejs }}', '{{ cat.color }}')" class="btn-icon-edit" style="background:none;border:none;cursor:pointer;"><i data-lucide="edit-3"></i></button>
+                                        <button type="button" onclick="deleteCategory('{{ cat.id }}')" class="btn-icon-delete" style="background:none;border:none;cursor:pointer;"><i data-lucide="trash-2"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" class="text-center py-8 text-slate-400">Nenhuma categoria cadastrada.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <div class="modal-overlay" id="categoryModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="catModalTitle">Nova Categoria</h2>
+                <button class="btn-close-modal" onclick="closeCategoryModal()"><i data-lucide="x"></i></button>
+            </div>
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_category">
+                <input type="hidden" name="category_id" id="cat_id">
+                
+                <div class="form-group">
+                    <label>Nome da Categoria</label>
+                    <input type="text" name="name" id="cat_name" required class="form-control">
+                </div>
+                
+                <div class="form-group">
+                    <label>Cor (RGB/Hex)</label>
+                    <div class="color-picker-wrapper">
+                        <input type="color" name="color" id="cat_color" value="#3b82f6" class="color-picker-input">
+                        <span class="color-picker-value" id="cat_color_val">#3b82f6</span>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeCategoryModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Salvar Categoria</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="unitModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2 id="unitModalTitle">Nova Unidade</h2>
+                <button class="btn-close-modal" onclick="closeUnitModal()"><i data-lucide="x"></i></button>
+            </div>
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_unit">
+                <input type="hidden" name="unit_id" id="unit_id">
+                
+                <div class="form-row">
+                    <div class="form-group col-6">
+                        <label>Nome da Unidade</label>
+                        <input type="text" name="name" id="unit_name" required class="form-control">
+                    </div>
+                    <div class="form-group col-6">
+                        <label>Categoria</label>
+                        <select name="category" id="unit_category" class="form-control" required>
+                            <option value="">Selecione...</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group col-6">
+                        <label>Região</label>
+                        <select name="region" id="unit_region" class="form-control">
+                            <option value="">Nenhuma</option>
+                            <option value="Norte">Norte</option>
+                            <option value="Sul">Sul</option>
+                            <option value="Leste">Leste</option>
+                            <option value="Oeste">Oeste</option>
+                            <option value="Central">Central</option>
+                            <option value="Rural">Rural</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-6">
+                        <label>Telefone</label>
+                        <input type="text" name="phone" id="unit_phone" class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Endereço</label>
+                    <input type="text" name="address" id="unit_address" class="form-control">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-6">
+                        <label>Latitude</label>
+                        <input type="text" name="latitude" id="unit_latitude" class="form-control" placeholder="-18.9186">
+                    </div>
+                    <div class="form-group col-6">
+                        <label>Longitude</label>
+                        <input type="text" name="longitude" id="unit_longitude" class="form-control" placeholder="-48.2772">
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeUnitModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Salvar Unidade</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <form id="deleteForm" method="POST" style="display:none;">
+        {% csrf_token %}
+        <input type="hidden" name="action" id="del_action">
+        <input type="hidden" name="unit_id" id="del_unit_id">
+        <input type="hidden" name="category_id" id="del_category_id">
+    </form>
+</div>
+
+<style>
+    @media (min-width: 1025px) {
+        .dashboard-main {
+            padding-top: 80px !important;
+        }
+    }
+
+    .mgmt-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px; }
+    .mgmt-title-copy h1 { font-size: 28px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
+    .mgmt-title-copy p { color: #64748b; font-size: 15px; }
+
+    .btn-primary-action { 
+        background: #0891b2; 
+        color: white; 
+        border: none; 
+        padding: 12px 24px; 
+        border-radius: 12px; 
+        font-weight: 700; 
+        display: flex; 
+        align-items: center; 
+        gap: 8px; 
+        cursor: pointer; 
+        transition: all 0.2s;
+    }
+    .btn-primary-action:hover { background: #0e7490; transform: translateY(-1px); }
+
+    .mgmt-tabs-container { background: #fff; border: 1px solid #e2e8f0; border-radius: 24px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    
+    .mgmt-tabs { display: flex; gap: 12px; padding: 16px 24px; border-bottom: 1px solid #f1f5f9; background: #fcfdfe; }
+    .tab-btn { 
+        background: transparent; 
+        border: none; 
+        padding: 10px 20px; 
+        border-radius: 10px; 
+        font-size: 14px; 
+        font-weight: 700; 
+        color: #64748b; 
+        cursor: pointer; 
+        display: flex; 
+        align-items: center; 
+        gap: 8px; 
+        transition: all 0.2s;
+    }
+    .tab-btn i { width: 18px; height: 18px; }
+    .tab-btn:hover { background: #f1f5f9; color: #334155; }
+    .tab-btn.active { background: white; color: #0f172a; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
+
+    .tab-content { display: none; padding: 0; }
+    .tab-content.active { display: block; }
+
+    .data-table-wrapper { padding: 0; }
+    .premium-table { width: 100%; border-collapse: collapse; }
+    .premium-table th { text-align: left; padding: 16px 24px; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #f1f5f9; }
+    .premium-table td { padding: 18px 24px; font-size: 14px; color: #334155; border-bottom: 1px solid #f8fafc; }
+    
+    .cat-pill { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #475569; }
+    .pill-dot { width: 8px; height: 8px; border-radius: 50%; }
+    
+    .color-display { display: flex; align-items: center; gap: 12px; }
+    .color-circle { width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #e2e8f0; }
+    
+    .action-btns { display: flex; justify-content: flex-end; gap: 12px; }
+    .btn-icon-edit { color: #3b82f6; transition: color 0.2s; }
+    .btn-icon-delete { color: #ef4444; transition: color 0.2s; }
+    .btn-icon-edit:hover { color: #1d4ed8; }
+    .btn-icon-delete:hover { color: #dc2626; }
+    
+    .text-right { text-align: right; }
+    .font-bold { font-weight: 700; }
+
+    /* Modals */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 9999; opacity: 0; transition: opacity 0.2s; }
+    .modal-overlay.show { display: flex; opacity: 1; }
+    .modal-content { background: white; border-radius: 20px; width: 100%; max-width: 500px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); transform: translateY(20px); transition: transform 0.2s; }
+    .modal-overlay.show .modal-content { transform: translateY(0); }
+    .modal-content.modal-lg { max-width: 700px; }
+    
+    .modal-header { padding: 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h2 { margin: 0; font-size: 20px; font-weight: 800; color: #0f172a; }
+    .btn-close-modal { background: none; border: none; color: #64748b; cursor: pointer; padding: 4px; transition: color 0.2s; }
+    .btn-close-modal:hover { color: #0f172a; }
+    
+    .modal-content form { padding: 24px; }
+    .form-group { margin-bottom: 20px; }
+    .form-row { display: flex; gap: 16px; margin-bottom: 20px; }
+    .form-row .form-group { margin-bottom: 0; flex: 1; }
+    .form-group label { display: block; font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 8px; }
+    .form-control { width: 100%; padding: 12px 16px; border: 1px solid #cbd5e1; border-radius: 12px; font-size: 14px; color: #334155; transition: all 0.2s; }
+    .form-control:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+    
+    .color-picker-wrapper { display: flex; align-items: center; gap: 12px; }
+    .color-picker-input { width: 48px; height: 48px; padding: 0; border: none; border-radius: 12px; cursor: pointer; overflow: hidden; }
+    .color-picker-input::-webkit-color-swatch-wrapper { padding: 0; }
+    .color-picker-input::-webkit-color-swatch { border: none; border-radius: 12px; }
+    .color-picker-value { font-family: monospace; font-size: 16px; font-weight: 600; color: #334155; }
+    
+    .modal-footer { margin-top: 32px; display: flex; justify-content: flex-end; gap: 12px; }
+    .btn-secondary { background: white; border: 1px solid #cbd5e1; color: #475569; padding: 12px 24px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn-secondary:hover { background: #f8fafc; color: #0f172a; }
+    .btn-primary { background: #3b82f6; border: none; color: white; padding: 12px 24px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn-primary:hover { background: #2563eb; transform: translateY(-1px); }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        lucide.createIcons();
+
+        const tabs = document.querySelectorAll('.tab-btn');
+        const contents = document.querySelectorAll('.tab-content');
+        const btnAddItem = document.getElementById('btnAddItem');
+        const btnLabel = document.getElementById('btnLabel');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const target = tab.getAttribute('data-tab');
+                
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                contents.forEach(c => c.classList.remove('active'));
+                document.getElementById('tab-' + target).classList.add('active');
+
+                if (target === 'unidades') {
+                    btnLabel.innerText = 'Nova Unidade';
+                    btnAddItem.onclick = () => window.openUnitModal();
+                } else {
+                    btnLabel.innerText = 'Nova Categoria';
+                    btnAddItem.onclick = () => window.openCategoryModal();
+                }
+            });
+        });
+
+        // Initial setup for the button
+        btnAddItem.onclick = () => window.openUnitModal();
+        
+        // Setup Modal Functions
+        window.openCategoryModal = function(id = '', name = '', color = '#3b82f6') {
+            document.getElementById('catModalTitle').innerText = id ? 'Editar Categoria' : 'Nova Categoria';
+            document.getElementById('cat_id').value = id;
+            document.getElementById('cat_name').value = name;
+            document.getElementById('cat_color').value = color;
+            document.getElementById('cat_color_val').innerText = color;
+            document.getElementById('categoryModal').classList.add('show');
+        }
+        window.closeCategoryModal = function() {
+            document.getElementById('categoryModal').classList.remove('show');
+        }
+
+        window.openUnitModal = function(id = '', name = '', category = '', region = '', address = '', phone = '', lat = '', lng = '') {
+            document.getElementById('unitModalTitle').innerText = id ? 'Editar Unidade' : 'Nova Unidade';
+            document.getElementById('unit_id').value = id;
+            document.getElementById('unit_name').value = name;
+            document.getElementById('unit_category').value = category;
+            document.getElementById('unit_region').value = region;
+            document.getElementById('unit_address').value = address;
+            document.getElementById('unit_phone').value = phone;
+            document.getElementById('unit_latitude').value = lat ? String(lat).replace(',', '.') : '';
+            document.getElementById('unit_longitude').value = lng ? String(lng).replace(',', '.') : '';
+            document.getElementById('unitModal').classList.add('show');
+        }
+        window.closeUnitModal = function() {
+            document.getElementById('unitModal').classList.remove('show');
+        }
+
+        document.getElementById('cat_color').addEventListener('input', function(e) {
+            document.getElementById('cat_color_val').innerText = e.target.value;
+        });
+
+        window.deleteUnit = function(id) {
+            if(confirm('Tem certeza que deseja remover esta unidade?')) {
+                document.getElementById('del_action').value = 'delete_unit';
+                document.getElementById('del_unit_id').value = id;
+                document.getElementById('deleteForm').submit();
+            }
+        }
+        
+        window.deleteCategory = function(id) {
+            if(confirm('Tem certeza que deseja remover esta categoria? Essa ação pode afetar unidades associadas.')) {
+                document.getElementById('del_action').value = 'delete_category';
+                document.getElementById('del_category_id').value = id;
+                document.getElementById('deleteForm').submit();
+            }
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}CREAS Idoso e Pessoa com Deficiência | {{ directorate.name }}{% endblock %}
+
+{% block body_class %}dashboard-fit-vh theme-amber{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+
+    <main class="dashboard-main" style="padding-top: 0;">
+        <div class="monitoring-header-container header-amber">
+            <div class="monitoring-header-content">
+                <div class="monitoring-title-area">
+                    <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 10px;">
+                        <div style="width: 50px; height: 50px; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #78350f;">
+                            <i data-lucide="shield-alert" style="width: 32px; height: 32px;"></i>
+                        </div>
+                        <div>
+                            <h1>{{ directorate.name }}</h1>
+                            <p style="margin:0; font-size: 14px; opacity: 0.9;">Indicadores de Violação de Direitos</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="monitoring-header-actions visit-header-actions" style="flex-direction: row; align-items: center;">
+                    <form method="get" class="visit-filter-form visit-filter-form-hero" style="margin: 0;">
+                        <div class="filter-row-group">
+                            <select name="month" class="filter-select" onchange="this.form.submit()">
+                                <option value="all" {% if selected_month == 'all' %}selected{% endif %}>Ano Inteiro</option>
+                                {% for m_num, m_name in months_range %}
+                                <option value="{{ m_num }}" {% if selected_month == m_num|stringformat:"s" %}selected{% endif %}>{{ m_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="year" class="filter-select" onchange="this.form.submit()">
+                                {% for y in years_range %}
+                                <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="button" class="btn-primary-premium" id="toggle-mgmt-menu" style="margin-left: 10px;">
+                                <i data-lucide="settings"></i><span id="mgmt-btn-text">Ações do CREAS</span>
+                                <i data-lucide="chevron-down" id="mgmt-btn-icon"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="monitoring-main-card">
+
+            <div class="management-overlay" id="mgmt-menu" style="display:none;">
+                <div class="mgmt-grid">
+                    <a href="{% url 'creasidoso:form-idoso' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon indigo"><i data-lucide="file-plus"></i></div>
+                        <div class="mgmt-info"><strong>Atualizar Dados Idoso</strong><span>Inserir indicadores mensais</span></div>
+                    </a>
+                    <a href="{% url 'creasidoso:form-pcd' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon emerald"><i data-lucide="file-plus"></i></div>
+                        <div class="mgmt-info"><strong>Atualizar Dados PCD</strong><span>Inserir indicadores mensais</span></div>
+                    </a>
+                    <a href="{% url 'creasidoso:data-idoso' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon violet"><i data-lucide="database"></i></div>
+                        <div class="mgmt-info"><strong>Ver Dados Idoso</strong><span>Tabela anual de indicadores</span></div>
+                    </a>
+                    <a href="{% url 'creasidoso:data-pcd' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon sky"><i data-lucide="database"></i></div>
+                        <div class="mgmt-info"><strong>Ver Dados PCD</strong><span>Tabela anual de indicadores</span></div>
+                    </a>
+                    <a href="{% url 'creasidoso:monthly-report' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon indigo"><i data-lucide="file-text"></i></div>
+                        <div class="mgmt-info"><strong>Relatorio Mensal</strong><span>Narrativa do periodo</span></div>
+                    </a>
+                    <a href="{% url 'creasidoso:reports' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon sky"><i data-lucide="folder-open"></i></div>
+                        <div class="mgmt-info"><strong>Historico</strong><span>Todos os relatorios</span></div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="dashboard-split-layout">
+                <aside class="metrics-stack">
+                    {% for c in cards %}
+                    <article class="metric-card-modern">
+                        <div class="metric-top">
+                            <div class="icon-circle" style="--accent-color:{{ c.color }};background:{{ c.color }}15;"><i data-lucide="{{ c.icon }}"></i></div>
+                            {% if c.variation %}<span class="variation {{ c.variation.direction }}"><i data-lucide="{{ c.variation.icon }}"></i>{{ c.variation.text }}</span>{% endif %}
+                        </div>
+                        <p class="metric-context">{{ c.label }}</p>
+                        <strong>{{ c.value }}</strong>
+                    </article>
+                    {% endfor %}
+                </aside>
+
+                <div class="charts-stack">
+                    <div class="charts-row-inner">
+                        <article class="chart-panel"><div class="chart-header"><div><h2>Tipos de Violencia Idosos</h2><p class="chart-subtitle">{{ period_label }}</p></div></div>
+                            <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                                {% if donut_idoso_items %}
+                                <canvas id="donutIdoso"></canvas>
+                                {% else %}
+                                <div class="chart-empty">Sem dados de Idoso</div>
+                                {% endif %}
+                            </div>
+                        </article>
+                        <article class="chart-panel"><div class="chart-header"><div><h2>Tipos de Violencia PCD</h2><p class="chart-subtitle">{{ period_label }}</p></div></div>
+                            <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                                {% if donut_pcd_items %}
+                                <canvas id="donutPcd"></canvas>
+                                {% else %}
+                                <div class="chart-empty">Sem dados de PCD</div>
+                                {% endif %}
+                            </div>
+                        </article>
+                    </div>
+                    <div class="charts-row-inner">
+                        <article class="chart-panel"><div class="chart-header"><div><h2>Violencia Idosos</h2><p class="chart-subtitle">{{ period_label }}</p></div></div>
+                            <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                                {% if bar_idoso_items %}
+                                <canvas id="barIdoso"></canvas>
+                                {% else %}
+                                <div class="chart-empty">Sem dados de Idoso</div>
+                                {% endif %}
+                            </div>
+                        </article>
+                        <article class="chart-panel"><div class="chart-header"><div><h2>Violencia Pessoa com Deficiencia</h2><p class="chart-subtitle">{{ period_label }}</p></div></div>
+                            <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                                {% if bar_pcd_items %}
+                                <canvas id="barPcd"></canvas>
+                                {% else %}
+                                <div class="chart-empty">Sem dados de PCD</div>
+                                {% endif %}
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+{{ donut_idoso_items|json_script:"donut-idoso" }}
+{{ donut_pcd_items|json_script:"donut-pcd" }}
+{{ bar_idoso_items|json_script:"bar-idoso" }}
+{{ bar_pcd_items|json_script:"bar-pcd" }}
+
+<script>
+document.addEventListener("DOMContentLoaded",function(){
+    var t=document.getElementById("toggle-mgmt-menu"),m=document.getElementById("mgmt-menu"),
+        bt=document.getElementById("mgmt-btn-text"),bi=document.getElementById("mgmt-btn-icon");
+    t.addEventListener("click",function(){var v=m.style.display!=="none";m.style.display=v?"none":"block";
+        bt.textContent=v?"Gerenciar Unidade":"Fechar";bi.setAttribute("data-lucide",v?"chevron-down":"chevron-up");lucide.createIcons()});
+    if(window.Chart&&window.ChartDataLabels)Chart.register(ChartDataLabels);
+    var di=JSON.parse(document.getElementById("donut-idoso").textContent);
+    var dp=JSON.parse(document.getElementById("donut-pcd").textContent);
+    var bi=JSON.parse(document.getElementById("bar-idoso").textContent);
+    var bp=JSON.parse(document.getElementById("bar-pcd").textContent);
+    var colors=["#3b82f6","#f59e0b","#ef4444","#10b981","#8b5cf6"];
+    function makeDonut(id,items){
+        if(!items.length)return;
+        new Chart(document.getElementById(id),{type:"doughnut",data:{labels:items.map(function(i){return i.label}),
+            datasets:[{data:items.map(function(i){return i.value}),backgroundColor:items.map(function(i){return i.color}),
+            borderColor:"#fff",borderWidth:2}]},options:{maintainAspectRatio:false,cutout:"55%",
+            plugins:{legend:{position:"bottom",labels:{font:{size:10,weight:"700"},padding:12,usePointStyle:!0,pointStyleWidth:8}},
+            tooltip:{callbacks:{label:function(c){var t=c.dataset.data.reduce(function(a,b){return a+b},0);return c.label+": "+c.raw+(t?" ("+Math.round(c.raw/t*100)+"%)":"")}}}}}})}
+    function makeBar(id,items){
+        if(!items.length)return;
+        new Chart(document.getElementById(id),{type:"bar",data:{labels:items.map(function(i){return i.label}),
+            datasets:[{data:items.map(function(i){return i.value}),backgroundColor:"#3b82f6",borderRadius:8,barThickness:20}]},
+            options:{maintainAspectRatio:!1,indexAxis:"y",
+            plugins:{legend:{display:!1},datalabels:{anchor:"end",align:"right",font:{weight:"800",size:9},formatter:function(v){return v||""}}},
+            scales:{x:{display:!1,beginAtZero:!0,suggestedMax:Math.max.apply(null,items.map(function(i){return i.value}),1)*1.3},
+            y:{grid:{display:!1},ticks:{font:{size:10,weight:"700"},color:"#64748b",padding:4}}}}})}
+    makeDonut("donutIdoso",di);makeDonut("donutPcd",dp);makeBar("barIdoso",bi);makeBar("barPcd",bp);
+});
+</script>
+
+<style>
+.variation{display:flex;align-items:center;gap:3px;padding:3px 6px;border-radius:14px;font-size:10px;font-weight:800}
+.variation.positive{background:#ecfdf5;color:#10b981}.variation.negative{background:#fef2f2;color:#ef4444}.variation i{width:11px;height:11px}
+.chart-empty{display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+</style>
+{% endblock %}

@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}CEAI - Indicadores Detalhados{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+    <main class="dashboard-main">
+        <section class="dashboard-container-inner" style="padding-top: 10px;">
+            <header class="dashboard-header-premium">
+                <div class="header-left-group">
+                    <a href="{% url 'ceai:dashboard' %}" class="btn-back">
+                        <i data-lucide="arrow-left"></i>
+                    </a>
+                    <h1>{{ unit_filter|default:"UNIDADES"|upper }}</h1>
+                </div>
+
+                <div class="header-right-group">
+                    <form method="get" class="filter-group-modern">
+                        <label class="pill-select">
+                            <span>Unidade</span>
+                            <select name="unit" onchange="this.form.submit()">
+                                <option value="all" {% if unit_filter == 'all' %}selected{% endif %}>Todas as Unidades</option>
+                                <option value="Brasil" {% if unit_filter == 'Brasil' %}selected{% endif %}>CEAI Brasil</option>
+                                <option value="Laranjeiras" {% if unit_filter == 'Laranjeiras' %}selected{% endif %}>CEAI Laranjeiras</option>
+                                <option value="Luizote" {% if unit_filter == 'Luizote' %}selected{% endif %}>CEAI Luizote</option>
+                                <option value="Guarani" {% if unit_filter == 'Guarani' %}selected{% endif %}>CEAI Guarani</option>
+                                <option value="Morumbi" {% if unit_filter == 'Morumbi' %}selected{% endif %}>CEAI Morumbi</option>
+                            </select>
+                        </label>
+                        <label class="pill-select">
+                            <span>Categoria</span>
+                            <select name="category" onchange="this.form.submit()">
+                                <option value="all" {% if category_filter == 'all' %}selected{% endif %}>Todas as Categorias</option>
+                                {% for cat in all_categories %}
+                                <option value="{{ cat }}" {% if category_filter == cat %}selected{% endif %}>{{ cat }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label class="pill-select">
+                            <span>Ano</span>
+                            <select name="year" onchange="this.form.submit()">
+                                {% for y in years_range %}
+                                    <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                    </form>
+                </div>
+            </header>
+
+            {% for unit in units_data %}
+            <div class="unit-block-premium">
+                <div class="unit-title-divider">
+                    <h2>{{ unit.name|upper }}</h2>
+                </div>
+
+                <div class="matrix-container-modern">
+                    <table class="matrix-table">
+                        <thead>
+                            <tr>
+                                <th class="indicator-col">ATRIBUTO / INDICADOR</th>
+                                {% for month in month_headers %}
+                                <th class="month-col">{{ month }}</th>
+                                {% endfor %}
+                                <th class="total-col">ACUMULADO</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in unit.matrix %}
+                            <tr>
+                                <td class="indicator-label">{{ row.label }}</td>
+                                {% for item in row.months %}
+                                <td class="val-cell {% if request.user.profile.role == 'admin' %}editable-cell{% endif %}"
+                                {% if request.user.profile.role == 'admin' %}
+                                contenteditable="true"
+                                data-sub-id="{{ item.sub_id|default:'' }}"
+                                data-month="{{ item.month }}"
+                                data-year="{{ item.year }}"
+                                data-unit="{{ unit.name }}"
+                                data-key="{{ row.key }}"
+                                {% endif %}>
+                                    {{ item.val|default:'' }}
+                                </td>
+                                {% endfor %}
+                                <td class="total-cell"><strong>{{ row.total }}</strong></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {% if unit.oficinas.available %}
+                <div class="oficinas-section-modern">
+                    <div class="section-title-premium">
+                        <div class="accent-line"></div>
+                        <span>OCUPAÇÃO DE OFICINAS - {{ unit.name }}</span>
+                    </div>
+
+                    <h3 class="table-subtitle">Vagas Disponíveis</h3>
+                    <div class="matrix-container-modern mini">
+                        <table class="matrix-table mini">
+                            <thead>
+                                <tr>
+                                    <th class="indicator-col">ATIVIDADE</th>
+                                    <th class="category-col">CATEGORIA</th>
+                                    {% for month in month_headers %}
+                                    <th>{{ month }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in unit.oficinas.available %}
+                                <tr>
+                                    <td class="indicator-label">{{ row.label }}</td>
+                                    <td class="category-cell"><span class="cat-badge">{{ row.category }}</span></td>
+                                    {% for m in row.months %}
+                                    <td class="val-cell {% if request.user.profile.role == 'admin' %}editable-cell{% endif %}"
+                                        {% if request.user.profile.role == 'admin' %}
+                                        contenteditable="true"
+                                        data-sub-id="{{ m.sub_id|default:'' }}"
+                                        data-month="{{ m.month }}"
+                                        data-year="{{ m.year }}"
+                                        data-unit="{{ unit.name }}"
+                                        data-key="{{ row.key }}"
+                                        {% endif %}>
+                                        {{ m.val|default:'' }}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="table-subtitle">Total de Vagas Ocupadas</h3>
+                    <div class="matrix-container-modern mini">
+                        <table class="matrix-table mini">
+                            <thead>
+                                <tr>
+                                    <th class="indicator-col">ATIVIDADE</th>
+                                    <th class="category-col">CATEGORIA</th>
+                                    {% for month in month_headers %}
+                                    <th>{{ month }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in unit.oficinas.occupied %}
+                                <tr>
+                                    <td class="indicator-label">{{ row.label }}</td>
+                                    <td class="category-cell"><span class="cat-badge secondary">{{ row.category }}</span></td>
+                                    {% for m in row.months %}
+                                    <td class="val-cell {% if request.user.profile.role == 'admin' %}editable-cell{% endif %}"
+                                        {% if request.user.profile.role == 'admin' %}
+                                        contenteditable="true"
+                                        data-sub-id="{{ m.sub_id|default:'' }}"
+                                        data-month="{{ m.month }}"
+                                        data-year="{{ m.year }}"
+                                        data-unit="{{ unit.name }}"
+                                        data-key="{{ row.key }}"
+                                        {% endif %}>
+                                        {% if m.val != '' and m.val != None and m.val != 0 %}{{ m.val }}{% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </section>
+    </main>
+</div>
+
+<style>
+.header-left-group { display: flex; align-items: center; gap: 4px; }
+.header-left-group h1 { margin: 0; line-height: 1; }
+.btn-back { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; background: #f1f5f9; color: #64748b; text-decoration: none; }
+.unit-block-premium { margin-bottom: 64px; }
+.unit-title-divider { border-bottom: 2px solid #3b82f6; margin-bottom: 24px; padding-bottom: 8px; }
+.unit-title-divider h2 { font-size: 20px; font-weight: 800; color: #1e3a8a; }
+
+.matrix-container-modern { background: white; border-radius: 20px; border: 1px solid #e2e8f0; overflow-x: auto; margin-top: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+.matrix-container-modern.mini { border-radius: 14px; margin-bottom: 32px; }
+
+.matrix-table { width: 100%; border-collapse: collapse; text-align: center; }
+.matrix-table th { padding: 12px 8px; font-size: 10px; font-weight: 800; color: #94a3b8; border-bottom: 1px solid #f1f5f9; background: #f8fafc; }
+.matrix-table td { padding: 12px 8px; font-size: 13px; color: #1e293b; border-bottom: 1px solid #f8fafc; white-space: nowrap; }
+
+.indicator-col { text-align: left !important; padding-left: 24px !important; min-width: 240px; width: 240px; }
+.category-col { text-align: left !important; width: 180px; min-width: 180px; }
+.indicator-label { text-align: left !important; padding-left: 24px !important; font-weight: 700; color: #1e3a8a !important; font-size: 12px !important; white-space: normal; }
+.category-cell { text-align: left !important; white-space: nowrap; }
+
+.cat-badge { padding: 4px 8px; background: #eff6ff; color: #3b82f6; border-radius: 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; border: 1px solid #dbeafe; }
+.cat-badge.secondary { background: #fdf2f8; color: #db2777; border-color: #fce7f3; }
+
+.total-col { background: #f1f5f9; font-weight: 800; color: #1e3a8a; }
+.total-cell { background: #f8fafc; font-weight: 800; color: #1e3a8a; border-left: 2px solid #f1f5f9; }
+
+.oficinas-section-modern { margin-top: 32px; }
+.section-title-premium { display: flex; align-items: center; gap: 12px; font-size: 11px; font-weight: 900; color: #3b82f6; letter-spacing: 0.1em; margin-bottom: 20px; }
+.accent-line { width: 24px; height: 3px; background: #3b82f6; border-radius: 2px; }
+.table-subtitle { font-size: 14px; font-weight: 800; color: #475569; margin-bottom: 12px; padding-left: 4px; border-left: 3px solid #cbd5e1; }
+
+@media (max-width: 1200px) {
+    .matrix-table th, .matrix-table td { padding: 8px 4px; font-size: 11px; }
+}
+
+.editable-cell:focus {
+    outline: 2px solid #3b82f6;
+    background: #fff !important;
+    box-shadow: inset 0 0 0 1px #3b82f6;
+}
+.editable-cell:hover {
+    background: #f1f5f9 !important;
+    cursor: cell;
+}
+.saving { opacity: 0.5; pointer-events: none; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const editableCells = document.querySelectorAll('.editable-cell');
+    
+    editableCells.forEach(cell => {
+        cell.addEventListener('focus', function() {
+            this.setAttribute('data-original', this.innerText.trim());
+        });
+
+        cell.addEventListener('blur', function() {
+            saveCell(this);
+        });
+
+        cell.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.blur();
+            }
+        });
+    });
+
+    function saveCell(cell) {
+        const subId = cell.dataset.subId;
+        const month = cell.dataset.month;
+        const year = cell.dataset.year;
+        const unit = cell.dataset.unit;
+        const key = cell.dataset.key;
+        const value = cell.innerText.trim();
+        const originalValue = (cell.getAttribute('data-original') || '').trim();
+
+        if (value === originalValue) return;
+
+        cell.classList.add('saving');
+
+        const formData = new FormData();
+        formData.append('sub_id', subId);
+        formData.append('month', month);
+        formData.append('year', year);
+        formData.append('unit', unit);
+        formData.append('key', key);
+        formData.append('value', value || '0');
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+        fetch('{% url "ceai:quick_edit" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            cell.classList.remove('saving');
+            if (data.status === 'success') {
+                const newVal = data.value > 0 ? data.value : '';
+                cell.innerText = newVal;
+                cell.setAttribute('data-original', newVal);
+                if (data.sub_id) {
+                    cell.setAttribute('data-sub-id', data.sub_id);
+                }
+                
+                window.showToast('Salvo', 'Indicador atualizado com sucesso!', 'success');
+                
+                // Visual Success - Stronger feedback
+                cell.style.transition = 'none';
+                cell.style.backgroundColor = '#4ade80'; // Strong green
+                cell.style.color = 'white';
+                
+                setTimeout(() => {
+                    cell.style.transition = 'all 0.6s';
+                    cell.style.backgroundColor = '';
+                    cell.style.color = '';
+                }, 400);
+            } else {
+                cell.innerText = originalValue;
+                alert('Erro ao salvar dados.');
+            }
+        })
+        .catch(err => {
+            cell.classList.remove('saving');
+            cell.innerText = originalValue;
+            console.error(err);
+        });
+    }
+});
+</script>
+{% endblock %}

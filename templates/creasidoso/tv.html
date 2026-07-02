@@ -1,0 +1,50 @@
+{% extends "base_tv.html" %}
+
+{% block title %}CREAS Idoso{% endblock %}
+{% block header_bg %}linear-gradient(100deg,#78350f,#d97706){% endblock %}
+{% block module_name %}CREAS — Idoso e PCD{% endblock %}
+{% block module_sub %}{{ system_name }} • {{ selected_year }}{% endblock %}
+
+{% block kpis %}
+{% for card in cards %}
+<div class="tv-kpi" style="--accent:{{ card.color|default:'#d97706' }}">
+    <div class="tv-kpi-label">{{ card.label }}</div>
+    <div class="tv-kpi-value">{{ card.value }}</div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block charts %}
+<div class="tv-panel">
+    <h2>Violações — Idoso</h2>
+    <div class="tv-panel-body"><canvas id="c-bar-idoso"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Violações — PCD</h2>
+    <div class="tv-panel-body"><canvas id="c-bar-pcd"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Distribuição Idoso</h2>
+    <div class="tv-panel-body"><canvas id="c-donut-idoso"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Distribuição PCD</h2>
+    <div class="tv-panel-body"><canvas id="c-donut-pcd"></canvas></div>
+</div>
+{% endblock %}
+
+{{ donut_idoso_items|json_script:"d-idoso" }}
+{{ donut_pcd_items|json_script:"d-pcd" }}
+{{ bar_idoso_items|json_script:"d-bar-idoso" }}
+{{ bar_pcd_items|json_script:"d-bar-pcd" }}
+
+{% block extra_js %}
+<script>
+(function () {
+    TV.makeDonut('c-donut-idoso', JSON.parse(document.getElementById('d-idoso').textContent));
+    TV.makeDonut('c-donut-pcd',   JSON.parse(document.getElementById('d-pcd').textContent));
+    TV.makeBar('c-bar-idoso', JSON.parse(document.getElementById('d-bar-idoso').textContent), '#d97706');
+    TV.makeBar('c-bar-pcd',   JSON.parse(document.getElementById('d-bar-pcd').textContent),   '#7c3aed');
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Relatórios - CEAI{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+    
+    <div class="dashboard-container">
+        <a class="back-link" href="{% url 'ceai:dashboard' %}">&larr; Voltar para o painel</a>
+
+        <header class="page-header">
+            <div class="header-info">
+                <p class="eyebrow">CEAI - HISTÓRICO</p>
+                <h1>Arquivo de Relatórios</h1>
+                <p class="section-description">Acesse todos os relatórios narrativos enviados por esta diretoria.</p>
+            </div>
+        </header>
+
+        <div class="reports-grid">
+            {% if not reports %}
+            <div class="empty-state">
+                <i data-lucide="folder-open"></i>
+                <p>Nenhum relatório encontrado para esta diretoria.</p>
+            </div>
+            {% else %}
+            {% for report in reports %}
+            <article class="report-list-card">
+                <div class="report-icon">
+                    <i data-lucide="file-text"></i>
+                </div>
+                <div class="report-details">
+                    <div class="report-period">
+                        <h2>{{ report.month|stringformat:"02d" }}/{{ report.year }}</h2>
+                        <span class="status-pill finalized">Finalizado</span>
+                    </div>
+                    <p class="report-preview">{{ report.content|truncatewords:20 }}</p>
+                    <div class="report-meta">
+                        <span><i data-lucide="calendar"></i> {{ report.updated_at|date:"d/m/Y" }}</span>
+                        <span><i data-lucide="user"></i> Sistema</span>
+                    </div>
+                </div>
+                <div class="report-actions">
+                    <a href="{% url 'ceai:ceai_monthly_report' directorate.id %}?month={{ report.month }}&year={{ report.year }}" class="btn-outline">
+                        <i data-lucide="eye"></i>
+                        Visualizar
+                    </a>
+                </div>
+            </article>
+            {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .reports-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-top: 24px;
+    }
+
+    .report-list-card {
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        padding: 24px;
+        display: flex;
+        gap: 24px;
+        align-items: center;
+        transition: all 0.2s;
+    }
+
+    .report-list-card:hover {
+        transform: translateX(4px);
+        border-color: #3b82f6;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .report-icon {
+        width: 56px;
+        height: 56px;
+        background: #eff6ff;
+        color: #3b82f6;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .report-icon i { width: 28px; height: 28px; }
+
+    .report-details { flex: 1; }
+
+    .report-period {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+    }
+
+    .report-period h2 {
+        font-size: 18px;
+        font-weight: 800;
+        color: #1e3a8a;
+        margin: 0;
+    }
+
+    .status-pill.finalized {
+        background: #ecfdf5;
+        color: #059669;
+        font-size: 10px;
+        font-weight: 800;
+        padding: 2px 8px;
+        border-radius: 99px;
+        text-transform: uppercase;
+    }
+
+    .report-preview {
+        font-size: 14px;
+        color: #64748b;
+        margin-bottom: 12px;
+        line-height: 1.5;
+    }
+
+    .report-meta {
+        display: flex;
+        gap: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #94a3b8;
+    }
+
+    .report-meta span { display: flex; align-items: center; gap: 6px; }
+    .report-meta i { width: 14px; height: 14px; }
+
+    .btn-outline {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 700;
+        color: #475569;
+        transition: all 0.2s;
+    }
+
+    .btn-outline:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+        color: #1e293b;
+    }
+</style>
+{% endblock %}

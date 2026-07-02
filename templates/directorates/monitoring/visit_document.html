@@ -1,0 +1,445 @@
+{% extends "base.html" %}
+{% load static %}
+{% load directorate_extras %}
+
+{% block title %}Relatório de Visita Técnica - {{ object.osc.name }} | {{ system_name }}{% endblock %}
+
+{% block content %}
+<div class="visit-document-shell">
+    <div class="visit-document-toolbar no-print">
+        <a href="{{ return_url }}" class="visit-document-toolbar-btn">
+            <i data-lucide="arrow-left"></i> Voltar para Listagem
+        </a>
+        <button type="button" onclick="window.print()" class="visit-document-toolbar-btn visit-document-toolbar-btn-primary">
+            <i data-lucide="printer"></i> Imprimir Documento
+        </button>
+    </div>
+
+    <article class="visit-document-page">
+        <header class="visit-document-header">
+            <div class="visit-document-header-top">
+                <img src="{{ logo_url }}" alt="Logo" class="visit-document-logo">
+                <div class="visit-document-header-meta">
+                    <h1>Relatório de Visita Técnica de Monitoramento</h1>
+                    <p>Secretaria Municipal de Desenvolvimento Social</p>
+                    <p>Diretoria de {{ directorate.name }}</p>
+                </div>
+            </div>
+            <div class="visit-document-status-tag">
+                <i data-lucide="check-circle"></i> Documento Finalizado e Autenticado
+            </div>
+        </header>
+
+        <section class="visit-document-section">
+            <div class="section-doc-header">
+                <i data-lucide="building-2"></i>
+                <h2>I. Identificação da OSC e da Visita</h2>
+            </div>
+            <table class="visit-doc-table">
+                <tbody>
+                    <tr>
+                        <th width="30%">Instituição (OSC)</th>
+                        <td>{{ object.osc.name }}</td>
+                    </tr>
+                    <tr>
+                        <th>Atividade / Natureza</th>
+                        <td>{{ object.osc.activity_type|default:"Não informada" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Endereço</th>
+                        <td>{{ object.osc.address|default:"Não informado" }}{% if object.osc.number %}, {{ object.osc.number }}{% endif %}{% if object.osc.neighborhood %} - {{ object.osc.neighborhood }}{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <th>Telefone</th>
+                        <td>{{ object.osc.phone|default:"---" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Data da Visita</th>
+                        <td>
+                            <strong>{{ object.visit_date|date:"d/m/Y" }}</strong> 
+                            {% if object.identificacao.visit_shift_1 %} - Turno: {{ object.identificacao.visit_shift_1|title }}{% endif %}
+                        </td>
+                    </tr>
+                    {% for ev in extra_visits %}
+                    <tr>
+                        <th>{{ ev.num }}ª Visita</th>
+                        <td>
+                            <strong>{{ ev.date }}</strong>
+                            {% if ev.shift %} — Turno: {{ ev.shift|title }}{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        <section class="visit-document-section">
+            <div class="section-doc-header">
+                <i data-lucide="users"></i>
+                <h2>II. Dados de Atendimento</h2>
+            </div>
+            <div class="visit-doc-grid">
+                <div class="visit-doc-card">
+                    <span>Horário de Funcionamento</span>
+                    <p>
+                        {% if object.atendimento.tipo_horario == '24h' %}
+                            Atendimento 24 Horas
+                        {% else %}
+                            {{ object.atendimento.horario_inicio|default:"--:--" }} às {{ object.atendimento.horario_fim|default:"--:--" }}
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="visit-doc-card">
+                    <span>Usuários Presentes</span>
+                    <p>
+                        Manhã: {{ object.atendimento.presentes.manha|default:0 }} | 
+                        Tarde: {{ object.atendimento.presentes.tarde|default:0 }} |
+                        <strong>Total: {{ object.atendimento.total_mes|default:0 }}</strong>
+                    </p>
+                </div>
+                <div class="visit-doc-card">
+                    <span>Capacidade Subvencionada</span>
+                    <p>{% if object.osc.subsidized_count == -1 %}Conforme Demanda{% else %}{{ object.osc.subsidized_count|default:0 }} usuários{% endif %}</p>
+                </div>
+            </div>
+
+            {% if is_subvencao_visit %}
+                <div class="visit-doc-text-block">
+                    <h3>Atividades Desenvolvidas</h3>
+                    <p>{{ object.atendimento.atividades_momento|default:"Nenhuma atividade descrita."|linebreaks }}</p>
+                </div>
+                <div class="visit-doc-text-block">
+                    <h3>Atividades em Execução no Momento</h3>
+                    <p>{{ object.atendimento.atividades_execucao|default:"Nenhuma atividade descrita."|linebreaks }}</p>
+                </div>
+            {% else %}
+                <div class="visit-doc-text-block">
+                    <h3>Aplicação do Recurso e Prestação de Contas</h3>
+                    <p>{{ object.atendimento.aplicacao_recurso|default:"Não informado."|linebreaks }}</p>
+                </div>
+                <div class="visit-doc-text-block">
+                    <h3>Resultados da Aplicacao dos Recursos</h3>
+                    <p>{{ object.atendimento.resultados_recursos|default:"Não informado."|linebreaks }}</p>
+                </div>
+            {% endif %}
+        </section>
+
+        <section class="visit-document-section">
+            <div class="section-doc-header">
+                <i data-lucide="users-2"></i>
+                <h2>III. Recursos Humanos / Colaboradores</h2>
+            </div>
+            <table class="visit-doc-table-striped">
+                <thead>
+                    <tr>
+                        <th align="left">Cargo / Função</th>
+                        <th align="center">Subvencionada</th>
+                        <th align="center">Voluntário</th>
+                        <th align="center">Terceirizado</th>
+                        <th align="center">Qtd.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in object.rh_data %}
+                    <tr>
+                        <td>{{ row.cargo }}</td>
+                        <td align="center">{% if row.subvencao %}Sim{% else %}Não{% endif %}</td>
+                        <td align="center">{% if row.voluntario %}Sim{% else %}Não{% endif %}</td>
+                        <td align="center">{% if row.terceirizado %}Sim{% else %}Não{% endif %}</td>
+                        <td align="center"><strong>{{ row.quantidade|default:0 }}</strong></td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" align="center">Nenhum colaborador registrado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        <section class="visit-document-section page-break-before">
+            <div class="section-doc-header">
+                <i data-lucide="clipboard-list"></i>
+                <h2>IV. Observações e Recomendações Técnicas</h2>
+            </div>
+            <div class="visit-doc-text-block">
+                <h3>Parecer da Equipe Técnica</h3>
+                <div class="parecer-content">
+                    {{ object.observacoes|default:"Sem observações registradas."|linebreaks }}
+                </div>
+            </div>
+            <div class="visit-doc-text-block">
+                <h3>Recomendações e Encaminhamentos</h3>
+                <div class="parecer-content">
+                    {{ object.recomendacoes|default:"Sem recomendações registradas."|linebreaks }}
+                </div>
+            </div>
+        </section>
+
+        {% if is_subvencao_visit and object.atendimento.pse_habilitado == 'sim' %}
+        <section class="visit-document-section">
+            <div class="section-doc-header">
+                <i data-lucide="shield-check"></i>
+                <h2>V. Dados PSE (Proteção Social Especial)</h2>
+            </div>
+            <div class="visit-doc-grid" style="grid-template-columns: 1fr;">
+                <div class="visit-doc-card">
+                    <span>Período</span>
+                    <p>{{ object.atendimento.pse_periodo|default:"Não informado" }}</p>
+                </div>
+            </div>
+            {% if object.atendimento.pse_qualitativos %}
+            <table class="visit-doc-table-striped" style="margin-top:16px;">
+                <thead>
+                    <tr>
+                        <th align="left" style="width:12%;">Data</th>
+                        <th align="left">Situação Encontrada</th>
+                        <th align="left">Recomendações</th>
+                        <th align="left">Observação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in object.atendimento.pse_qualitativos %}
+                    {% if row.data or row.situacao or row.recomendacoes or row.observacao %}
+                    <tr>
+                        <td>{{ row.data|default:"---" }}</td>
+                        <td>{{ row.situacao|default:"---" }}</td>
+                        <td>{{ row.recomendacoes|default:"---" }}</td>
+                        <td>{{ row.observacao|default:"---" }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </section>
+        {% endif %}
+
+        {% if object.documents %}
+        <section class="visit-document-section">
+            <div class="section-doc-header">
+                <i data-lucide="image"></i>
+                <h2>Fotos / Evidências</h2>
+            </div>
+            <div class="doc-photo-grid">
+                {% for doc in object.documents %}
+                {% if doc.type == "Foto / Evidência" %}
+                <div class="doc-photo-item" onclick="docLbOpen('{{ doc.url|escapejs }}')">
+                    <img src="{{ doc.url }}" alt="{{ doc.name }}">
+                    <div class="doc-photo-overlay"><i data-lucide="zoom-in"></i></div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <footer class="visit-document-signatures">
+            <div class="signatures-grid">
+                {% if object.assinaturas.tecnico1 %}
+                <div class="signature-doc-item">
+                    <img src="{{ object.assinaturas.tecnico1 }}" alt="Assinatura Tecnico 1">
+                    <div class="signature-line"></div>
+                    <strong>{{ object.assinaturas.tecnico1_nome|default:"Técnico Responsável 1" }}</strong>
+                    <span>Técnico de Monitoramento</span>
+                </div>
+                {% endif %}
+
+                {% if object.assinaturas.tecnico2 %}
+                <div class="signature-doc-item">
+                    <img src="{{ object.assinaturas.tecnico2 }}" alt="Assinatura Tecnico 2">
+                    <div class="signature-line"></div>
+                    <strong>{{ object.assinaturas.tecnico2_nome|default:"Técnico Responsável 2" }}</strong>
+                    <span>Técnico de Monitoramento</span>
+                </div>
+                {% endif %}
+
+                {% if object.assinaturas.responsavel %}
+                <div class="signature-doc-item">
+                    <img src="{{ object.assinaturas.responsavel }}" alt="Assinatura OSC">
+                    <div class="signature-line"></div>
+                    <strong>{{ object.assinaturas.responsavel_nome|default:"Representante da OSC" }}</strong>
+                    <span>Representante da Instituição</span>
+                </div>
+                {% endif %}
+            </div>
+            <div class="signature-doc-date">
+                Uberlândia - MG, {{ object.visit_date|date:"d" }} de {{ object.visit_date|date:"F" }} de {{ object.visit_date|date:"Y" }}
+            </div>
+        </footer>
+    </article>
+</div>
+
+<style>
+    body { background: #f1f5f9; }
+    .visit-document-shell { max-width: 1000px; margin: 0 auto; padding: 40px 20px; }
+    .visit-document-toolbar { display: flex; justify-content: flex-end; gap: 12px; margin-bottom: 20px; }
+    
+    .visit-document-toolbar-btn {
+        min-height: 48px; padding: 0 20px; border-radius: 12px; border: 1px solid #cbd5e1;
+        background: #fff; color: #1e293b; display: inline-flex; align-items: center; gap: 8px;
+        font-size: 13px; font-weight: 800; text-transform: uppercase; text-decoration: none; cursor: pointer;
+        transition: all 0.2s;
+    }
+    .visit-document-toolbar-btn-primary { background: #1e40af; border-color: #1e40af; color: #fff; }
+    .visit-document-toolbar-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+
+    .visit-document-page {
+        background: #fff; border-radius: 2px; border: 1px solid #e2e8f0;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.04); padding: 70px 80px; position: relative;
+    }
+
+    .visit-document-header { margin-bottom: 50px; border-bottom: 2px solid #1e40af; padding-bottom: 25px; }
+    .visit-document-header-top { display: flex; align-items: center; gap: 40px; }
+    .visit-document-logo { max-width: 250px; height: auto; }
+    .visit-document-header-meta h1 { font-size: 20px; font-weight: 900; color: #1e40af; margin: 0 0 5px; text-transform: uppercase; }
+    .visit-document-header-meta p { margin: 0; font-size: 13px; color: #64748b; font-weight: 700; text-transform: uppercase; }
+
+    .visit-document-status-tag {
+        position: absolute; top: 40px; right: 40px; background: #f0fdf4; border: 1px solid #bbf7d0;
+        color: #166534; padding: 8px 16px; border-radius: 50px; font-size: 11px; font-weight: 800;
+        text-transform: uppercase; display: flex; align-items: center; gap: 8px;
+    }
+
+    .visit-document-section { margin-bottom: 40px; }
+    .section-doc-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; color: #1e40af; }
+    .section-doc-header h2 { font-size: 16px; font-weight: 900; margin: 0; text-transform: uppercase; }
+    .section-doc-header i { width: 20px; height: 20px; }
+
+    .visit-doc-table { width: 100%; border-collapse: collapse; }
+    .visit-doc-table th, .visit-doc-table td { padding: 12px 15px; border: 1px solid #e2e8f0; font-size: 14px; text-align: left; }
+    .visit-doc-table th { background: #f8fafc; color: #475569; font-weight: 800; }
+
+    .visit-doc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; }
+    .visit-doc-card { padding: 15px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
+    .visit-doc-card span { display: block; font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 5px; }
+    .visit-doc-card p { margin: 0; font-size: 14px; color: #1e293b; font-weight: 600; }
+
+    .visit-doc-text-block { margin-top: 25px; }
+    .visit-doc-text-block h3 { font-size: 13px; font-weight: 800; color: #475569; text-transform: uppercase; margin-bottom: 10px; }
+    .visit-doc-text-block p, .parecer-content { font-size: 14px; line-height: 1.7; color: #334155; }
+
+    .visit-doc-table-striped { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    .visit-doc-table-striped th { background: #1e40af; color: #fff; padding: 12px; font-size: 12px; text-transform: uppercase; }
+    .visit-doc-table-striped td { padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+    .visit-doc-table-striped tr:nth-child(even) { background: #f8fafc; }
+
+    .visit-document-signatures { margin-top: 80px; padding-top: 40px; border-top: 1px dashed #cbd5e1; }
+    .signatures-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; text-align: center; }
+    .signature-doc-item img { max-height: 70px; margin-bottom: 10px; filter: grayscale(1) contrast(1.2); mix-blend-mode: multiply; }
+    .signature-line { height: 1px; background: #334155; margin-bottom: 10px; }
+    .signature-doc-item strong { display: block; font-size: 13px; font-weight: 800; color: #1e293b; }
+    .signature-doc-item span { font-size: 11px; color: #64748b; text-transform: uppercase; }
+    .signature-doc-date { margin-top: 60px; text-align: center; font-size: 14px; color: #64748b; font-weight: 600; }
+
+    @media print {
+        body { background: #fff; }
+        .visit-document-shell { padding: 0; max-width: none; }
+        .visit-document-page { border: none; box-shadow: none; padding: 0; }
+        .no-print { display: none !important; }
+        .page-break-before { page-break-before: always; padding-top: 40px; }
+    }
+</style>
+
+<div id="docLightbox" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.93);backdrop-filter:blur(8px);align-items:center;justify-content:center;">
+    <button onclick="docLbClose()" style="position:absolute;top:16px;right:16px;width:40px;height:40px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:26px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Fechar (Esc)">×</button>
+    <button id="docLbPrev" onclick="docLbNav(-1)" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:48px;height:80px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:42px;font-weight:200;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Anterior (←)">&#8249;</button>
+    <div id="docLbWrap" onclick="docLbToggleZoom(event)" style="max-width:88vw;max-height:80vh;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:zoom-in;border-radius:10px;">
+        <img id="docLbImg" src="" alt="" style="max-width:88vw;max-height:80vh;object-fit:contain;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,0.6);transition:transform 0.2s ease;user-select:none;pointer-events:none;display:block;">
+    </div>
+    <button id="docLbNext" onclick="docLbNav(1)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:48px;height:80px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:42px;font-weight:200;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Próxima (→)">&#8250;</button>
+    <div style="position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;">
+        <span id="docLbCounter" style="color:rgba(255,255,255,0.75);font-size:13px;font-weight:500;min-width:48px;text-align:center;"></span>
+        <button onclick="docLbZoom(-0.3)" style="width:34px;height:34px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:20px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Diminuir (-)">−</button>
+        <button onclick="docLbZoom(0.3)"  style="width:34px;height:34px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:20px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Aumentar (+)">+</button>
+    </div>
+</div>
+
+<style>
+    .doc-photo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+    .doc-photo-item { position:relative; border-radius:8px; overflow:hidden; border:1px solid #e2e8f0; cursor:pointer; aspect-ratio:4/3; }
+    .doc-photo-item img { width:100%; height:100%; object-fit:cover; display:block; transition:transform 0.2s; }
+    .doc-photo-item:hover img { transform:scale(1.04); }
+    .doc-photo-overlay { position:absolute; inset:0; background:rgba(0,0,0,0); display:flex; align-items:center; justify-content:center; transition:background 0.2s; }
+    .doc-photo-overlay svg { width:32px; height:32px; color:#fff; opacity:0; transition:opacity 0.2s; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+    .doc-photo-item:hover .doc-photo-overlay { background:rgba(0,0,0,0.3); }
+    .doc-photo-item:hover .doc-photo-overlay svg { opacity:1; }
+    @media print { .doc-photo-item { cursor:default; } .doc-photo-overlay { display:none; } #docLightbox { display:none !important; } }
+</style>
+
+<script>
+    var docLbImgs = [], docLbIdx = 0, docLbScale = 1;
+
+    function docLbOpen(url) {
+        docLbImgs = [];
+        document.querySelectorAll('.doc-photo-item img').forEach(function(img) {
+            docLbImgs.push(img.getAttribute('src'));
+        });
+        docLbIdx = docLbImgs.indexOf(url);
+        if (docLbIdx < 0) { docLbImgs = [url]; docLbIdx = 0; }
+        docLbScale = 1;
+        docLbRender();
+        var m = document.getElementById('docLightbox');
+        m.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function docLbClose() {
+        document.getElementById('docLightbox').style.display = 'none';
+        document.body.style.overflow = '';
+        docLbScale = 1;
+        document.getElementById('docLbImg').style.transform = 'scale(1)';
+        document.getElementById('docLbWrap').style.cursor = 'zoom-in';
+    }
+
+    function docLbRender() {
+        var img = document.getElementById('docLbImg');
+        var counter = document.getElementById('docLbCounter');
+        var prev = document.getElementById('docLbPrev');
+        var next = document.getElementById('docLbNext');
+        img.src = docLbImgs[docLbIdx];
+        var single = docLbImgs.length <= 1;
+        counter.textContent = single ? '' : (docLbIdx + 1) + ' / ' + docLbImgs.length;
+        prev.style.visibility = single ? 'hidden' : 'visible';
+        next.style.visibility = single ? 'hidden' : 'visible';
+    }
+
+    function docLbNav(dir) {
+        docLbIdx = (docLbIdx + dir + docLbImgs.length) % docLbImgs.length;
+        docLbScale = 1;
+        document.getElementById('docLbImg').style.transform = 'scale(1)';
+        document.getElementById('docLbWrap').style.cursor = 'zoom-in';
+        docLbRender();
+    }
+
+    function docLbZoom(delta) {
+        docLbScale = Math.min(5, Math.max(0.5, docLbScale + delta));
+        document.getElementById('docLbImg').style.transform = 'scale(' + docLbScale.toFixed(2) + ')';
+        document.getElementById('docLbWrap').style.cursor = docLbScale > 1.05 ? 'zoom-out' : 'zoom-in';
+    }
+
+    function docLbToggleZoom(e) {
+        e.stopPropagation();
+        docLbScale > 1.05
+            ? (docLbScale = 1, document.getElementById('docLbImg').style.transform = 'scale(1)', document.getElementById('docLbWrap').style.cursor = 'zoom-in')
+            : docLbZoom(1.5);
+    }
+
+    document.getElementById('docLightbox').addEventListener('click', function(e) {
+        if (e.target === this) docLbClose();
+    });
+    document.getElementById('docLbWrap').addEventListener('wheel', function(e) {
+        e.preventDefault();
+        docLbZoom(e.deltaY < 0 ? 0.2 : -0.2);
+    }, { passive: false });
+    document.addEventListener('keydown', function(e) {
+        var m = document.getElementById('docLightbox');
+        if (!m || m.style.display !== 'flex') return;
+        if (e.key === 'Escape')     docLbClose();
+        if (e.key === 'ArrowLeft')  docLbNav(-1);
+        if (e.key === 'ArrowRight') docLbNav(1);
+        if (e.key === '+')          docLbZoom(0.3);
+        if (e.key === '-')          docLbZoom(-0.3);
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}Oficinas - {{ unit }}{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+<div class="dashboard-container">
+    <a class="back-link" href="{% url 'ceai:dashboard' %}">&larr; Voltar para o painel</a>
+
+    <header class="page-header">
+        <div class="header-info">
+            <p class="eyebrow">CEAI - UNIDADE {{ unit|upper }}</p>
+            <h1>Gestão de Oficinas</h1>
+            <p class="section-description">Gerencie as atividades, vagas e categorias de cada oficina.</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn-primary" onclick="openModal('add-oficina')">
+                <i data-lucide="plus"></i>
+                Nova Oficina
+            </button>
+        </div>
+    </header>
+
+    <div class="content-grid">
+        <aside class="sidebar">
+            <div class="sidebar-card">
+                <h3>Resumo da Unidade</h3>
+                <div class="summary-list">
+                    <div class="summary-item">
+                        <span>Total de Oficinas</span>
+                        <strong>{{ oficinas.count }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Categorias Ativas</span>
+                        <strong>{{ categories.count }}</strong>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            {% if not oficinas %}
+            <div class="empty-state">
+                <i data-lucide="info"></i>
+                <p>Nenhuma oficina cadastrada para esta unidade.</p>
+            </div>
+            {% else %}
+            <div class="oficinas-list">
+                {% for category in categories %}
+                <div class="category-group">
+                    <h2 class="category-title">{{ category.name }}</h2>
+                    <div class="oficinas-grid">
+                        {% for oficina in oficinas %}
+                        {% if oficina.category == category %}
+                        <div class="oficina-card">
+                            <div class="oficina-info">
+                                <h3>{{ oficina.activity_name }}</h3>
+                                <div class="vacancy-bar">
+                                    <div class="vacancy-progress" style="width: {% if oficina.total_vacancies > 0 %}{{ oficina.vacancies|divide:oficina.total_vacancies|multiply:100 }}{% else %}0{% endif %}%"></div>
+                                </div>
+                                <div class="vacancy-stats">
+                                    <span>{{ oficina.vacancies }} ocupadas de {{ oficina.total_vacancies }}</span>
+                                </div>
+                            </div>
+                            <div class="oficina-actions">
+                                <button class="btn-icon" title="Editar"><i data-lucide="edit-2"></i></button>
+                                <button class="btn-icon danger" title="Excluir"><i data-lucide="trash-2"></i></button>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+                
+                <!-- Oficinas sem categoria -->
+                {% with unsorted=oficinas|filter_no_category %}
+                {% if unsorted %}
+                <div class="category-group">
+                    <h2 class="category-title">Sem Categoria</h2>
+                    <div class="oficinas-grid">
+                        {% for oficina in unsorted %}
+                        <div class="oficina-card">
+                            <div class="oficina-info">
+                                <h3>{{ oficina.activity_name }}</h3>
+                                <div class="vacancy-bar">
+                                    <div class="vacancy-progress" style="width: {% if oficina.total_vacancies > 0 %}{{ oficina.vacancies|divide:oficina.total_vacancies|multiply:100 }}{% else %}0{% endif %}%"></div>
+                                </div>
+                                <div class="vacancy-stats">
+                                    <span>{{ oficina.vacancies }} ocupadas de {{ oficina.total_vacancies }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
+            </div>
+            {% endif %}
+        </main>
+    </div>
+</div>
+
+<style>
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #64748b;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 24px;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-bottom: 32px;
+    }
+
+    .header-info h1 {
+        font-size: 28px;
+        font-weight: 800;
+        color: #1e3a8a;
+    }
+
+    .content-grid {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 32px;
+    }
+
+    .sidebar-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 24px;
+        position: sticky;
+        top: 24px;
+    }
+
+    .sidebar-card h3 {
+        font-size: 14px;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 16px;
+    }
+
+    .summary-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 0;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 13px;
+    }
+
+    .summary-item:last-child { border-bottom: none; }
+
+    .category-group { margin-bottom: 32px; }
+
+    .category-title {
+        font-size: 14px;
+        font-weight: 800;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .category-title::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: #e2e8f0;
+    }
+
+    .oficinas-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 16px;
+    }
+
+    .oficina-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        transition: all 0.2s;
+    }
+
+    .oficina-card:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .oficina-info { flex: 1; }
+
+    .oficina-info h3 {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 12px;
+    }
+
+    .vacancy-bar {
+        height: 6px;
+        background: #f1f5f9;
+        border-radius: 3px;
+        margin-bottom: 8px;
+        overflow: hidden;
+    }
+
+    .vacancy-progress {
+        height: 100%;
+        background: #3b82f6;
+        border-radius: 3px;
+    }
+
+    .vacancy-stats {
+        font-size: 11px;
+        font-weight: 600;
+        color: #64748b;
+    }
+
+    .oficina-actions {
+        display: flex;
+        gap: 4px;
+    }
+
+    .btn-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-icon:hover {
+        border-color: #3b82f6;
+        color: #3b82f6;
+        background: #eff6ff;
+    }
+
+    .btn-icon.danger:hover {
+        border-color: #ef4444;
+        color: #ef4444;
+        background: #fef2f2;
+    }
+
+    .btn-icon i { width: 16px; height: 16px; }
+
+    .btn-primary {
+        background: #2563eb;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+    }
+</style>
+</div>
+{% endblock %}

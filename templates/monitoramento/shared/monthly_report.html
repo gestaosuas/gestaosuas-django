@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Relatorio Mensal {{ module_title }} | {{ directorate.name }}{% endblock %}
+
+{% block content %}
+<section class="simple-shell benefits-shell">
+    <a class="back-link" href="{{ back_url }}">&larr; Voltar para o painel</a>
+
+    <div class="benefits-hero">
+        <div>
+            <p class="eyebrow">Relatorio Mensal</p>
+            <h1>{{ module_title }}</h1>
+        </div>
+        <form method="get" class="benefits-filter-bar">
+            <label class="pill-input">
+                <span>Ano</span>
+                <input type="number" name="year" value="{{ selected_year }}" min="2020">
+            </label>
+            <label class="pill-input">
+                <span>Mes</span>
+                <input type="number" name="month" value="{{ selected_month }}" min="1" max="12">
+            </label>
+            <button type="submit" class="secondary-button">Abrir</button>
+        </form>
+    </div>
+
+    <div class="panels-grid">
+        <article class="panel report-html-panel">
+            <h2>
+                {% if monthly_report %}
+                    Relatorio {{ monthly_report.month }}/{{ monthly_report.year }}
+                {% else %}
+                    Relatorio nao encontrado
+                {% endif %}
+            </h2>
+            {% if monthly_report and monthly_report.content.html %}
+                <div class="rich-report">{{ monthly_report.content.html|safe }}</div>
+            {% else %}
+                <p>Nao ha narrativa salva para o periodo selecionado.</p>
+            {% endif %}
+        </article>
+
+        <article class="panel">
+            <h2>Ultimos documentos</h2>
+            <ul class="panel-list">
+                {% for item in history %}
+                    <li>{{ item.month }}/{{ item.year }} • {{ item.get_status_display|default:item.status }}</li>
+                {% empty %}
+                    <li>Nenhum relatorio mensal encontrado.</li>
+                {% endfor %}
+            </ul>
+        </article>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Dados {{ module_title }} | {{ directorate.name }}{% endblock %}
+
+{% block content %}
+<section class="simple-shell benefits-shell">
+    <a class="back-link" href="{{ back_url }}">&larr; Voltar para o painel</a>
+
+    <div class="benefits-hero">
+        <div>
+            <p class="eyebrow">Historico de Dados</p>
+            <h1>{{ module_title }}</h1>
+            <p class="section-description">{{ directorate.name }} • {{ selected_year }}</p>
+        </div>
+    </div>
+
+    <div class="action-strip">
+        <a class="primary-button" href="{{ form_url }}">Atualizar Dados</a>
+        <a class="secondary-button" href="{{ monthly_report_url }}">Relatorio Mensal</a>
+    </div>
+
+    {% for group in table_groups %}
+        <div class="data-table-card">
+            <h2>{{ group.title }}</h2>
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Indicador</th>
+                            {% for month in month_labels %}
+                                <th>{{ month }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in group.rows %}
+                            <tr>
+                                <td>{{ row.label }}</td>
+                                {% for value in row.values %}
+                                    <td>{{ value|default_if_none:"" }}</td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endfor %}
+</section>
+{% endblock %}

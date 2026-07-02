@@ -1,0 +1,478 @@
+{% extends "base.html" %}
+{% load static %}
+{% load l10n %}
+{% load custom_filters %}
+
+{% block title %}Unidades SMDS | {{ system_name }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>
+    /* Fix overlap with absolute navbar */
+    .dashboard-main.map-main {
+        padding-top: 100px !important;
+        padding-bottom: 0 !important;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+    }
+
+    /* Single Line Compact Header */
+    .compact-map-bar {
+        background: white;
+        padding: 8px 20px;
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 12px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        flex-shrink: 0;
+    }
+
+    .map-title-mini {
+        font-size: 16px; /* Título menor */
+        font-weight: 800;
+        color: #0f172a;
+        white-space: nowrap;
+        margin-right: 8px;
+    }
+
+    .map-frame-premium { 
+        flex: 1; /* Maximiza área visível */
+        border-radius: 20px; 
+        overflow: hidden; 
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        position: relative;
+        background: #f1f5f9;
+        margin-bottom: 20px;
+    }
+    
+    #map { width: 100%; height: 100%; z-index: 1; }
+
+    /* Compact Filter Container */
+    .filter-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .filter-item label {
+        font-size: 10px;
+        font-weight: 700;
+        color: #94a3b8;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .multi-select-container {
+        position: relative;
+        width: 220px; /* Aumentado de 150px para evitar quebra de texto */
+    }
+
+    .multi-select-trigger {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0 10px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #334155;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        transition: all 0.2s;
+        height: 32px; /* Super compacto */
+    }
+
+    .multi-select-trigger span {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding-right: 4px;
+    }
+
+    .multi-select-trigger:hover { 
+        border-color: #3b82f6; 
+        background: #f8fafc;
+    }
+    
+    .multi-select-dropdown {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        z-index: 1000;
+        min-width: 200px; /* Garante largura mínima para as opções */
+        max-height: 300px;
+        overflow-y: auto;
+        padding: 6px;
+        display: none;
+    }
+
+    .multi-select-dropdown.active { display: block; }
+
+    .select-option {
+        padding: 5px 8px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 12px;
+        color: #475569;
+        white-space: nowrap; /* Evita quebra de linha nas opções */
+    }
+
+    .select-option:hover { background: #eff6ff; color: #2563eb; }
+    .select-option input { width: 14px; height: 14px; flex-shrink: 0; }
+
+    .btn-clear-map {
+        background: #fef2f2;
+        color: #ef4444;
+        border: 1px solid #fee2e2;
+        padding: 0 10px;
+        height: 32px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+    }
+
+    .btn-clear-map:hover { background: #ef4444; color: white; }
+
+    .units-count-badge {
+        background: #f8fafc;
+        color: #64748b;
+        padding: 0 10px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 700;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        border: 1px solid #e2e8f0;
+        white-space: nowrap;
+    }
+
+    .btn-manage {
+        background: #f1f5f9;
+        color: #475569;
+        padding: 0 12px;
+        height: 32px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        margin-left: auto; /* Empurra para a direita */
+        border: 1px solid #e2e8f0;
+        white-space: nowrap;
+    }
+
+    .btn-manage:hover { background: #e2e8f0; color: #0f172a; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+    
+    <main class="dashboard-main map-main">
+        <section class="compact-map-bar">
+            <h1 class="map-title-mini">Unidades SMDS</h1>
+
+            <div class="filter-item">
+                <div class="multi-select-container">
+                    <div class="multi-select-trigger" id="typeTrigger">
+                        <span id="typeLabel">Tipo Unidade</span>
+                        <i data-lucide="chevron-down" style="width: 12px;"></i>
+                    </div>
+                    <div class="multi-select-dropdown" id="typeDropdown">
+                        <label class="select-option" style="border-bottom: 1px solid #f1f5f9; padding-bottom: 6px; margin-bottom: 4px;">
+                            <input type="checkbox" id="selectAllTypes" checked>
+                            <strong>Todos</strong>
+                        </label>
+                        {% for cat in categories %}
+                        <label class="select-option">
+                            <input type="checkbox" class="type-checkbox" value="{{ cat.id }}" data-name="{{ cat.name }}" checked>
+                            <span>{{ cat.name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-item">
+                <div class="multi-select-container" style="width: 170px;">
+                    <div class="multi-select-trigger" id="regionTrigger">
+                        <span id="regionLabel">Região</span>
+                        <i data-lucide="chevron-down" style="width: 12px;"></i>
+                    </div>
+                    <div class="multi-select-dropdown" id="regionDropdown">
+                        <label class="select-option" style="border-bottom: 1px solid #f1f5f9; padding-bottom: 6px; margin-bottom: 4px;">
+                            <input type="checkbox" id="selectAllRegions" checked>
+                            <strong>Todas</strong>
+                        </label>
+                        {% for region in "Norte,Sul,Leste,Oeste,Central,Rural"|split:"," %}
+                        <label class="select-option">
+                            <input type="checkbox" class="region-checkbox" value="{{ region }}" checked>
+                            <span>{{ region }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-item">
+                <div class="multi-select-container" style="width: 160px;">
+                    <div class="multi-select-trigger" id="themeTrigger">
+                        <span id="themeLabel">Padrão</span>
+                        <i data-lucide="chevron-down" style="width: 12px;"></i>
+                    </div>
+                    <div class="multi-select-dropdown" id="themeDropdown">
+                        <label class="select-option">
+                            <input type="radio" name="mapTheme" value="osm" data-name="Padrão" checked>
+                            <span>Padrão</span>
+                        </label>
+                        <label class="select-option">
+                            <input type="radio" name="mapTheme" value="satellite" data-name="Satélite">
+                            <span>Satélite</span>
+                        </label>
+                        <label class="select-option">
+                            <input type="radio" name="mapTheme" value="dark" data-name="Escuro">
+                            <span>Escuro</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="units-count-badge">
+                <span id="unitsCount">0</span>&nbsp;unid
+            </div>
+
+            <button class="btn-clear-map" id="clearFilters" title="Limpar Filtros">
+                <i data-lucide="rotate-ccw" style="width: 12px;"></i>
+                Limpar
+            </button>
+
+            <a href="{% url 'core:map_management' %}" class="btn-manage">
+                <i data-lucide="settings" style="width: 12px;"></i>
+                Gerenciar Dados
+            </a>
+        </section>
+
+        <div class="map-frame-premium" id="mapFrame">
+            <div id="map"></div>
+        </div>
+    </main>
+</div>
+
+<script>
+    (function() {
+        function initMap() {
+            try {
+                if (window.lucide) window.lucide.createIcons();
+                if (typeof L === 'undefined') return;
+
+                const map = L.map('map').setView([-18.9186, -48.2772], 13);
+                
+                const tileLayers = {
+                    osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '© OpenStreetMap contributors'
+                    }),
+                    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                        attribution: 'Tiles © Esri'
+                    }),
+                    dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                        attribution: '© OSM © CARTO'
+                    })
+                };
+
+                let currentLayer = tileLayers.osm;
+                currentLayer.addTo(map);
+
+                const markers = [];
+                const unitsData = [
+                    {% for unit in map_units %}
+                    {
+                        id: "{{ unit.id }}",
+                        name: "{{ unit.name|escapejs }}",
+                        category: "{{ unit.category.id }}",
+                        categoryName: "{{ unit.category.name|escapejs }}",
+                        region: "{{ unit.region|escapejs }}",
+                        color: "{{ unit.category.color|default:'#3b82f6' }}",
+                        lat: parseFloat("{{ unit.latitude|unlocalize|default:'0' }}".replace(',', '.')),
+                        lng: parseFloat("{{ unit.longitude|unlocalize|default:'0' }}".replace(',', '.')),
+                        address: "{{ unit.address|escapejs }}"
+                    },
+                    {% endfor %}
+                ];
+
+                function getIconForCategory(categoryName) {
+                    const name = categoryName.toLowerCase();
+                    if (name.includes('cras')) return 'home';
+                    if (name.includes('creas')) return 'shield';
+                    if (name.includes('osc')) return 'heart';
+                    if (name.includes('centro pop')) return 'users';
+                    if (name.includes('acolhimento')) return 'bed';
+                    if (name.includes('conselho')) return 'message-circle';
+                    if (name.includes('sine')) return 'briefcase';
+                    if (name.includes('profissionalizante')) return 'graduation-cap';
+                    if (name.includes('naica')) return 'smile';
+                    if (name.includes('ceai') || name.includes('idoso')) return 'coffee';
+                    return 'map-pin';
+                }
+
+                function createCustomIcon(color, categoryName) {
+                    const iconName = getIconForCategory(categoryName);
+                    return L.divIcon({
+                        className: 'custom-div-icon',
+                        html: `
+                            <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
+                                <div style="background-color: ${color}; width: 24px; height: 24px; border: 2px solid white; border-radius: 50%; box-shadow: 0 3px 6px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; color: white; z-index: 2;">
+                                    <i data-lucide="${iconName}" style="width: 12px; height: 12px; stroke-width: 2px;"></i>
+                                </div>
+                                <div style="width: 2px; height: 6px; background-color: white; border-left: 1px solid ${color}; border-right: 1px solid ${color}; margin-top: -1px; z-index: 1;"></div>
+                            </div>
+                        `,
+                        iconSize: [24, 30],
+                        iconAnchor: [12, 30]
+                    });
+                }
+
+                function renderMarkers() {
+                    const selectedTypes = Array.from(document.querySelectorAll('.type-checkbox:checked')).map(cb => cb.value);
+                    const selectedRegions = Array.from(document.querySelectorAll('.region-checkbox:checked')).map(cb => cb.value);
+                    
+                    markers.forEach(m => map.removeLayer(m));
+                    markers.length = 0;
+
+                    const bounds = L.latLngBounds();
+                    let count = 0;
+
+                    unitsData.forEach(unit => {
+                        const matchesType = selectedTypes.includes(unit.category);
+                        const matchesRegion = selectedRegions.includes(unit.region);
+
+                        if (matchesType && matchesRegion && unit.lat !== 0 && unit.lng !== 0) {
+                            const marker = L.marker([unit.lat, unit.lng], {
+                                icon: createCustomIcon(unit.color, unit.categoryName)
+                            }).addTo(map);
+
+                            marker.bindPopup(`<strong>${unit.name}</strong><br><small>${unit.address || ''}</small>`);
+                            markers.push(marker);
+                            bounds.extend([unit.lat, unit.lng]);
+                            count++;
+                        }
+                    });
+
+                    document.getElementById('unitsCount').innerText = count;
+                    
+                    // Update trigger labels
+                    const typeCount = selectedTypes.length;
+                    const allTypesCount = document.querySelectorAll('.type-checkbox').length;
+                    document.getElementById('typeLabel').innerText = typeCount === allTypesCount ? 'Todos os Tipos' : (typeCount === 0 ? 'Nenhum' : `${typeCount} selecionados`);
+                    
+                    const regionCount = selectedRegions.length;
+                    const allRegionsCount = document.querySelectorAll('.region-checkbox').length;
+                    document.getElementById('regionLabel').innerText = regionCount === allRegionsCount ? 'Todas as Regiões' : (regionCount === 0 ? 'Nenhuma' : `${regionCount} selecionadas`);
+
+                    if (window.lucide) window.lucide.createIcons();
+                    if (count > 0) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 });
+                }
+
+                // Dropdown logic
+                function setupDropdown(triggerId, dropdownId, shouldCloseOnChange = false) {
+                    const trigger = document.getElementById(triggerId);
+                    const dropdown = document.getElementById(dropdownId);
+                    
+                    trigger.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const wasActive = dropdown.classList.contains('active');
+                        document.querySelectorAll('.multi-select-dropdown').forEach(d => d.classList.remove('active'));
+                        if (!wasActive) dropdown.classList.add('active');
+                    });
+
+                    // Prevent closing when clicking inside the dropdown
+                    dropdown.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                    });
+                }
+
+                setupDropdown('typeTrigger', 'typeDropdown');
+                setupDropdown('regionTrigger', 'regionDropdown');
+                setupDropdown('themeTrigger', 'themeDropdown', true);
+
+                document.addEventListener('click', () => {
+                    document.querySelectorAll('.multi-select-dropdown').forEach(d => d.classList.remove('active'));
+                });
+
+                // Select All logic
+                function setupSelectAll(allId, classCheck) {
+                    const selectAll = document.getElementById(allId);
+                    const checks = document.querySelectorAll('.' + classCheck);
+                    
+                    selectAll.addEventListener('change', (e) => {
+                        checks.forEach(c => c.checked = e.target.checked);
+                        renderMarkers();
+                    });
+
+                    checks.forEach(c => {
+                        c.addEventListener('change', () => {
+                            selectAll.checked = Array.from(checks).every(x => x.checked);
+                            renderMarkers();
+                        });
+                    });
+                }
+
+                setupSelectAll('selectAllTypes', 'type-checkbox');
+                setupSelectAll('selectAllRegions', 'region-checkbox');
+
+                // Theme selection
+                document.querySelectorAll('input[name="mapTheme"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        const val = e.target.value;
+                        const label = e.target.dataset.name;
+                        map.removeLayer(currentLayer);
+                        currentLayer = tileLayers[val];
+                        currentLayer.addTo(map);
+                        document.getElementById('themeLabel').innerText = label;
+                        document.getElementById('themeDropdown').classList.remove('active');
+                    });
+                });
+
+                document.getElementById('clearFilters').addEventListener('click', () => {
+                    document.querySelectorAll('input[type="checkbox"]').forEach(c => c.checked = true);
+                    renderMarkers();
+                });
+
+                renderMarkers();
+                setTimeout(() => map.invalidateSize(), 500);
+            } catch (err) {
+                console.error('Erro ao inicializar o mapa:', err);
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initMap);
+        } else {
+            initMap();
+        }
+    })();
+</script>
+{% endblock %}

@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Dados {{ subcategory|title }} | {{ directorate.name }}{% endblock %}
+
+{% block content %}
+<section class="simple-shell benefits-shell">
+    <a class="back-link" href="{% url 'protecaoespecial:home' directorate.pk %}?year={{ selected_year }}">&larr; Voltar</a>
+    <div class="benefits-hero">
+        <div>
+            <p class="eyebrow">Tabela de Dados</p>
+            <h1>{{ subcategory|title }} &mdash; {{ selected_year }}</h1>
+        </div>
+        <div class="benefits-filter-bar static-bar">
+            <span class="pill">Ano {{ selected_year }}</span>
+            <a href="{% if subcategory == 'protetivo' %}{% url 'protecaoespecial:form-protetivo' directorate.pk %}{% else %}{% url 'protecaoespecial:form-socioeducativo' directorate.pk %}{% endif %}?year={{ selected_year }}" class="primary-button" style="text-decoration:none">
+                <i data-lucide="file-plus" style="width:16px;height:16px"></i> Novo
+            </a>
+        </div>
+    </div>
+    {% for g in table_groups %}
+    <div class="data-table-card" style="margin-top:24px">
+        <div class="section-head">
+            <div class="section-line"></div>
+            <h2>{{ g.title }}</h2>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Indicador</th>
+                        {% for l in month_labels %}
+                        <th>{{ l }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in g.rows %}
+                    <tr>
+                        <td style="font-weight: 800; color: #1e293b;">{{ row.label }}</td>
+                        {% for item in row.values %}
+                            <td class="val-cell {% if request.user.profile.role == 'admin' and not row.is_readonly %}editable-cell{% else %}readonly-cell{% endif %}" 
+                                style="color: {% if row.is_readonly %}#94a3b8{% else %}#64748b{% endif %}; font-weight: 600;"
+                                {% if request.user.profile.role == 'admin' and not row.is_readonly %}
+                                contenteditable="true"
+                                data-sub-id="{{ item.sub_id|default:'' }}"
+                                data-month="{{ item.month }}"
+                                data-year="{{ item.year }}"
+                                data-key="{{ row.key }}"
+                                {% endif %}
+                                data-key="{{ row.key }}"
+                                data-month="{{ item.month }}"
+                                data-year="{{ item.year }}">
+                                <span class="val-inner" style="display: inline-block; min-width: 30px; padding: 2px 4px; border-radius: 4px;">
+                                    {% if item.val != '' and item.val != None and item.val != 0 %}{{ item.val }}{% endif %}
+                                </span>
+                            </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+</section>
+
+<style>
+.val-cell.editable-cell .val-inner { cursor: pointer; transition: all 0.2s; }
+.val-cell.editable-cell:hover .val-inner { background: #eff6ff !important; color: #3b82f6 !important; outline: 2px solid #bfdbfe; }
+.val-cell.editable-cell:focus { outline: none; }
+.val-cell.editable-cell:focus .val-inner { background: white !important; outline: 2px solid #3b82f6 !important; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+.val-cell.saving .val-inner { opacity: 0.6; }
+.val-cell.readonly-cell .val-inner { background: transparent !important; }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        lucide.createIcons();
+        
+        document.querySelectorAll('.editable-cell').forEach(cell => {
+            cell.addEventListener('focus', function() {
+                const inner = this.querySelector('.val-inner');
+                if(inner) {
+                    this.setAttribute('data-original', inner.innerText.trim());
+                }
+            });
+
+            cell.addEventListener('blur', function() {
+                saveCell(this);
+            });
+
+            cell.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.blur();
+                }
+            });
+        });
+
+        function saveCell(cell) {
+            const inner = cell.querySelector('.val-inner');
+            if(!inner) return;
+            
+            const subId = cell.dataset.subId;
+            const month = cell.dataset.month;
+            const year = cell.dataset.year;
+            const key = cell.dataset.key;
+            const value = inner.innerText.trim();
+            const originalValue = (cell.getAttribute('data-original') || '').trim();
+
+            if (value === originalValue) return;
+
+            cell.classList.add('saving');
+
+            const formData = new FormData();
+            formData.append('sub_id', subId);
+            formData.append('month', month);
+            formData.append('year', year);
+            formData.append('key', key);
+            formData.append('value', value || '0');
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            let fetchUrl = '{% url "protecaoespecial:quick-edit-protetivo" %}';
+            {% if subcategory == 'socioeducativo' %}
+                fetchUrl = '{% url "protecaoespecial:quick-edit-socioeducativo" %}';
+            {% endif %}
+
+            fetch(fetchUrl, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                cell.classList.remove('saving');
+                if (data.status === 'success') {
+                    const newVal = (data.value !== null && data.value !== 0 && data.value !== '0') ? data.value : '';
+                    inner.innerText = newVal;
+                    cell.setAttribute('data-original', newVal);
+                    if (data.sub_id) {
+                        cell.setAttribute('data-sub-id', data.sub_id);
+                    }
+                    
+                    window.showToast('Salvo', 'Indicador atualizado com sucesso!', 'success');
+                    
+                    inner.style.transition = 'none';
+                    inner.style.backgroundColor = '#4ade80';
+                    inner.style.color = 'white';
+                    
+                    setTimeout(() => {
+                        inner.style.transition = 'all 0.6s';
+                        inner.style.backgroundColor = 'transparent';
+                        inner.style.color = '#64748b';
+                    }, 400);
+
+                    // Update calculated computed fields dynamically in the same column!
+                    if (data.computed) {
+                        for (const [compKey, compVal] of Object.entries(data.computed)) {
+                            // Find cell in the same column (month & year) matching the computed key
+                            const compCell = document.querySelector(`td[data-key="${compKey}"][data-month="${month}"][data-year="${year}"]`);
+                            if (compCell) {
+                                const compInner = compCell.querySelector('.val-inner');
+                                if (compInner) {
+                                    const computedStr = (compVal !== null && compVal !== 0 && compVal !== '0') ? compVal : '';
+                                    compInner.innerText = computedStr;
+                                    compCell.setAttribute('data-original', computedStr);
+                                    
+                                    // Visual flash feedback for computed value updates!
+                                    compInner.style.transition = 'none';
+                                    compInner.style.backgroundColor = '#93c5fd';
+                                    compInner.style.color = 'white';
+                                    
+                                    setTimeout(() => {
+                                        compInner.style.transition = 'all 0.6s';
+                                        compInner.style.backgroundColor = 'transparent';
+                                        compInner.style.color = '#94a3b8';
+                                    }, 400);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    inner.innerText = originalValue;
+                    alert('Erro ao salvar dados.');
+                }
+            })
+            .catch(err => {
+                cell.classList.remove('saving');
+                inner.innerText = originalValue;
+                console.error(err);
+            });
+        }
+    });
+</script>
+{% endblock %}

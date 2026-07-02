@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Historico CREAS | {{ directorate.name }}{% endblock %}
+
+{% block content %}
+<section class="simple-shell benefits-shell">
+    <a class="back-link" href="{% url 'creasidoso:home' directorate.pk %}">&larr; Voltar</a>
+    <div class="benefits-hero"><div><p class="eyebrow">Historico</p><h1>Relatorios CREAS</h1></div><span class="pill">Ano {{ selected_year }}</span></div>
+    <div class="report-history-grid" style="margin-top:24px">
+        {% for r in reports %}<a href="{% url 'creasidoso:monthly-report' directorate.pk %}?year={{ r.year }}&month={{ r.month }}" class="history-card"><h2>{{ r.month }}/{{ r.year }}</h2><p>{{ r.get_status_display }}</p></a>
+        {% empty %}<div class="panel" style="text-align:center;padding:48px;grid-column:1/-1"><i data-lucide="folder-open" style="width:48px;height:48px;color:#94a3b8;margin-bottom:16px"></i><h2>Nenhum relatorio</h2></div>{% endfor %}
+    </div>
+</section>
+{% endblock %}

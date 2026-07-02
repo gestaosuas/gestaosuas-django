@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Nova Visita | {{ directorate.name }}{% endblock %}
+
+{% block content %}
+<div class="monitoring-header-container">
+    <div class="monitoring-header-content">
+        <div class="monitoring-title-area">
+            <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 10px;">
+                <div style="width: 50px; height: 50px; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #1e3a8a;">
+                    <i data-lucide="calendar-plus" style="width: 32px; height: 32px;"></i>
+                </div>
+                <div>
+                    <h1>Agendar Nova Visita</h1>
+                    <p>{{ directorate.name }} &mdash; Monitoramento e Avaliacao Tecnica</p>
+                </div>
+            </div>
+            <a href="{% url 'directorates:visit-list' directorate.pk %}" class="btn-ghost-white">
+                <i data-lucide="arrow-left"></i> Voltar para Lista
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="monitoring-main-card" style="max-width: 600px; margin-top: -50px;">
+    <div class="card-section-header" style="border-bottom: 1px solid #f1f5f9; padding: 16px 24px; background: #f8fafc;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 28px; height: 28px; border-radius: 8px; background: #eff6ff; color: #3b82f6; display: flex; align-items: center; justify-content: center;">
+                <i data-lucide="clipboard-list" style="width: 15px; height: 15px;"></i>
+            </div>
+            <h2 style="margin:0; font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#1e293b;">Dados da Visita</h2>
+        </div>
+    </div>
+
+    <form method="post" class="section-body" style="padding: 24px;">
+        {% csrf_token %}
+
+        <div class="space-y-5">
+            <div class="form-group">
+                <label class="premium-label">Selecione a OSC</label>
+                <div style="position:relative;">
+                    <i data-lucide="search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#94a3b8;pointer-events:none;"></i>
+                    <select name="osc" required class="form-input-premium w-full" style="padding-left:42px;">
+                        <option value="">Buscar e selecionar OSC...</option>
+                        {% for osc in directorate.oscs.all %}
+                            <option value="{{ osc.pk }}">{{ osc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="form-group">
+                    <label class="premium-label">Data da Visita</label>
+                    <input type="date" name="visit_date" required class="form-input-premium w-full">
+                </div>
+                <div class="form-group">
+                    <label class="premium-label">Horario</label>
+                    <input type="time" name="visit_time" value="09:00" required class="form-input-premium w-full">
+                </div>
+            </div>
+
+            <input type="hidden" name="status" value="draft">
+        </div>
+
+        <div class="flex justify-end gap-3 pt-6 mt-6 border-t border-zinc-100">
+            <a href="{% url 'directorates:visit-list' directorate.pk %}" class="btn-outline-monitoring" style="padding: 11px 24px;">Cancelar</a>
+            <button type="submit" class="btn-primary-premium" style="padding: 11px 28px;">
+                <i data-lucide="save"></i> Agendar e Iniciar
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+    .premium-label {
+        font-size: 10px; font-weight: 800; text-transform: uppercase;
+        letter-spacing: 0.1em; color: #94a3b8; display: block; margin-bottom: 6px;
+    }
+    .form-input-premium {
+        height: 46px; background: #fdfdfd; border: 1px solid #e2e8f0;
+        border-radius: 10px; padding: 0 14px; font-size: 13px; font-weight: 500;
+        transition: all 0.2s ease; width: 100%;
+    }
+    .form-input-premium:focus {
+        border-color: #3b82f6; background: white;
+        outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,0.08);
+    }
+    select.form-input-premium { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 40px; }
+
+    .btn-ghost-white {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 16px; border-radius: 10px;
+        font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+        color: rgba(255,255,255,0.75); border: 1px solid rgba(255,255,255,0.2);
+        background: transparent; cursor: pointer; text-decoration: none;
+        transition: all 0.2s;
+    }
+    .btn-ghost-white:hover { color: #fff; border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.08); }
+    .btn-ghost-white i { width: 14px; height: 14px; }
+</style>
+{% endblock %}

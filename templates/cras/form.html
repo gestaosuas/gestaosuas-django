@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Preencher CRAS | {{ directorate.name }}{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+
+    <main class="dashboard-main cras-main" style="padding-top: 0;">
+        <div class="monitoring-header-container header-emerald">
+            <div class="monitoring-header-content">
+                <div class="monitoring-title-area">
+                    <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 10px;">
+                        <a href="{% url 'cras:home' directorate.pk %}?year={{ selected_year }}" style="color: white; background: rgba(255,255,255,0.2); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none;">
+                            <i data-lucide="arrow-left" style="width: 20px; height: 20px;"></i>
+                        </a>
+                        <div>
+                            <h1>Atualizar Dados CRAS</h1>
+                            <p style="margin:0; font-size: 14px; opacity: 0.9;">Preenchimento de Indicadores Mensais</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="monitoring-header-actions visit-header-actions" style="flex-direction: row; align-items: center;">
+                    <div class="filter-row-group" style="margin: 0;">
+                        <span class="pill" style="background: rgba(255,255,255,0.2); color: white; border: none; font-weight: 800;">Ano {{ selected_year }}</span>
+                        {% if selected_unit %}<span class="pill" style="background: #10b981; color: white; border: none; font-weight: 800;">{{ selected_unit }}</span>{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="monitoring-main-card">
+            {% if not selected_unit %}
+            <div style="text-align:center; padding: 60px 24px; background: #f8fafc; border-radius: 24px; border: 2px dashed #e2e8f0;">
+                <i data-lucide="building-2" style="width: 56px; height: 56px; color: #cbd5e1; margin-bottom: 20px;"></i>
+                <h2 style="font-size: 20px; font-weight: 800; color: #1e3a8a;">Selecione uma Unidade</h2>
+                <p style="color: #64748b; font-weight: 600; margin-bottom: 24px;">Escolha uma unidade CRAS para iniciar o preenchimento dos dados.</p>
+                <form method="get" style="display: inline-flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center;">
+                    <input type="hidden" name="year" value="{{ selected_year }}">
+                    <input type="hidden" name="month" value="{{ selected_month }}">
+                    <select name="unit" class="filter-select" style="min-width: 240px; height: 44px; border-color: #e2e8f0; background: white;">
+                        <option value="">Selecione a Unidade...</option>
+                        {% for unit in cras_units %}
+                        <option value="{{ unit }}">{{ unit }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn-primary-premium" style="height: 44px; padding: 0 30px;">
+                        Continuar <i data-lucide="arrow-right"></i>
+                    </button>
+                </form>
+            </div>
+            {% else %}
+            <form method="post" class="report-form-shell" enctype="multipart/form-data">
+                {% csrf_token %}
+                {% if form.non_field_errors %}<div class="error-text" style="background: #fef2f2; color: #ef4444; padding: 12px; border-radius: 12px; margin-bottom: 20px; font-weight: 700;">{{ form.non_field_errors }}</div>{% endif %}
+                <input type="hidden" name="unit_name" value="{{ selected_unit }}">
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; padding: 20px; background: #f8fafc; border-radius: 16px;">
+                    <div class="field-group">
+                        <label style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 6px; display: block;">Mês de Referência</label>
+                        {{ form.month }}
+                    </div>
+                    <div class="field-group">
+                        <label style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 6px; display: block;">Ano de Referência</label>
+                        {{ form.year }}
+                    </div>
+                </div>
+
+                {% for section in section_items %}
+                <div class="report-section-card" style="margin-bottom: 30px; border: 1px solid #f1f5f9; padding: 24px; border-radius: 20px;">
+                    <div class="section-head" style="margin-bottom: 24px;">
+                        <div class="section-line" style="background:#10b981;"></div>
+                        <h2 style="font-size: 18px; font-weight: 800; color: #064e3b;">{{ section.title }}</h2>
+                    </div>
+                    <div class="report-form-grid" style="display: grid; {% if section.title == 'ANEXOS' %}grid-template-columns: 1fr; max-width: 500px;{% else %}grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));{% endif %} gap: 20px;">
+                        {% for field in section.fields %}
+                        <div class="field-group">
+                            <label for="{{ field.id_for_label }}" style="font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px; display: block;">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<small style="display: block; margin-top: 4px; color: #94a3b8; font-size: 11px;">{{ field.help_text }}</small>{% endif %}
+                            {% if field.errors %}<div class="error-text" style="color: #ef4444; font-size: 11px; margin-top: 4px; font-weight: 600;">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+
+                <div class="form-actions-row" style="display: flex; gap: 16px; margin-top: 40px; padding-top: 30px; border-top: 1px solid #f1f5f9;">
+                    <a class="btn-primary-premium" href="{% url 'cras:data' directorate.pk %}?year={{ selected_year }}" style="background: #f1f5f9; color: #475569; border-color: #e2e8f0;">
+                        Cancelar
+                    </a>
+                    <button type="submit" class="btn-primary-premium" style="background: #10b981; border-color: #059669; padding: 0 40px;">
+                        Salvar Indicadores
+                    </button>
+                </div>
+            </form>
+            <script>
+            document.addEventListener("DOMContentLoaded", function() {
+                var mesAnt = document.getElementById("id_mes_anterior");
+                var admitidas = document.getElementById("id_admitidas");
+                var atual = document.getElementById("id_atual");
+                function calc() {
+                    var m = parseInt(mesAnt.value) || 0;
+                    var a = parseInt(admitidas.value) || 0;
+                    atual.value = m + a;
+                }
+                if (mesAnt && admitidas) {
+                    mesAnt.addEventListener("input", calc);
+                    admitidas.addEventListener("input", calc);
+                }
+            });
+            </script>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}

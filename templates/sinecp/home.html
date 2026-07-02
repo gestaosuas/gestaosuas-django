@@ -1,0 +1,652 @@
+{% extends "base.html" %}
+
+{% block title %}Qualificacao Profissional e SINE | {{ directorate.name }}{% endblock %}
+
+{% block body_class %}theme-indigo{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+
+    <main class="dashboard-main sinecp-main" style="padding-top: 0;">
+        <div class="monitoring-header-container header-indigo">
+            <div class="monitoring-header-content">
+                <div class="monitoring-title-area">
+                    <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 10px;">
+                        <div style="width: 50px; height: 50px; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #1e1b4b;">
+                            <i data-lucide="briefcase-business" style="width: 32px; height: 32px;"></i>
+                        </div>
+                        <div>
+                            <h1>{{ directorate.name }}</h1>
+                            <p style="margin:0; font-size: 14px; opacity: 0.9;">SINE e Qualificação Profissional</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="monitoring-header-actions visit-header-actions" style="flex-direction: row; align-items: center;">
+                    <div class="tab-switcher sinecp-tabs-premium" style="margin-right: 20px; background: rgba(255,255,255,0.1); padding: 4px; border-radius: 12px;">
+                        <a class="tab-chip {% if active_tab == 'sine' %}active{% endif %}" href="?tab=sine&year={{ selected_year }}&month={{ selected_month }}" style="color: white; padding: 8px 16px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: 12px; font-weight: 700; {% if active_tab == 'sine' %}background: white; color: #1e1b4b;{% endif %}">
+                            <i data-lucide="briefcase-business" style="width: 16px; height: 16px;"></i>
+                            <span>SINE</span>
+                        </a>
+                        <a class="tab-chip {% if active_tab == 'cp' %}active{% endif %}" href="?tab=cp&year={{ selected_year }}&month={{ selected_month }}" style="color: white; padding: 8px 16px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: 12px; font-weight: 700; {% if active_tab == 'cp' %}background: white; color: #1e1b4b;{% endif %}">
+                            <i data-lucide="graduation-cap" style="width: 16px; height: 16px;"></i>
+                            <span>QUALIFICAÇÃO</span>
+                        </a>
+                    </div>
+
+                    <form method="get" class="visit-filter-form visit-filter-form-hero" style="margin: 0;">
+                        <input type="hidden" name="tab" value="{{ active_tab }}">
+                        <div class="filter-row-group">
+                            <select name="month" class="filter-select" onchange="this.form.submit()">
+                                <option value="all" {% if selected_month == 'all' %}selected{% endif %}>Ano Inteiro</option>
+                                {% for m_num, m_name in months_range %}
+                                    <option value="{{ m_num }}" {% if selected_month == m_num|stringformat:"s" %}selected{% endif %}>{{ m_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="year" class="filter-select" onchange="this.form.submit()">
+                                {% for y in years_range %}
+                                    <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="button" class="btn-primary-premium" id="toggle-sinecp-menu" style="margin-left: 10px;">
+                                <i data-lucide="settings"></i>
+                                <span id="toggle-sinecp-text">Gerenciar Unidade</span>
+                                <i data-lucide="chevron-down" id="toggle-sinecp-icon"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="monitoring-main-card">
+            <div class="management-overlay management-overlay-rich" id="sinecp-management-menu" style="display: none;">
+                <section class="management-section">
+                    <div class="section-head">
+                        <div class="section-line"></div>
+                        <h2>Gestão SINE</h2>
+                    </div>
+                    <div class="mgmt-grid">
+                        <a href="{% url 'sinecp:sine-form' %}?year={{ selected_year }}" class="mgmt-card">
+                            <div class="mgmt-icon indigo"><i data-lucide="file-plus"></i></div>
+                            <div class="mgmt-info">
+                                <strong>Atualizar Dados SINE</strong>
+                                <span>Inserir indicadores mensais</span>
+                            </div>
+                        </a>
+                        <a href="{% url 'sinecp:sine-data' %}?year={{ selected_year }}" class="mgmt-card">
+                            <div class="mgmt-icon emerald"><i data-lucide="database"></i></div>
+                            <div class="mgmt-info">
+                                <strong>Ver Dados SINE</strong>
+                                <span>Tabela anual de indicadores</span>
+                            </div>
+                        </a>
+                        <a href="{% url 'sinecp:sine-monthly-report' %}?year={{ selected_year }}" class="mgmt-card">
+                            <div class="mgmt-icon violet"><i data-lucide="file-text"></i></div>
+                            <div class="mgmt-info">
+                                <strong>Relatório Mensal SINE</strong>
+                                <span>Narrativa do mês vigente</span>
+                            </div>
+                        </a>
+                        <a href="{% url 'sinecp:sine-reports' %}?year={{ selected_year }}" class="mgmt-card">
+                            <div class="mgmt-icon sky"><i data-lucide="folder-open"></i></div>
+                            <div class="mgmt-info">
+                                <strong>Ver Relatórios SINE</strong>
+                                <span>Histórico de narrativas</span>
+                            </div>
+                        </a>
+                    </div>
+                </section>
+
+                <section class="management-section">
+                    <div class="section-head">
+                        <div class="section-line"></div>
+                        <h2>Gestão Qualificação Profissional</h2>
+                    </div>
+                    <div class="mgmt-grid">
+                        <a href="{% url 'sinecp:qualificacao-form' %}?year={{ selected_year }}" class="mgmt-card">
+                            <div class="mgmt-icon indigo"><i data-lucide="file-plus"></i></div>
+                            <div class="mgmt-info">
+                                <strong>Atualizar Dados CP</strong>
+                                <span>Inserir indicadores mensais</span>
+                            </div>
+                        </a>
+                        <a href="{% url 'sinecp:qualificacao-data' %}?year={{ selected_year }}" class="mgmt-card">
+                            <div class="mgmt-icon emerald"><i data-lucide="database"></i></div>
+                            <div class="mgmt-info">
+                                <strong>Ver Dados CP</strong>
+                                <span>Tabela anual de indicadores</span>
+                            </div>
+                        </a>
+                        <a href="{% url 'sinecp:qualificacao-monthly-report' %}?year={{ selected_year }}" class="mgmt-card">
+                            <div class="mgmt-icon violet"><i data-lucide="file-text"></i></div>
+                            <div class="mgmt-info">
+                                <strong>Relatório Mensal CP</strong>
+                                <span>Narrativa do mês vigente</span>
+                            </div>
+                        </a>
+                        <a href="{% url 'sinecp:qualificacao-reports' %}?year={{ selected_year }}" class="mgmt-card">
+                            <div class="mgmt-icon sky"><i data-lucide="folder-open"></i></div>
+                            <div class="mgmt-info">
+                                <strong>Ver Relatórios CP</strong>
+                                <span>Histórico de narrativas</span>
+                            </div>
+                        </a>
+                    </div>
+                </section>
+            </div>
+
+            <div class="dashboard-split-layout">
+                <aside class="metrics-stack">
+                    {% for card in active_cards %}
+                        <article class="metric-card-modern">
+                            <div class="metric-top">
+                                <div class="icon-circle" style="--accent-color: {{ card.color }}; background: {{ card.color }}15;">
+                                    <i data-lucide="{{ card.icon }}"></i>
+                                </div>
+                                {% if card.variation %}
+                                    <div class="variation {{ card.variation.direction }}">
+                                        <i data-lucide="{{ card.variation.icon }}"></i>
+                                        <span>{{ card.variation.text }}</span>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <p class="metric-context">{{ card.label }}</p>
+                            <strong>{{ card.value }}</strong>
+                        </article>
+                    {% endfor %}
+                </aside>
+
+                    <div class="charts-stack-grid">
+                    {% if active_tab == 'sine' %}
+                        <article class="chart-panel">
+                            <div class="chart-header">
+                                <div>
+                                    <h2>Serviços Prestados</h2>
+                                </div>
+                            </div>
+                            <div class="monitoring-chart-wrap">
+                                <canvas id="sine-services-chart"></canvas>
+                            </div>
+                        </article>
+
+                        <article class="chart-panel">
+                            <div class="chart-header">
+                                <div>
+                                    <h2>Atendimento</h2>
+                                </div>
+                                <span class="chart-value">{{ sine_total_attendance }}</span>
+                            </div>
+                            <div class="monitoring-chart-wrap">
+                                <canvas id="sine-attendance-chart"></canvas>
+                            </div>
+                        </article>
+                    {% else %}
+                        <article class="chart-panel">
+                            <div class="chart-header">
+                                <div>
+                                    <h2>Concluintes</h2>
+                                </div>
+                                <span class="chart-value">{{ cp_peak_concluintes }}</span>
+                            </div>
+                            <div class="monitoring-chart-wrap">
+                                <canvas id="cp-concluintes-chart"></canvas>
+                            </div>
+                        </article>
+
+                        <article class="chart-panel">
+                            <div class="chart-header">
+                                <div>
+                                    <h2>Interações</h2>
+                                </div>
+                                <span class="chart-value">{{ cp_total_interactions }}</span>
+                            </div>
+                            <div class="monitoring-chart-wrap">
+                                <canvas id="cp-comparison-chart"></canvas>
+                            </div>
+                        </article>
+
+                        <article class="chart-panel chart-panel-gender">
+                            <div class="chart-header" style="margin-bottom: 5px;">
+                                <h2>Gênero</h2>
+                            </div>
+                            <div class="sinecp-gender-panel">
+                                <div class="sinecp-gender-canvas-wrap">
+                                    <canvas id="cp-gender-chart"></canvas>
+                                </div>
+                                <ul class="donut-legend">
+                                    {% for item in cp_gender %}
+                                        <li>
+                                            <span class="legend-dot" style="background: {{ item.color }};"></span>
+                                            <span>{{ item.label }}</span>
+                                            <strong>{{ item.value }}</strong>
+                                        </li>
+                                    {% empty %}
+                                        <li>Sem dados</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </article>
+                    {% endif %}
+                    </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+{{ sine_chart_data|json_script:"sine-chart-data" }}
+{{ cp_chart_data|json_script:"cp-chart-data" }}
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const toggleButton = document.getElementById("toggle-sinecp-menu");
+        const managementMenu = document.getElementById("sinecp-management-menu");
+        const toggleText = document.getElementById("toggle-sinecp-text");
+        const toggleIcon = document.getElementById("toggle-sinecp-icon");
+
+        if (toggleButton && managementMenu) {
+            toggleButton.addEventListener("click", () => {
+                const isHidden = managementMenu.style.display === "none";
+                managementMenu.style.display = isHidden ? "grid" : "none";
+                toggleText.textContent = isHidden ? "Fechar Menu" : "Gerenciar Unidade";
+                toggleIcon.setAttribute("data-lucide", isHidden ? "chevron-up" : "chevron-down");
+                lucide.createIcons();
+            });
+        }
+
+        if (window.Chart && window.ChartDataLabels) {
+            Chart.register(ChartDataLabels);
+        }
+
+        const sineChartPayload = JSON.parse(document.getElementById("sine-chart-data").textContent);
+        const cpChartPayload = JSON.parse(document.getElementById("cp-chart-data").textContent);
+
+        const defaultGrid = {
+            color: "rgba(148, 163, 184, 0.14)",
+            drawBorder: false,
+        };
+
+        const defaultTicks = {
+            color: "#8ca0bf",
+            font: {
+                size: 11,
+                weight: "700",
+            },
+        };
+
+        const lineLabelFormatter = (value) => value > 0 ? value : "";
+
+        const basePlugins = {
+            legend: {
+                labels: {
+                    color: "#334155",
+                    usePointStyle: true,
+                    pointStyle: "circle",
+                    boxWidth: 8,
+                    boxHeight: 8,
+                    padding: 18,
+                    font: {
+                        size: 12,
+                        weight: "700",
+                    },
+                },
+            },
+            tooltip: {
+                backgroundColor: "rgba(15, 23, 42, 0.92)",
+                titleColor: "#f8fafc",
+                bodyColor: "#e2e8f0",
+                padding: 12,
+                displayColors: true,
+            },
+            datalabels: {
+                color: "#3b82f6",
+                anchor: "end",
+                align: "top",
+                clamp: true,
+                clip: false,
+                offset: 4,
+                font: {
+                    size: 10,
+                    weight: "800",
+                },
+                formatter: lineLabelFormatter,
+            },
+        };
+
+        const monthTicks = {
+            ...defaultTicks,
+            autoSkip: false,
+            maxRotation: 0,
+            minRotation: 0,
+            padding: 8,
+        };
+
+        const sineServicesCanvas = document.getElementById("sine-services-chart");
+        if (sineServicesCanvas) {
+            new Chart(sineServicesCanvas, {
+                type: "bar",
+                data: {
+                    labels: sineChartPayload.services_labels,
+                    datasets: [{
+                        data: sineChartPayload.services_values,
+                        backgroundColor: ["#3b82f6", "#60a5fa", "#38bdf8", "#10b981", "#f59e0b"],
+                        borderRadius: 8,
+                        barThickness: 14,
+                    }],
+                },
+                options: {
+                    indexAxis: "y",
+                    maintainAspectRatio: false,
+                    layout: {
+                        padding: { top: 6, right: 12, bottom: 4, left: 0 },
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: basePlugins.tooltip,
+                        datalabels: {
+                            anchor: "end",
+                            align: "right",
+                            color: "#475569",
+                            font: { weight: "800", size: 10 },
+                            formatter: (value) => value,
+                        },
+                    },
+                    scales: {
+                        x: {
+                            display: false,
+                            grid: { display: false, drawBorder: false },
+                            border: { display: false },
+                        },
+                        y: {
+                            grid: { display: false, drawBorder: false },
+                            ticks: defaultTicks,
+                            border: { display: false },
+                        },
+                    },
+                },
+            });
+        }
+
+        const sineAttendanceCanvas = document.getElementById("sine-attendance-chart");
+        if (sineAttendanceCanvas) {
+            new Chart(sineAttendanceCanvas, {
+                type: "line",
+                data: {
+                    labels: sineChartPayload.labels,
+                    datasets: [
+                        {
+                            label: "Empregador",
+                            data: sineChartPayload.empregador_values,
+                            borderColor: "#0f172a",
+                            backgroundColor: "#0f172a",
+                            tension: 0.35,
+                            borderWidth: 3,
+                            pointRadius: 3,
+                            pointHoverRadius: 4,
+                        },
+                        {
+                            label: "Trabalhador",
+                            data: sineChartPayload.trabalhador_values,
+                            borderColor: "#3b82f6",
+                            backgroundColor: "#3b82f6",
+                            tension: 0.35,
+                            borderWidth: 4,
+                            pointRadius: 4,
+                            pointHoverRadius: 5,
+                        },
+                    ],
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    layout: {
+                        padding: { top: 22, right: 12, bottom: 8, left: 6 },
+                    },
+                    plugins: {
+                        ...basePlugins,
+                        datalabels: {
+                            ...basePlugins.datalabels,
+                            color: (ctx) => ctx.dataset.borderColor,
+                        },
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false, drawBorder: false },
+                            ticks: monthTicks,
+                            border: { display: false },
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: defaultGrid,
+                            ticks: { ...defaultTicks, precision: 0 },
+                            border: { display: false },
+                        },
+                    },
+                },
+            });
+        }
+
+        const cpConcluintesCanvas = document.getElementById("cp-concluintes-chart");
+        if (cpConcluintesCanvas) {
+            new Chart(cpConcluintesCanvas, {
+                type: "line",
+                data: {
+                    labels: cpChartPayload.labels,
+                    datasets: [{
+                        label: "Concluintes",
+                        data: cpChartPayload.concluintes_values,
+                        borderColor: "#0ea5e9",
+                        backgroundColor: "rgba(14, 165, 233, 0.06)",
+                        fill: true,
+                        tension: 0.38,
+                        borderWidth: 4,
+                        pointRadius: 4,
+                        pointHoverRadius: 5,
+                    }],
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    layout: {
+                        padding: { top: 22, right: 12, bottom: 8, left: 6 },
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: basePlugins.tooltip,
+                        datalabels: {
+                            ...basePlugins.datalabels,
+                            color: "#0ea5e9",
+                        },
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false, drawBorder: false },
+                            ticks: monthTicks,
+                            border: { display: false },
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: defaultGrid,
+                            ticks: { ...defaultTicks, precision: 0 },
+                            border: { display: false },
+                        },
+                    },
+                },
+            });
+        }
+
+        const cpComparisonCanvas = document.getElementById("cp-comparison-chart");
+        if (cpComparisonCanvas) {
+            new Chart(cpComparisonCanvas, {
+                type: "line",
+                data: {
+                    labels: cpChartPayload.labels,
+                    datasets: [
+                        {
+                            label: "Atendimentos",
+                            data: cpChartPayload.atendimentos_values,
+                            borderColor: "#3b82f6",
+                            backgroundColor: "#3b82f6",
+                            tension: 0.35,
+                            borderWidth: 4,
+                            pointRadius: 4,
+                            pointHoverRadius: 5,
+                        },
+                    ],
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    layout: {
+                        padding: { top: 22, right: 12, bottom: 8, left: 6 },
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: basePlugins.tooltip,
+                        datalabels: {
+                            ...basePlugins.datalabels,
+                            color: "#3b82f6",
+                        },
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false, drawBorder: false },
+                            ticks: monthTicks,
+                            border: { display: false },
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: defaultGrid,
+                            ticks: { ...defaultTicks, precision: 0 },
+                            border: { display: false },
+                        },
+                    },
+                },
+            });
+        }
+
+        const cpGenderCanvas = document.getElementById("cp-gender-chart");
+        if (cpGenderCanvas) {
+            const genderValues = cpChartPayload.gender_values.length ? cpChartPayload.gender_values : [1];
+            const genderLabels = cpChartPayload.gender_labels.length ? cpChartPayload.gender_labels : ["Sem dados"];
+            const genderColors = cpChartPayload.gender_colors.length ? cpChartPayload.gender_colors : ["#dbe5f3"];
+
+            new Chart(cpGenderCanvas, {
+                type: "doughnut",
+                data: {
+                    labels: genderLabels,
+                    datasets: [{
+                        data: genderValues,
+                        backgroundColor: genderColors,
+                        borderWidth: 0,
+                        hoverOffset: 4,
+                    }],
+                },
+                options: {
+                    maintainAspectRatio: true,
+                    cutout: "50%",
+                    layout: {
+                        padding: 5,
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: basePlugins.tooltip,
+                        datalabels: {
+                            color: "#ffffff",
+                            font: { size: 10, weight: "800" },
+                            formatter: (value, context) => context.chart.data.labels[context.dataIndex] === "Sem dados" ? "" : value,
+                        },
+                    },
+                },
+            });
+        }
+    });
+</script>
+
+<style>
+    .dashboard-split-layout {
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        gap: 20px;
+        margin-top: 12px;
+    }
+
+    .metrics-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .charts-stack-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    .chart-panel {
+        display: flex;
+        flex-direction: column;
+        background: white;
+        border-radius: 20px;
+        padding: 20px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 18px rgba(47,104,230,0.06);
+        min-height: 320px;
+    }
+
+    .chart-panel-gender {
+        max-width: 450px;
+        min-height: 220px !important;
+    }
+
+    .monitoring-chart-wrap {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+    }
+
+    .sinecp-gender-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        flex: 1;
+        min-height: 0;
+    }
+
+    .sinecp-gender-canvas-wrap {
+        width: 100px;
+        height: 100px;
+        position: relative;
+    }
+
+    .donut-legend {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: row;
+        gap: 20px;
+        justify-content: center;
+    }
+
+    .donut-legend li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        color: #475569;
+    }
+
+    .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+
+    .donut-legend li strong {
+        margin-left: 5px;
+        color: #1e293b;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Relatorios | {{ directorate.name }}{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+
+    <main class="dashboard-main beneficios-main" style="padding-top: 0;">
+        <div class="monitoring-header-container">
+            <div class="monitoring-header-content">
+                <div class="monitoring-title-area">
+                    <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 10px;">
+                        <div style="width: 50px; height: 50px; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #064e3b;">
+                            <i data-lucide="folder-open" style="width: 32px; height: 32px;"></i>
+                        </div>
+                        <div>
+                            <h1>Histórico de Relatórios</h1>
+                            <p style="margin:0; font-size: 14px; opacity: 0.9;">Consulta de relatórios narrativos mensais</p>
+                        </div>
+                    </div>
+                    <a href="{% url 'beneficios:home' %}?year={{ selected_year }}" class="btn-ghost-white" style="margin-top: 10px; display: inline-flex;">
+                        <i data-lucide="arrow-left"></i> Voltar para o painel
+                    </a>
+                </div>
+
+                <div class="monitoring-header-actions visit-header-actions" style="flex-direction: row; align-items: center;">
+                    <form method="get" class="visit-filter-form visit-filter-form-hero" style="margin: 0;">
+                        <div class="filter-row-group">
+                            <select name="month" class="filter-select" onchange="this.form.submit()">
+                                <option value="all" {% if selected_month == 'all' %}selected{% endif %}>Todos os Meses</option>
+                                {% for m_num, m_name in months_range %}
+                                    <option value="{{ m_num }}" {% if selected_month == m_num|stringformat:"s" %}selected{% endif %}>{{ m_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="number" name="year" value="{{ selected_year }}" min="2020" class="filter-input" style="width: 100px;" placeholder="Ano">
+                            <button type="submit" class="btn-primary-premium" style="padding: 10px 20px; font-size: 11px;">
+                                Filtrar
+                            </button>
+                            <a href="{% url 'beneficios:monthly-report' %}?year={{ selected_year }}" class="btn-primary-premium" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); margin-left: 10px;">
+                                <i data-lucide="plus"></i> Novo Relatório Mensal
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="monitoring-main-card">
+            <div class="report-grid-cards">
+                {% for report in reports %}
+                    <article class="report-visit-card" style="border-color: #10b981;">
+                        <div class="card-top-info">
+                            <div class="card-icon-box" style="background: #ecfdf5; color: #10b981;">
+                                <i data-lucide="file-text"></i>
+                            </div>
+                            <span class="visit-status-badge {% if report.status == 'finalized' %}status-finalized{% else %}status-draft{% endif %}">
+                                {% if report.status == 'finalized' %}<i data-lucide="check-circle"></i>{% else %}<i data-lucide="clock"></i>{% endif %}
+                                {{ report.get_status_display|default:report.status|title }}
+                            </span>
+                        </div>
+                        
+                        <div>
+                            <h3>Relatório {{ report.month|stringformat:"02d" }}/{{ report.year }}</h3>
+                            <div class="visit-date">
+                                <i data-lucide="calendar"></i> Competência
+                            </div>
+                        </div>
+
+                        <div class="report-actions-stack">
+                            <a href="{% url 'beneficios:monthly-report' %}?year={{ report.year }}&month={{ report.month }}" class="report-action-btn" style="border-color: #10b981; color: #10b981;">
+                                <i data-lucide="edit"></i> Visualizar/Editar
+                            </a>
+                        </div>
+                    </article>
+                {% empty %}
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 60px 0; background: #f8fafc; border-radius: 16px; border: 1px dashed #cbd5e1;">
+                        <i data-lucide="inbox" style="width: 48px; height: 48px; color: #94a3b8; margin-bottom: 16px;"></i>
+                        <h3 style="font-size: 16px; color: #475569; font-weight: 800; margin-bottom: 8px;">Nenhum Relatório Encontrado</h3>
+                        <p style="color: #64748b; font-size: 13px;">Não existem relatórios narrativos para o ano de {{ selected_year }}.</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

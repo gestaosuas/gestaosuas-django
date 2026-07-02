@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+
+{% block title %}{{ document_title }} | {{ system_name }}{% endblock %}
+
+{% block content %}
+<div class="plan-document-shell">
+    <div class="plan-document-toolbar no-print">
+        <a href="{% url 'directorates:plan-list' directorate.pk %}?osc={{ osc.pk }}" class="plan-document-toolbar-btn">
+            <i data-lucide="arrow-left"></i> Voltar
+        </a>
+        <button type="button" onclick="window.print()" class="plan-document-toolbar-btn plan-document-toolbar-btn-primary">
+            <i data-lucide="printer"></i> Imprimir Documento
+        </button>
+    </div>
+
+    <article class="plan-document-page">
+        <header class="plan-document-header">
+            <img src="{{ logo_url }}" alt="Logo" class="plan-document-logo">
+            <h1>{{ document_title }}</h1>
+            <p>Gerado pelo Sistema de Vigilancia Socioassistencial em {{ generated_at|date:"d/m/Y \a\s H:i" }}</p>
+        </header>
+
+        <section class="plan-document-section">
+            <h2>Plano de Trabalho</h2>
+            <h3>I. Dados da Organizacao da Sociedade Civil - OSC</h3>
+            <table class="plan-document-table">
+                <tbody>
+                    <tr>
+                        <th>Nome</th>
+                        <td>{{ osc.name }}</td>
+                    </tr>
+                    <tr>
+                        <th>Atividade</th>
+                        <td>{{ osc.activity_type|default:"Nao informada" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Endereco</th>
+                        <td>{{ osc.address|default:"Nao informado" }}{% if osc.number %}, {{ osc.number }}{% endif %}{% if osc.neighborhood %} - {{ osc.neighborhood }}{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <th>Telefone</th>
+                        <td>{{ osc.phone|default:"Nao informado" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Subvencionados</th>
+                        <td>{{ osc.subsidized_count|default:0 }}</td>
+                    </tr>
+                    <tr>
+                        <th>Diretoria</th>
+                        <td>{{ directorate.name }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        {% if osc.objeto or osc.objetivos or osc.metas or osc.atividades %}
+        <section class="plan-document-section">
+            <h3>II. Informacoes da Parceria</h3>
+            <div class="plan-document-copy-grid">
+                {% if osc.objeto %}
+                <div class="plan-document-copy-card">
+                    <span>Objeto</span>
+                    <p>{{ osc.objeto }}</p>
+                </div>
+                {% endif %}
+                {% if osc.objetivos %}
+                <div class="plan-document-copy-card">
+                    <span>Objetivos</span>
+                    <p>{{ osc.objetivos }}</p>
+                </div>
+                {% endif %}
+                {% if osc.metas %}
+                <div class="plan-document-copy-card">
+                    <span>Metas</span>
+                    <p>{{ osc.metas }}</p>
+                </div>
+                {% endif %}
+                {% if osc.atividades %}
+                <div class="plan-document-copy-card">
+                    <span>Atividades</span>
+                    <p>{{ osc.atividades }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+        {% endif %}
+
+        <section class="plan-document-section">
+            <h3>III. Conteudo Estruturado do Plano</h3>
+            {% if content_blocks %}
+            <div class="plan-document-blocks">
+                {% for block in content_blocks %}
+                    {% if block.type == "title" %}
+                    <h4>{{ block.content }}</h4>
+                    {% elif block.type == "table" %}
+                    <div class="plan-document-table-block">
+                        <span>Tabela do plano</span>
+                        {% if block.content.headers %}
+                        <table class="plan-document-table">
+                            <thead>
+                                <tr>
+                                    {% for header in block.content.headers %}
+                                    <th>{{ header }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in block.content.rows %}
+                                <tr>
+                                    {% for cell in row %}
+                                    <td>{{ cell }}</td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p>Esta tabela ainda nao possui dados definidos.</p>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="plan-document-paragraph">{{ block.content|linebreaks }}</div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="plan-document-empty">Este plano ainda nao possui conteudo estruturado.</p>
+            {% endif %}
+        </section>
+    </article>
+</div>
+
+<style>
+    body {
+        background: #eef2f7;
+    }
+
+    .plan-document-shell {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 28px 20px 48px;
+    }
+
+    .plan-document-toolbar {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+
+    .plan-document-toolbar-btn {
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 12px;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #0f172a;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 800;
+        text-transform: uppercase;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .plan-document-toolbar-btn-primary {
+        background: #1e40af;
+        border-color: #1e40af;
+        color: #ffffff;
+    }
+
+    .plan-document-page {
+        background: #ffffff;
+        border-radius: 20px;
+        border: 1px solid #dbe4ee;
+        box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+        padding: 56px 58px;
+    }
+
+    .plan-document-header {
+        text-align: center;
+        padding-bottom: 30px;
+        border-bottom: 1px solid #e2e8f0;
+        margin-bottom: 34px;
+    }
+
+    .plan-document-logo {
+        display: block;
+        margin: 0 auto 22px;
+        max-width: 380px;
+        width: 100%;
+    }
+
+    .plan-document-header h1 {
+        margin: 0 0 12px;
+        font-size: 23px;
+        font-weight: 900;
+        color: #1e40af;
+        text-transform: uppercase;
+    }
+
+    .plan-document-header p {
+        margin: 0;
+        font-size: 14px;
+        color: #64748b;
+    }
+
+    .plan-document-section + .plan-document-section {
+        margin-top: 30px;
+    }
+
+    .plan-document-section h2,
+    .plan-document-section h3,
+    .plan-document-blocks h4 {
+        color: #1e3a8a;
+    }
+
+    .plan-document-section h2 {
+        font-size: 17px;
+        margin: 0 0 20px;
+        text-transform: uppercase;
+    }
+
+    .plan-document-section h3 {
+        font-size: 15px;
+        margin: 0 0 18px;
+        text-transform: uppercase;
+    }
+
+    .plan-document-blocks h4 {
+        margin: 26px 0 10px;
+        font-size: 16px;
+    }
+
+    .plan-document-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+
+    .plan-document-table th,
+    .plan-document-table td {
+        border: 1px solid #dbe4ee;
+        padding: 12px 14px;
+        text-align: left;
+        vertical-align: top;
+    }
+
+    .plan-document-table th {
+        width: 180px;
+        background: #f8fafc;
+        color: #1e3a8a;
+        font-weight: 800;
+    }
+
+    .plan-document-copy-grid {
+        display: grid;
+        gap: 14px;
+    }
+
+    .plan-document-copy-card {
+        padding: 16px 18px;
+        border: 1px solid #dbe4ee;
+        border-radius: 16px;
+        background: #f8fbff;
+    }
+
+    .plan-document-copy-card span {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #64748b;
+    }
+
+    .plan-document-copy-card p,
+    .plan-document-paragraph p,
+    .plan-document-empty {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.8;
+        color: #1e293b;
+    }
+
+    .plan-document-table-block {
+        margin-top: 18px;
+    }
+
+    .plan-document-table-block > span {
+        display: inline-block;
+        margin-bottom: 10px;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+
+    @media (max-width: 768px) {
+        .plan-document-page {
+            padding: 28px 20px;
+        }
+
+        .plan-document-toolbar {
+            justify-content: stretch;
+            flex-direction: column;
+        }
+
+        .plan-document-toolbar-btn {
+            justify-content: center;
+        }
+    }
+
+    @media print {
+        body {
+            background: #ffffff;
+        }
+
+        .plan-document-shell {
+            max-width: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .plan-document-page {
+            box-shadow: none;
+            border: none;
+            border-radius: 0;
+            padding: 0;
+        }
+    }
+</style>
+{% endblock %}

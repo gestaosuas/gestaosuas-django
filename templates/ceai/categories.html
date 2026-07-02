@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Categorias - {{ unit }}{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+<div class="dashboard-container">
+    <a class="back-link" href="{% url 'ceai:oficinas' unit %}">&larr; Voltar para Oficinas</a>
+
+    <header class="page-header">
+        <div class="header-info">
+            <p class="eyebrow">CEAI - UNIDADE {{ unit|upper }}</p>
+            <h1>Categorias de Oficinas</h1>
+            <p class="section-description">Agrupe suas oficinas por categorias temáticas.</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn-primary" onclick="openModal('add-category')">
+                <i data-lucide="plus"></i>
+                Nova Categoria
+            </button>
+        </div>
+    </header>
+
+    <div class="categories-list">
+        {% if not categories %}
+        <div class="empty-state">
+            <i data-lucide="info"></i>
+            <p>Nenhuma categoria cadastrada.</p>
+        </div>
+        {% else %}
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>NOME DA CATEGORIA</th>
+                        <th>TOTAL DE OFICINAS</th>
+                        <th>DATA DE CRIAÇÃO</th>
+                        <th class="actions-col">AÇÕES</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for category in categories %}
+                    <tr>
+                        <td>
+                            <div class="category-name-cell">
+                                <div class="category-dot"></div>
+                                <strong>{{ category.name }}</strong>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="count-badge">{{ category.oficinas.count }}</span>
+                        </td>
+                        <td>{{ category.created_at|date:"d/m/Y" }}</td>
+                        <td>
+                            <div class="row-actions">
+                                <button class="btn-icon" title="Editar"><i data-lucide="edit-2"></i></button>
+                                <button class="btn-icon danger" title="Excluir"><i data-lucide="trash-2"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .table-container {
+        background: #fff;
+        border-radius: 20px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .data-table th {
+        background: #f8fafc;
+        padding: 16px 24px;
+        text-align: left;
+        font-size: 11px;
+        font-weight: 800;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .data-table td {
+        padding: 16px 24px;
+        font-size: 14px;
+        color: #1e293b;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .category-name-cell {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .category-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #3b82f6;
+    }
+
+    .count-badge {
+        background: #f1f5f9;
+        color: #475569;
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .row-actions {
+        display: flex;
+        gap: 8px;
+    }
+</style>
+</div>
+{% endblock %}

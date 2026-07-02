@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+
+{% block title %}NAICAs | {{ directorate.name }}{% endblock %}
+
+{% block body_class %}dashboard-fit-vh theme-indigo{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+
+    <main class="dashboard-main" style="padding-top: 0;">
+        <div class="monitoring-header-container header-indigo">
+            <div class="monitoring-header-content">
+                <div class="monitoring-title-area">
+                    <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 10px;">
+                        <div style="width: 50px; height: 50px; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #1e1b4b;">
+                            <i data-lucide="users" style="width: 32px; height: 32px;"></i>
+                        </div>
+                        <div>
+                            <h1>{{ directorate.name }}</h1>
+                            <p style="margin:0; font-size: 14px; opacity: 0.9;">Núcleo de Apoio Integral à Criança e Adolescente</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="monitoring-header-actions visit-header-actions" style="flex-direction: row; align-items: center;">
+                    <form method="get" class="visit-filter-form visit-filter-form-hero" style="margin: 0;">
+                        <div class="filter-row-group">
+                            <select name="unit" class="filter-select" onchange="this.form.submit()">
+                                <option value="all" {% if selected_unit == 'all' %}selected{% endif %}>Todas as Unidades</option>
+                                {% for unit in naica_units %}
+                                    <option value="{{ unit }}" {% if selected_unit == unit %}selected{% endif %}>{{ unit }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="month" class="filter-select" onchange="this.form.submit()">
+                                <option value="all" {% if selected_month == 'all' %}selected{% endif %}>Ano Inteiro</option>
+                                {% for m_num, m_name in months_range %}
+                                    <option value="{{ m_num }}" {% if selected_month == m_num|stringformat:"s" %}selected{% endif %}>{{ m_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="year" class="filter-select" onchange="this.form.submit()">
+                                {% for y in years_range %}
+                                    <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="button" class="btn-primary-premium" id="toggle-mgmt-menu" style="margin-left: 10px;">
+                                <i data-lucide="settings"></i>
+                                <span id="mgmt-btn-text">Gerenciar Unidade</span>
+                                <i data-lucide="chevron-down" id="mgmt-btn-icon"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="monitoring-main-card">
+
+            <!-- Management Menu -->
+            <div class="management-overlay" id="mgmt-menu" style="display: none;">
+                <div class="mgmt-grid">
+                    <a href="{% url 'naica:form' directorate.pk %}?year={{ selected_year }}&unit={% if selected_unit != 'all' %}{{ selected_unit }}{% endif %}" class="mgmt-card">
+                        <div class="mgmt-icon indigo"><i data-lucide="file-plus"></i></div>
+                        <div class="mgmt-info">
+                            <strong>Atualizar Dados</strong>
+                            <span>Inserir indicadores mensais por unidade</span>
+                        </div>
+                    </a>
+                    <a href="{% url 'naica:data' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon emerald"><i data-lucide="database"></i></div>
+                        <div class="mgmt-info">
+                            <strong>Ver Dados</strong>
+                            <span>Tabela anual por unidade</span>
+                        </div>
+                    </a>
+                    <a href="{% url 'naica:monthly-report' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon violet"><i data-lucide="file-text"></i></div>
+                        <div class="mgmt-info">
+                            <strong>Relatorio Mensal</strong>
+                            <span>Narrativa descritiva do periodo</span>
+                        </div>
+                    </a>
+                    <a href="{% url 'naica:reports' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon sky"><i data-lucide="folder-open"></i></div>
+                        <div class="mgmt-info">
+                            <strong>Historico</strong>
+                            <span>Todos os relatorios narrativos</span>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Dashboard Split Layout -->
+            <div class="dashboard-split-layout">
+                <aside class="metrics-stack">
+                    {% for card in cards %}
+                    <article class="metric-card-modern">
+                        <div class="metric-top">
+                            <div class="icon-circle" style="--accent-color:{{ card.color }};background:{{ card.color }}15;">
+                                <i data-lucide="{{ card.icon }}"></i>
+                            </div>
+                            {% if card.variation %}
+                            <span class="variation {{ card.variation.direction }}">
+                                <i data-lucide="{{ card.variation.icon }}"></i>
+                                {{ card.variation.text }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <p class="metric-context">{{ card.label }}</p>
+                        <strong>{{ card.value }}{{ card.suffix }}</strong>
+                        {% if card.sparkline %}
+                        <div class="sparkline-box">
+                            <svg viewBox="0 0 92 34">
+                                <polyline points="{{ card.sparkline }}" />
+                            </svg>
+                        </div>
+                        {% endif %}
+                    </article>
+                    {% endfor %}
+                </aside>
+
+                <div class="charts-stack">
+                    <div class="charts-row-inner">
+                        <article class="chart-panel">
+                            <div class="chart-header">
+                                <div>
+                                    <h2>Acompanhamento (Crescimento)</h2>
+                                    <p class="chart-subtitle">Evolucao do total de criancas inseridas • {{ period_label }}</p>
+                                </div>
+                            </div>
+                            <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                                <canvas id="totalChart"></canvas>
+                            </div>
+                        </article>
+
+                        <article class="chart-panel">
+                            <div class="chart-header">
+                                <div>
+                                    <h2>Movimentacao (Admitidos x Desligados)</h2>
+                                    <p class="chart-subtitle">Entradas e saidas de criancas • {{ period_label }}</p>
+                                </div>
+                            </div>
+                            <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                                <canvas id="movChart"></canvas>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+{{ line_chart_total|json_script:"total-data" }}
+{{ adm_desl_points|json_script:"mov-data" }}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const toggleBtn = document.getElementById("toggle-mgmt-menu");
+    const menu = document.getElementById("mgmt-menu");
+    const btnText = document.getElementById("mgmt-btn-text");
+    const btnIcon = document.getElementById("mgmt-btn-icon");
+
+    toggleBtn.addEventListener("click", function () {
+        const isVisible = menu.style.display !== "none";
+        menu.style.display = isVisible ? "none" : "block";
+        btnText.textContent = isVisible ? "Gerenciar Unidade" : "Fechar";
+        btnIcon.setAttribute("data-lucide", isVisible ? "chevron-down" : "chevron-up");
+        lucide.createIcons();
+    });
+
+    if (window.Chart && window.ChartDataLabels) {
+        Chart.register(ChartDataLabels);
+    }
+
+    const monthTicks = {
+        color: '#8ca0bf',
+        font: { size: 10, weight: '700' },
+        autoSkip: false,
+        maxRotation: 0,
+        minRotation: 0,
+        padding: 8,
+    };
+
+    const axisTicks = {
+        color: '#8ca0bf',
+        font: { size: 10, weight: '700' },
+        padding: 6,
+    };
+
+    const commonLine = {
+        maintainAspectRatio: false,
+        layout: { padding: { top: 24, right: 16, bottom: 8, left: 8 } },
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.92)',
+                titleColor: '#f8fafc',
+                bodyColor: '#e2e8f0',
+                padding: 12,
+            },
+            datalabels: {
+                color: function(ctx) { return ctx.dataset.borderColor; },
+                anchor: 'end',
+                align: 'top',
+                offset: 4,
+                clamp: true,
+                clip: false,
+                font: { size: 10, weight: '800' },
+                formatter: function(v) { return v > 0 ? v : ''; }
+            }
+        },
+        scales: {
+            x: {
+                grid: { display: false, drawBorder: false },
+                ticks: monthTicks,
+                border: { display: false },
+            },
+            y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(148, 163, 184, 0.14)', drawBorder: false },
+                ticks: axisTicks,
+                border: { display: false },
+            }
+        }
+    };
+
+    const totalData = JSON.parse(document.getElementById('total-data').textContent);
+    new Chart(document.getElementById('totalChart'), {
+        type: 'line',
+        data: {
+            labels: totalData.map(function(p) { return p.label; }),
+            datasets: [{
+                data: totalData.map(function(p) { return p.value; }),
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                fill: true,
+                tension: 0.4,
+                borderWidth: 3,
+                pointRadius: 4,
+                pointBackgroundColor: '#3b82f6'
+            }]
+        },
+        options: commonLine
+    });
+
+    const movData = JSON.parse(document.getElementById('mov-data').textContent);
+    new Chart(document.getElementById('movChart'), {
+        type: 'bar',
+        data: {
+            labels: movData.map(function(d) { return d.label; }),
+            datasets: [
+                {
+                    label: 'Admitidos',
+                    data: movData.map(function(d) { return d.admitidos; }),
+                    backgroundColor: 'rgba(16, 185, 129, 0.85)',
+                    borderRadius: 8,
+                    barThickness: 14,
+                },
+                {
+                    label: 'Desligados',
+                    data: movData.map(function(d) { return d.desligados; }),
+                    backgroundColor: 'rgba(239, 68, 68, 0.85)',
+                    borderRadius: 8,
+                    barThickness: 14,
+                }
+            ]
+        },
+        options: {
+            maintainAspectRatio: false,
+            layout: { padding: { top: 24, right: 16, bottom: 8, left: 8 } },
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { font: { weight: '700', size: 10 }, usePointStyle: true, pointStyleWidth: 10, padding: 18 },
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.92)',
+                    titleColor: '#f8fafc',
+                    bodyColor: '#e2e8f0',
+                    padding: 12,
+                },
+                datalabels: {
+                    anchor: 'end',
+                    align: 'top',
+                    offset: 2,
+                    font: { weight: '800', size: 9 },
+                    formatter: function(v) { return v > 0 ? v : ''; }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false, drawBorder: false },
+                    ticks: monthTicks,
+                    border: { display: false },
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(148, 163, 184, 0.14)', drawBorder: false },
+                    ticks: axisTicks,
+                    border: { display: false },
+                }
+            }
+        }
+    });
+});
+</script>
+
+<style>
+.variation {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 800;
+}
+.variation.positive { background: #ecfdf5; color: #10b981; }
+.variation.negative { background: #fef2f2; color: #ef4444; }
+.variation i { width: 12px; height: 12px; }
+
+.sparkline-box {
+    margin-top: 8px;
+    height: 38px;
+}
+.sparkline-box svg {
+    width: 100%;
+    height: 100%;
+}
+.sparkline-box polyline {
+    fill: none;
+    stroke: #3b82f6;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+</style>
+{% endblock %}

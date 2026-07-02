@@ -1,0 +1,53 @@
+<div class="plan-preview-doc">
+    <div class="plan-preview-doc-header">
+        <img src="{{ logo_url }}" alt="Prefeitura de Uberlandia" class="plan-preview-doc-logo">
+        <h3>{{ document_title }}</h3>
+        <p>{{ osc.name }} | {{ directorate.name }}</p>
+    </div>
+
+    <section class="plan-preview-doc-section">
+        <h4>Dados da Organizacao da Sociedade Civil</h4>
+        <div class="plan-preview-info-grid">
+            <div><span>Nome</span><strong>{{ osc.name }}</strong></div>
+            <div><span>Atividade</span><strong>{{ osc.activity_type|default:"Nao informada" }}</strong></div>
+            <div><span>Endereco</span><strong>{{ osc.address|default:"Nao informado" }}{% if osc.number %}, {{ osc.number }}{% endif %}</strong></div>
+            <div><span>Bairro</span><strong>{{ osc.neighborhood|default:"Nao informado" }}</strong></div>
+            <div><span>Telefone</span><strong>{{ osc.phone|default:"Nao informado" }}</strong></div>
+            <div><span>Subvencionados</span><strong>{{ osc.subsidized_count|default:0 }}</strong></div>
+        </div>
+    </section>
+
+    {% if osc.objeto or osc.objetivos or osc.metas or osc.atividades %}
+    <section class="plan-preview-doc-section">
+        <h4>Informacoes da Parceria</h4>
+        <div class="plan-preview-text-stack">
+            {% if osc.objeto %}<div><span>Objeto</span><p>{{ osc.objeto }}</p></div>{% endif %}
+            {% if osc.objetivos %}<div><span>Objetivos</span><p>{{ osc.objetivos }}</p></div>{% endif %}
+            {% if osc.metas %}<div><span>Metas</span><p>{{ osc.metas }}</p></div>{% endif %}
+            {% if osc.atividades %}<div><span>Atividades</span><p>{{ osc.atividades }}</p></div>{% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="plan-preview-doc-section">
+        <h4>Conteudo do Plano</h4>
+        {% if content_blocks %}
+        <div class="plan-preview-blocks">
+            {% for block in content_blocks %}
+                {% if block.type == "title" %}
+                <h5>{{ block.content }}</h5>
+                {% elif block.type == "table" %}
+                <div class="plan-preview-table-card">
+                    <span>Tabela estruturada</span>
+                    <p>Abra em nova guia para visualizacao completa do documento.</p>
+                </div>
+                {% else %}
+                <p>{{ block.content|linebreaksbr }}</p>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="plan-preview-empty">Este plano ainda nao possui conteudo estruturado.</p>
+        {% endif %}
+    </section>
+</div>

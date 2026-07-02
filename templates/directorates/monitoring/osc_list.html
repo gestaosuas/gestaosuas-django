@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}OSCs Cadastradas | {{ directorate.name }} | {{ system_name }}{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+    <main class="dashboard-main">
+        <div class="mon-page-shell">
+
+            {# ── Header ── #}
+            <header class="mon-page-header">
+                <div class="mon-page-title">
+                    <a href="{% url 'directorates:detail' directorate.pk %}" class="back-link-modern">
+                        <i data-lucide="arrow-left"></i> {{ directorate.name }}
+                    </a>
+                    <p class="eyebrow">Cadastro de OSCs</p>
+                    <h1>Organizações da Sociedade Civil</h1>
+                    <p class="subtitle-muted">Gerencie as OSCs vinculadas a esta diretoria</p>
+                </div>
+                <div class="mon-page-actions">
+                    <a href="{% url 'directorates:osc-create' directorate.pk %}" class="btn-primary-premium">
+                        <i data-lucide="plus"></i> Nova OSC
+                    </a>
+                </div>
+            </header>
+
+            {# ── Stats + Filters row ── #}
+            <div class="osc-filters-bar">
+                <div class="osc-stat-chip">
+                    <i data-lucide="building-2"></i>
+                    <span><strong>{{ oscs|length }}</strong> OSCs cadastradas</span>
+                </div>
+
+                <div class="mon-search-input-wrap">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="osc-search" placeholder="Buscar OSC pelo nome..." autocomplete="off">
+                </div>
+
+                <select id="osc-type-filter" class="filter-select-pill">
+                    <option value="">Todas as Atividades</option>
+                    {% for type in activity_types %}
+                        <option value="{{ type }}">{{ type }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# ── OSC Table ── #}
+            <div class="mon-table-card">
+                <table class="mon-table" id="osc-table">
+                    <thead>
+                        <tr>
+                            <th>OSC</th>
+                            <th>Tipo de Atividade</th>
+                            <th>Endereço</th>
+                            <th>Telefone</th>
+                            <th>Subvencionados</th>
+                            <th style="text-align:right;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for osc in oscs %}
+                        <tr class="osc-row" data-activity="{{ osc.activity_type|default:'' }}">
+                            <td>
+                                <div class="osc-name-cell">
+                                    <div class="osc-avatar-lg">{{ osc.name|first }}</div>
+                                    <div>
+                                        <span class="osc-name-main">{{ osc.name }}</span>
+                                        {% if osc.objeto %}
+                                        <span class="osc-objeto-preview">{{ osc.objeto|truncatechars:60 }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="osc-tag" title="{{ osc.activity_type|default:'—' }}">{{ osc.activity_type|default:"—"|truncatechars:30 }}</span>
+                            </td>
+                            <td>
+                                <span class="cell-muted">
+                                    {% if osc.address %}
+                                        {{ osc.address }}{% if osc.number %}, {{ osc.number }}{% endif %}
+                                        {% if osc.neighborhood %} — {{ osc.neighborhood }}{% endif %}
+                                    {% else %}—{% endif %}
+                                </span>
+                            </td>
+                            <td><span class="cell-muted cell-phone">{{ osc.phone|default:"—" }}</span></td>
+                            <td class="cell-subsidized">
+                                {% if osc.subsidized_count == -1 %}
+                                    <span class="subs-badge demand">Conforme Demanda</span>
+                                {% else %}
+                                    <strong>{{ osc.subsidized_count }}</strong>
+                                {% endif %}
+                            </td>
+                            <td class="actions-cell">
+                                <a href="{% url 'directorates:osc-update' osc.pk %}" class="action-icon-btn-sm" title="Editar">
+                                    <i data-lucide="pencil"></i>
+                                </a>
+                                {% if can_delete %}
+                                <form action="{% url 'directorates:osc-delete' osc.pk %}" method="post" style="display:inline;"
+                                      onsubmit="return confirm('Excluir OSC {{ osc.name }}?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="action-icon-btn-sm danger" title="Excluir">
+                                        <i data-lucide="trash-2"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="empty-table-cell">
+                                <i data-lucide="building-x"></i>
+                                <p>Nenhuma OSC cadastrada ainda.</p>
+                                <a href="{% url 'directorates:osc-create' directorate.pk %}" class="btn-primary-premium" style="margin-top:12px;">
+                                    <i data-lucide="plus"></i> Cadastrar primeira OSC
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    var searchInput = document.getElementById('osc-search');
+    var typeFilter = document.getElementById('osc-type-filter');
+
+    function filterTable() {
+        var q = (searchInput.value || '').toLowerCase();
+        var activity = typeFilter.value || '';
+
+        document.querySelectorAll('#osc-table .osc-row').forEach(function(row) {
+            var name = (row.querySelector('.osc-name-main')?.textContent || '').toLowerCase();
+            var rowActivity = (row.dataset.activity || '').toLowerCase();
+            var matchName = !q || name.includes(q);
+            var matchType = !activity || rowActivity === activity.toLowerCase();
+            row.style.display = (matchName && matchType) ? '' : 'none';
+        });
+    }
+
+    searchInput.addEventListener('input', filterTable);
+    typeFilter.addEventListener('change', filterTable);
+});
+</script>
+
+<style>
+.mon-page-shell { width: 96%; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+.mon-page-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    flex-wrap: wrap; gap: 16px;
+    background: white; border-radius: 20px; padding: 24px 28px;
+    box-shadow: 0 4px 20px rgba(47,104,230,0.07); border: 1px solid #e8edf5;
+}
+.mon-page-title h1 { margin: 4px 0 4px; font-size: 22px; font-weight: 800; color: #1e3a8a; }
+.mon-page-actions { display: flex; align-items: center; gap: 10px; }
+
+.osc-filters-bar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: white; border-radius: 16px; padding: 12px 20px;
+    box-shadow: 0 2px 12px rgba(47,104,230,0.06); border: 1px solid #e8edf5;
+}
+.osc-stat-chip {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 600; color: #475569;
+    white-space: nowrap;
+}
+.osc-stat-chip i { width: 16px; height: 16px; color: #3b82f6; }
+.osc-stat-chip strong { color: #1e3a8a; font-size: 18px; font-weight: 900; }
+
+.mon-search-input-wrap {
+    position: relative; flex: 1; min-width: 180px;
+}
+.mon-search-input-wrap i {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    width: 16px; height: 16px; color: #94a3b8; pointer-events: none;
+}
+.mon-search-input-wrap input {
+    width: 100%; padding: 10px 14px 10px 42px;
+    border: 1.5px solid #e2e8f0; border-radius: 12px;
+    font-size: 13px; font-weight: 500; color: #1e293b;
+    background: white; outline: none; transition: border-color 0.2s;
+}
+.mon-search-input-wrap input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+
+.filter-select-pill {
+    padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 12px;
+    font-size: 12px; font-weight: 700; color: #475569;
+    background: white; cursor: pointer; outline: none;
+    max-width: 280px;
+}
+.filter-select-pill:focus { border-color: #3b82f6; }
+
+.mon-table-card {
+    background: white; border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(47,104,230,0.07); border: 1px solid #e8edf5;
+    overflow: hidden;
+}
+.mon-table { width: 100%; border-collapse: collapse; }
+.mon-table th {
+    font-size: 10px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #94a3b8;
+    padding: 14px 16px; border-bottom: 2px solid #f1f5f9; text-align: left;
+}
+.mon-table td { padding: 14px 16px; border-bottom: 1px solid #f8fafc; vertical-align: middle; }
+.mon-table tr:last-child td { border-bottom: none; }
+.mon-table tbody tr:hover td { background: #fafbff; }
+
+.osc-name-cell { display: flex; align-items: center; gap: 12px; }
+.osc-avatar-lg {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: #eff6ff; color: #3b82f6;
+    font-size: 15px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; text-transform: uppercase;
+}
+.osc-name-main { display: block; font-size: 13px; font-weight: 700; color: #1e293b; }
+.osc-objeto-preview { display: block; font-size: 11px; color: #94a3b8; margin-top: 2px; }
+.osc-tag {
+    display: inline-block; padding: 3px 10px;
+    background: #f1f5f9; border-radius: 8px;
+    font-size: 11px; font-weight: 700; color: #64748b;
+    max-width: 200px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+    vertical-align: middle;
+}
+.cell-muted { font-size: 12px; color: #64748b; }
+.cell-phone { white-space: nowrap; }
+.cell-subsidized { text-align: center; }
+.cell-subsidized strong { font-size: 15px; font-weight: 900; color: #1e3a8a; }
+.subs-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 6px;
+    font-size: 10px; font-weight: 800; text-transform: uppercase;
+}
+.subs-badge.demand { background: #fef3c7; color: #92400e; }
+
+.actions-cell { text-align: right; white-space: nowrap; }
+.action-icon-btn-sm {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 8px;
+    background: #f8fafc; border: none; cursor: pointer;
+    color: #64748b; transition: all 0.2s; margin-left: 4px;
+}
+.action-icon-btn-sm:hover { background: #eff6ff; color: #3b82f6; }
+.action-icon-btn-sm.danger:hover { background: #fef2f2; color: #ef4444; }
+.action-icon-btn-sm i { width: 14px; height: 14px; }
+
+.empty-table-cell {
+    text-align: center; padding: 60px 24px !important;
+    color: #94a3b8; display: flex; flex-direction: column;
+    align-items: center; gap: 8px;
+}
+.empty-table-cell i { width: 40px; height: 40px; opacity: 0.3; }
+.empty-table-cell p { font-size: 14px; font-weight: 600; margin: 0; }
+
+.back-link-modern { display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;transition:color .2s;}
+.back-link-modern:hover{color:#3b82f6;}
+.back-link-modern i{width:14px;height:14px;}
+.subtitle-muted{font-size:13px;color:#64748b;font-weight:500;margin:0;}
+.eyebrow{text-transform:uppercase;letter-spacing:.24em;font-size:11px;color:#6d7f9c;font-weight:700;margin:0 0 4px;}
+.btn-primary-premium{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#3b82f6;color:white;border:none;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;box-shadow:0 8px 20px rgba(59,130,246,.25);transition:all .2s;text-decoration:none;}
+.btn-primary-premium:hover{background:#2563eb;transform:translateY(-1px);}
+.btn-primary-premium i{width:14px;height:14px;}
+</style>
+{% endblock %}

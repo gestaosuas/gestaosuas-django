@@ -1,0 +1,93 @@
+{% extends "base_tv.html" %}
+
+{% block title %}CEAI{% endblock %}
+{% block header_bg %}linear-gradient(100deg,#064e3b,#059669){% endblock %}
+{% block module_name %}CEAI — Centro de Convivência{% endblock %}
+{% block module_sub %}{{ system_name }} • {{ selected_year }}{% endblock %}
+
+{% block kpis %}
+<div class="tv-kpi" style="--accent:#059669">
+    <div class="tv-kpi-label">Total de Idosos</div>
+    <div class="tv-kpi-value">{{ summary.total_idosos|default:"—" }}</div>
+</div>
+<div class="tv-kpi" style="--accent:#10b981">
+    <div class="tv-kpi-label">Admitidos Masc.</div>
+    <div class="tv-kpi-value">{{ summary.admitidos_masc|default:"—" }}</div>
+</div>
+<div class="tv-kpi" style="--accent:#6ee7b7">
+    <div class="tv-kpi-label">Admitidas Fem.</div>
+    <div class="tv-kpi-value">{{ summary.admitidos_fem|default:"—" }}</div>
+</div>
+<div class="tv-kpi" style="--accent:#34d399">
+    <div class="tv-kpi-label">Atendidos no Mês</div>
+    <div class="tv-kpi-value">{{ summary.atendidos_mes|default:"—" }}</div>
+</div>
+<div class="tv-kpi" style="--accent:#f59e0b">
+    <div class="tv-kpi-label">Desligamentos</div>
+    <div class="tv-kpi-value">{{ summary.desligados|default:"—" }}</div>
+</div>
+{% endblock %}
+
+{% block charts %}
+<div class="tv-panel">
+    <h2>Admissões vs Desligamentos</h2>
+    <div class="tv-panel-body"><canvas id="c-adm-desl"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Total de Idosos</h2>
+    <div class="tv-panel-body"><canvas id="c-total-idosos"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Atendimentos</h2>
+    <div class="tv-panel-body"><canvas id="c-atend"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Atendimentos por Unidade</h2>
+    <div class="tv-panel-body"><canvas id="c-pie"></canvas></div>
+</div>
+{% endblock %}
+
+{{ line_chart_admissoes|json_script:"d-adm" }}
+{{ line_chart_desligamentos|json_script:"d-desl" }}
+{{ line_chart_total_idosos|json_script:"d-total" }}
+{{ line_chart_atendimentos|json_script:"d-aten" }}
+{{ pie_chart_atendimentos|json_script:"d-pie" }}
+
+{% block extra_js %}
+<script>
+(function () {
+    var adm   = JSON.parse(document.getElementById('d-adm').textContent);
+    var desl  = JSON.parse(document.getElementById('d-desl').textContent);
+    var total = JSON.parse(document.getElementById('d-total').textContent);
+    var aten  = JSON.parse(document.getElementById('d-aten').textContent);
+    var pie   = JSON.parse(document.getElementById('d-pie').textContent);
+
+    /* Admissões + Desligamentos — dual line */
+    new Chart(document.getElementById('c-adm-desl'), {
+        type: 'line',
+        data: {
+            labels: adm.map(p => p.label),
+            datasets: [
+                { label: 'Admissões', data: adm.map(p => p.value), borderColor: '#059669', backgroundColor: '#05966914', fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#059669' },
+                { label: 'Desligamentos', data: desl.map(p => p.value), borderColor: '#f59e0b', backgroundColor: '#f59e0b14', fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#f59e0b' }
+            ]
+        },
+        options: {
+            maintainAspectRatio: false, animation: false,
+            plugins: {
+                legend: { display: true, position: 'top', labels: { font: { size: 10 }, color: '#475569', boxWidth: 10, padding: 8 } },
+                datalabels: { display: false }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 9, weight: '700' }, maxRotation: 0 } },
+                y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,0.12)' }, ticks: { color: '#94a3b8', font: { size: 9 } } }
+            }
+        }
+    });
+
+    TV.makeLine('c-total-idosos', total, '#059669', 'Total Idosos');
+    TV.makeLine('c-atend', aten, '#10b981', 'Atendimentos');
+    TV.makeDonut('c-pie', pie);
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "base_tv.html" %}
+
+{% block title %}Pop Rua{% endblock %}
+{% block header_bg %}linear-gradient(100deg,#881337,#e11d48){% endblock %}
+{% block module_name %}População em Situação de Rua{% endblock %}
+{% block module_sub %}{{ system_name }} • {{ selected_year }}{% endblock %}
+
+{% block kpis %}
+<div class="tv-kpi" style="--accent:#e11d48">
+    <div class="tv-kpi-label">Total Geral</div>
+    <div class="tv-kpi-value">{{ total_geral|default:"—" }}</div>
+</div>
+<div class="tv-kpi" style="--accent:#f43f5e">
+    <div class="tv-kpi-label">Centro de Referência</div>
+    <div class="tv-kpi-value">{{ total_atend_centro|default:"—" }}</div>
+</div>
+<div class="tv-kpi" style="--accent:#fb7185">
+    <div class="tv-kpi-label">Abordagem Social</div>
+    <div class="tv-kpi-value">{{ total_atend_abordagem|default:"—" }}</div>
+</div>
+<div class="tv-kpi" style="--accent:#fda4af">
+    <div class="tv-kpi-label">Migração</div>
+    <div class="tv-kpi-value">{{ total_atend_migracao|default:"—" }}</div>
+</div>
+{% endblock %}
+
+{% block charts %}
+<div class="tv-panel">
+    <h2>Centro de Referência</h2>
+    <div class="tv-panel-body"><canvas id="c-centro"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Abordagem Social</h2>
+    <div class="tv-panel-body"><canvas id="c-abord"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Migração</h2>
+    <div class="tv-panel-body"><canvas id="c-migr"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Uso de Drogas por Serviço</h2>
+    <div class="tv-panel-body"><canvas id="c-drogas"></canvas></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    /* Pop Rua usa JSON pré-serializado no contexto */
+    var labels  = {{ chart_labels|safe }};
+    var centro  = {{ chart_centro|safe }};
+    var abord   = {{ chart_abordagem|safe }};
+    var migr    = {{ chart_migracao|safe }};
+    var drogas  = {{ drogas_data|safe }};
+    var dLabels = {{ drogas_labels|safe }};
+
+    function makeBarChart(canvasId, lbl, vals, color) {
+        var el = document.getElementById(canvasId);
+        if (!el) return;
+        new Chart(el, {
+            type: 'bar',
+            data: {
+                labels: lbl,
+                datasets: [{ data: vals, backgroundColor: color + 'cc', borderRadius: 4 }]
+            },
+            options: {
+                maintainAspectRatio: false, animation: false,
+                plugins: {
+                    legend: { display: false },
+                    datalabels: { color: '#334155', anchor: 'end', align: 'top', font: { size: 9, weight: '800' }, formatter: v => v > 0 ? v : '' }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 8 }, maxRotation: 0 } },
+                    y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,0.1)' }, ticks: { color: '#94a3b8', font: { size: 9 } } }
+                }
+            }
+        });
+    }
+
+    makeBarChart('c-centro', labels, centro, '#e11d48');
+    makeBarChart('c-abord',  labels, abord,  '#f59e0b');
+    makeBarChart('c-migr',   labels, migr,   '#8b5cf6');
+
+    /* Drogas donut */
+    new Chart(document.getElementById('c-drogas'), {
+        type: 'doughnut',
+        data: {
+            labels: dLabels,
+            datasets: [{ data: drogas, backgroundColor: ['#e11d48','#f59e0b'], borderWidth: 2, borderColor: '#fff' }]
+        },
+        options: {
+            maintainAspectRatio: false, animation: false, cutout: '60%',
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { size: 10 }, color: '#334155', padding: 8, boxWidth: 10 } },
+                datalabels: { color: '#fff', font: { size: 11, weight: '800' }, formatter: (v, ctx) => { var t = ctx.dataset.data.reduce((a,b)=>a+b,0); return t > 0 ? Math.round(v/t*100)+'%' : ''; } }
+            }
+        }
+    });
+})();
+</script>
+{% endblock %}

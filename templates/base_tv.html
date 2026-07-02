@@ -1,0 +1,326 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}TV{% endblock %} | {{ system_name }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100vh; overflow: hidden; background: #e2e8f0; font-family: 'Inter', sans-serif; }
+
+        #tv-shell { display: flex; flex-direction: column; height: 100vh; }
+
+        /* ── Header ──────────────────────────────────────────────── */
+        #tv-head {
+            flex-shrink: 0;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 0 20px;
+            color: white;
+        }
+        #tv-head h1 { font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
+        #tv-head .tv-sub { font-size: 11px; opacity: 0.65; font-weight: 500; margin-top: 1px; }
+        #tv-head .tv-period {
+            margin-left: auto;
+            font-size: 11px;
+            font-weight: 700;
+            background: rgba(255,255,255,0.15);
+            padding: 3px 10px;
+            border-radius: 20px;
+        }
+
+        /* ── Body ────────────────────────────────────────────────── */
+        #tv-body {
+            flex: 1;
+            min-height: 0;
+            display: grid;
+            grid-template-columns: 205px 1fr;
+            gap: 7px;
+            padding: 0 7px 50px;
+        }
+
+        /* ── KPI column ──────────────────────────────────────────── */
+        #tv-kpis {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-height: 0;
+        }
+        .tv-kpi {
+            flex: 1;
+            background: white;
+            border-radius: 10px;
+            padding: 8px 13px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+            border-left: 3px solid var(--accent, #3b82f6);
+        }
+        .tv-kpi-label {
+            font-size: 8.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #64748b;
+            margin-bottom: 3px;
+        }
+        .tv-kpi-value {
+            font-size: clamp(20px, 3.2vh, 38px);
+            font-weight: 900;
+            color: #0f172a;
+            line-height: 1;
+        }
+        .tv-kpi-sub {
+            font-size: 10px;
+            color: #94a3b8;
+            margin-top: 3px;
+        }
+
+        /* ── Charts area ─────────────────────────────────────────── */
+        #tv-charts {
+            display: grid;
+            grid-template-rows: 1fr 1fr;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            min-height: 0;
+        }
+        .tv-panel {
+            background: white;
+            border-radius: 10px;
+            padding: 8px 12px 6px;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+        }
+        .tv-panel h2 {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: #475569;
+            margin: 0 0 4px;
+            flex-shrink: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .tv-panel-body {
+            flex: 1;
+            min-height: 0;
+            position: relative;
+        }
+        .tv-panel-body canvas { width: 100% !important; height: 100% !important; }
+
+        /* ── TV Control bar ──────────────────────────────────────── */
+        #tv-bar {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            z-index: 9999;
+            height: 42px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 0 14px;
+            background: rgba(15,23,42,0.78);
+            backdrop-filter: blur(10px);
+            color: white;
+        }
+        #tv-counter { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.38); min-width: 56px; }
+        .tv-btn {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.13);
+            border-radius: 7px;
+            width: 29px; height: 29px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            color: rgba(255,255,255,0.45);
+            transition: .18s;
+        }
+        .tv-btn:hover { background: rgba(255,255,255,0.09); color: white; }
+        .tv-btn i { width: 14px; height: 14px; }
+        #tv-timer { font-size: 13px; font-weight: 800; color: #60a5fa; min-width: 22px; text-align: center; }
+        .tv-close {
+            margin-left: auto;
+            color: rgba(255,255,255,0.22);
+            text-decoration: none;
+            display: flex; align-items: center;
+            transition: .18s;
+        }
+        .tv-close:hover { color: #f87171; }
+        .tv-close i { width: 18px; height: 18px; }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<div id="tv-shell">
+    <div id="tv-head" style="background: {% block header_bg %}linear-gradient(100deg,#1e3a8a,#2563eb){% endblock %}">
+        <div>
+            <h1>{% block module_name %}Dashboard{% endblock %}</h1>
+            <div class="tv-sub">{% block module_sub %}{{ system_name }}{% endblock %}</div>
+        </div>
+        <span class="tv-period">{{ period_label|default:selected_year }}</span>
+    </div>
+
+    <div id="tv-body">
+        <div id="tv-kpis">{% block kpis %}{% endblock %}</div>
+        <div id="tv-charts" {% block charts_style %}{% endblock %}>
+            {% block charts %}{% endblock %}
+        </div>
+    </div>
+</div>
+
+<!-- TV Control bar -->
+<div id="tv-bar">
+    <span id="tv-counter">Slide {{ request.GET.slide|add:1 }}/{{ request.GET.total }}</span>
+    <button class="tv-btn" onclick="window.tvPrev()" title="Anterior"><i data-lucide="chevron-left"></i></button>
+    <button class="tv-btn" onclick="window.tvToggle()" id="tv-play-btn" title="Pausar"><i data-lucide="pause"></i></button>
+    <button class="tv-btn" onclick="window.tvNext()" title="Próximo"><i data-lucide="chevron-right"></i></button>
+    <span id="tv-timer">30</span>
+    <a href="{% url 'core:map' %}" class="tv-close"><i data-lucide="x"></i></a>
+</div>
+
+<script>
+lucide.createIcons();
+if (window.Chart && window.ChartDataLabels) { Chart.register(ChartDataLabels); }
+
+/* ── TV carousel controls ─────────────────────────────────── */
+(function () {
+    var idx = parseInt('{{ request.GET.slide }}') || 0;
+    var total = parseInt('{{ request.GET.total }}') || 0;
+    if (!total) return;
+    var playing = true, secs = 30;
+    var timer = document.getElementById('tv-timer');
+    var slides = [];
+    fetch('{% url "core:tv-api-urls" %}').then(r => r.json()).then(d => { slides = d.slides || []; }).catch(() => {});
+
+    function go(n) {
+        var i = (n + total) % total;
+        if (slides.length) window.location.href = slides[i][0];
+    }
+    window.tvNext = () => go(idx + 1);
+    window.tvPrev = () => go(idx - 1);
+    window.tvToggle = function () {
+        playing = !playing;
+        document.getElementById('tv-play-btn').innerHTML = playing ? '<i data-lucide="pause"></i>' : '<i data-lucide="play"></i>';
+        lucide.createIcons();
+    };
+    setInterval(function () {
+        if (!playing) return;
+        secs--;
+        timer.textContent = secs < 10 ? '0' + secs : '' + secs;
+        if (secs <= 0) go(idx + 1);
+    }, 1000);
+})();
+
+/* ── Shared chart helpers ─────────────────────────────────── */
+var TV = {
+    lineOpts: function (color) {
+        return {
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+                legend: { display: false },
+                datalabels: {
+                    color: color,
+                    anchor: 'end', align: 'top', offset: 3,
+                    font: { size: 9, weight: '800' },
+                    formatter: v => v > 0 ? v : ''
+                }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 9, weight: '700' }, maxRotation: 0 } },
+                y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,0.12)' }, ticks: { color: '#94a3b8', font: { size: 9, weight: '700' } } }
+            }
+        };
+    },
+    donutOpts: function () {
+        return {
+            maintainAspectRatio: false,
+            animation: false,
+            cutout: '62%',
+            plugins: {
+                legend: { position: 'right', labels: { font: { size: 10, weight: '600' }, color: '#334155', padding: 8, boxWidth: 10 } },
+                datalabels: { display: false }
+            }
+        };
+    },
+    barOpts: function (color) {
+        return {
+            maintainAspectRatio: false,
+            animation: false,
+            indexAxis: 'y',
+            plugins: {
+                legend: { display: false },
+                datalabels: {
+                    color: '#fff', anchor: 'end', align: 'left', offset: 4,
+                    font: { size: 10, weight: '800' },
+                    formatter: v => v > 0 ? v : ''
+                }
+            },
+            scales: {
+                x: { beginAtZero: true, grid: { color: 'rgba(148,163,184,0.1)' }, ticks: { color: '#94a3b8', font: { size: 9 } } },
+                y: { grid: { display: false }, ticks: { color: '#334155', font: { size: 10, weight: '600' } } }
+            }
+        };
+    },
+    makeLine: function (canvasId, points, color, label) {
+        var el = document.getElementById(canvasId);
+        if (!el || !points || !points.length) return;
+        return new Chart(el, {
+            type: 'line',
+            data: {
+                labels: points.map(p => p.label),
+                datasets: [{
+                    label: label || '',
+                    data: points.map(p => p.value),
+                    borderColor: color,
+                    backgroundColor: color + '18',
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 2.5,
+                    pointRadius: 3,
+                    pointBackgroundColor: color
+                }]
+            },
+            options: TV.lineOpts(color)
+        });
+    },
+    makeDonut: function (canvasId, items) {
+        var el = document.getElementById(canvasId);
+        if (!el || !items || !items.length) return;
+        var palette = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
+        return new Chart(el, {
+            type: 'doughnut',
+            data: {
+                labels: items.map(i => i.label),
+                datasets: [{ data: items.map(i => i.value), backgroundColor: items.map((i, n) => i.color || palette[n % palette.length]), borderWidth: 2, borderColor: '#fff' }]
+            },
+            options: TV.donutOpts()
+        });
+    },
+    makeBar: function (canvasId, items, color) {
+        var el = document.getElementById(canvasId);
+        if (!el || !items || !items.length) return;
+        var palette = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6'];
+        return new Chart(el, {
+            type: 'bar',
+            data: {
+                labels: items.map(i => i.label),
+                datasets: [{ data: items.map(i => i.value), backgroundColor: items.map((i, n) => i.color || color || palette[n % palette.length]), borderRadius: 4 }]
+            },
+            options: TV.barOpts(color || '#3b82f6')
+        });
+    }
+};
+</script>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

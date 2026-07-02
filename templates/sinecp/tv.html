@@ -1,0 +1,92 @@
+{% extends "base_tv.html" %}
+
+{% block title %}SINE / CP{% endblock %}
+{% block header_bg %}linear-gradient(100deg,#1e3a5f,#1d4ed8){% endblock %}
+{% block module_name %}SINE / Qualificação Profissional{% endblock %}
+{% block module_sub %}{{ system_name }} • {{ selected_year }}{% endblock %}
+
+{% block kpis %}
+{% for card in active_cards %}
+<div class="tv-kpi" style="--accent:{{ card.color|default:'#1d4ed8' }}">
+    <div class="tv-kpi-label">{{ card.label }}</div>
+    <div class="tv-kpi-value">{{ card.value }}</div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block charts %}
+<div class="tv-panel" style="grid-column: span 2;">
+    <h2>SINE — Trabalhadores e Empregadores</h2>
+    <div class="tv-panel-body"><canvas id="c-sine"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>CP — Concluintes e Atendimentos</h2>
+    <div class="tv-panel-body"><canvas id="c-cp"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Gênero — Qualificação</h2>
+    <div class="tv-panel-body"><canvas id="c-gender"></canvas></div>
+</div>
+{% endblock %}
+
+{{ sine_chart_data|json_script:"d-sine" }}
+{{ cp_chart_data|json_script:"d-cp" }}
+{{ cp_gender|json_script:"d-gender" }}
+
+{% block extra_js %}
+<script>
+(function () {
+    var sine   = JSON.parse(document.getElementById('d-sine').textContent);
+    var cp     = JSON.parse(document.getElementById('d-cp').textContent);
+    var gender = JSON.parse(document.getElementById('d-gender').textContent);
+
+    /* SINE dual line */
+    new Chart(document.getElementById('c-sine'), {
+        type: 'line',
+        data: {
+            labels: sine.labels,
+            datasets: [
+                { label: 'Trabalhadores', data: sine.trabalhador_values, borderColor: '#1d4ed8', backgroundColor: '#1d4ed814', fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#1d4ed8' },
+                { label: 'Empregadores',  data: sine.empregador_values,  borderColor: '#10b981', backgroundColor: '#10b98114', fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#10b981' }
+            ]
+        },
+        options: {
+            maintainAspectRatio: false, animation: false,
+            plugins: {
+                legend: { display: true, position: 'top', labels: { font: { size: 10 }, color: '#475569', boxWidth: 10, padding: 8 } },
+                datalabels: { display: false }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 9, weight: '700' }, maxRotation: 0 } },
+                y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,0.12)' }, ticks: { color: '#94a3b8', font: { size: 9 } } }
+            }
+        }
+    });
+
+    /* CP dual line */
+    new Chart(document.getElementById('c-cp'), {
+        type: 'line',
+        data: {
+            labels: cp.labels,
+            datasets: [
+                { label: 'Concluintes',   data: cp.concluintes_values,  borderColor: '#7c3aed', backgroundColor: '#7c3aed14', fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#7c3aed' },
+                { label: 'Atendimentos',  data: cp.atendimentos_values, borderColor: '#0e7490', backgroundColor: '#0e749014', fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#0e7490' }
+            ]
+        },
+        options: {
+            maintainAspectRatio: false, animation: false,
+            plugins: {
+                legend: { display: true, position: 'top', labels: { font: { size: 10 }, color: '#475569', boxWidth: 10, padding: 8 } },
+                datalabels: { display: false }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 9, weight: '700' }, maxRotation: 0 } },
+                y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,0.12)' }, ticks: { color: '#94a3b8', font: { size: 9 } } }
+            }
+        }
+    });
+
+    TV.makeDonut('c-gender', gender);
+})();
+</script>
+{% endblock %}

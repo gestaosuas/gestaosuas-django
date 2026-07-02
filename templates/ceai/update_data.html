@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Atualizar Dados - {{ unit }}{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+<div class="dashboard-container">
+    <a class="back-link" href="{% url 'ceai:dashboard' %}">&larr; Voltar para o painel</a>
+
+    <header class="form-header">
+        <div class="header-info">
+            <p class="eyebrow">CEAI - UNIDADE {{ unit|upper }}</p>
+            <h1>Atualizar Indicadores Mensais</h1>
+            <p class="section-description">Preenchimento dos dados quantitativos para o período selecionado.</p>
+        </div>
+        <div class="status-bar">
+            <span class="status-pill">Mês: {{ month }}</span>
+            <span class="status-pill">Ano: {{ year }}</span>
+            <span class="status-pill">{{ unit }}</span>
+        </div>
+    </header>
+
+    <form method="post" class="report-form-container">
+        {% csrf_token %}
+        <input type="hidden" name="month" value="{{ month }}">
+        <input type="hidden" name="year" value="{{ year }}">
+
+        {% for section in form_def.sections %}
+        <div class="form-section-card">
+            <div class="section-header">
+                <div class="section-accent"></div>
+                <h2>{{ section.title }}</h2>
+            </div>
+            <div class="form-grid">
+                {% for field in section.fields %}
+                <div class="field-group">
+                    <label for="id_{{ field.id }}">{{ field.label }}</label>
+                    <input type="{{ field.type }}" name="{{ field.id }}" id="id_{{ field.id }}"
+                           class="form-control" 
+                           {% if field.disabled %}readonly{% endif %}
+                           value="{% for k, v in initial_data.items %}{% if k == field.id %}{{ v }}{% endif %}{% endfor %}">
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if oficinas %}
+        <div class="form-section-card">
+            <div class="section-header">
+                <div class="section-accent purple"></div>
+                <h2>Oficinas e Atividades</h2>
+            </div>
+            <div class="oficinas-list">
+                {% for ofi in oficinas %}
+                <div class="oficina-item">
+                    <div class="oficina-info">
+                        <span class="oficina-name">{{ ofi.label }}</span>
+                        <span class="oficina-cat">{{ ofi.category }}</span>
+                    </div>
+                    <div class="oficina-fields">
+                        <div class="field-mini">
+                            <label>Vagas Totais</label>
+                            <input type="number" name="{{ ofi.id }}_vagas" value="{{ ofi.initial_vagas }}" class="form-control-mini">
+                        </div>
+                        <div class="field-mini">
+                            <label>Ocupação</label>
+                            <input type="number" name="{{ ofi.id }}_ocupacao" value="{{ ofi.initial_ocupacao }}" class="form-control-mini">
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="form-actions">
+            <a href="{% url 'ceai:dashboard' %}" class="btn-cancel">Cancelar</a>
+            <button type="submit" class="btn-save">
+                <i data-lucide="check-circle-2"></i>
+                Salvar Alterações
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #64748b;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 24px;
+        transition: color 0.2s;
+    }
+
+    .back-link:hover { color: #2563eb; }
+
+    .form-header {
+        margin-bottom: 32px;
+    }
+
+    .eyebrow {
+        font-size: 12px;
+        font-weight: 800;
+        color: #3b82f6;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
+    }
+
+    .form-header h1 {
+        font-size: 28px;
+        font-weight: 800;
+        color: #1e3a8a;
+        margin-bottom: 8px;
+    }
+
+    .section-description {
+        color: #64748b;
+        font-size: 15px;
+    }
+
+    .status-bar {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+    }
+
+    .status-pill {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        padding: 4px 12px;
+        border-radius: 99px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #475569;
+    }
+
+    .form-section-card {
+        background: #fff;
+        border-radius: 20px;
+        border: 1px solid #e2e8f0;
+        padding: 32px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    .section-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+
+    .section-accent {
+        width: 4px;
+        height: 24px;
+        background: #3b82f6;
+        border-radius: 2px;
+    }
+
+    .section-header h2 {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1e293b;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 24px;
+    }
+
+    .field-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .field-group label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #475569;
+    }
+
+    .form-control {
+        height: 44px;
+        padding: 0 12px;
+        border-radius: 10px;
+        border: 1px solid #cbd5e1;
+        background: #f8fafc;
+        font-size: 14px;
+        transition: all 0.2s;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #3b82f6;
+        background: #fff;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    }
+
+    .form-control[readonly] {
+        background: #f1f5f9;
+        cursor: not-allowed;
+    }
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 16px;
+        margin-top: 32px;
+        padding-top: 24px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .btn-cancel {
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 700;
+        color: #64748b;
+    }
+
+    .btn-save {
+        height: 52px;
+        padding: 0 32px;
+        background: #2563eb;
+        color: #fff;
+        border: none;
+        border-radius: 12px;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: all 0.2s;
+        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+    }
+
+    .btn-save:hover {
+        background: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+    }
+
+    .section-accent.purple { background: #a855f7; }
+
+    .oficinas-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .oficina-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px;
+        background: #f8fafc;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .oficina-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .oficina-name {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1e3a8a;
+    }
+
+    .oficina-cat {
+        font-size: 11px;
+        font-weight: 800;
+        color: #3b82f6;
+        text-transform: uppercase;
+    }
+
+    .oficina-fields {
+        display: flex;
+        gap: 20px;
+    }
+
+    .field-mini {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .field-mini label {
+        font-size: 10px;
+        font-weight: 700;
+        color: #94a3b8;
+        text-transform: uppercase;
+    }
+
+    .form-control-mini {
+        width: 100px;
+        height: 36px;
+        padding: 0 10px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        font-size: 13px;
+        font-weight: 600;
+    }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Simple calculation for total_atendimentos or similar if needed
+        const fields = ["atendidos_anterior_masc", "atendidos_anterior_fem", "inseridos_masc", "inseridos_fem", "desligados_masc", "desligados_fem"];
+        const inputs = fields.map(id => document.getElementById("id_" + id));
+        const totalInseridos = document.getElementById("id_total_inseridos");
+
+        function updateTotals() {
+            if (!totalInseridos) return;
+            const antM = parseInt(document.getElementById("id_atendidos_anterior_masc")?.value) || 0;
+            const antF = parseInt(document.getElementById("id_atendidos_anterior_fem")?.value) || 0;
+            const insM = parseInt(document.getElementById("id_inseridos_masc")?.value) || 0;
+            const insF = parseInt(document.getElementById("id_inseridos_fem")?.value) || 0;
+            const desM = parseInt(document.getElementById("id_desligados_masc")?.value) || 0;
+            const desF = parseInt(document.getElementById("id_desligados_fem")?.value) || 0;
+
+            totalInseridos.value = (antM + antF + insM + insF) - (desM + desF);
+        }
+
+        inputs.forEach(input => {
+            if (input) input.addEventListener("input", updateTotals);
+        });
+        
+        updateTotals();
+    });
+</script>
+</div>
+{% endblock %}

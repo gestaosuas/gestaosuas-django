@@ -1,0 +1,318 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{{ system_name }}{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    {% block content %}{% endblock %}
+    <div id="globalToastStack" class="global-toast-stack" aria-live="polite" aria-atomic="true">
+        {% if messages %}
+            {% for message in messages %}
+            <div class="global-toast global-toast-{{ message.tags|default:'info' }}" data-toast>
+                <div class="global-toast-icon">
+                    <i data-lucide="{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}alert-circle{% else %}info{% endif %}"></i>
+                </div>
+                <div class="global-toast-copy">
+                    <strong>{% if message.tags == 'success' %}Sucesso{% elif message.tags == 'error' %}Erro{% else %}Aviso{% endif %}</strong>
+                    <p>{{ message }}</p>
+                </div>
+                <button type="button" class="global-toast-close" data-toast-close aria-label="Fechar aviso">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        function initToast(toast) {
+            var removeToast = function() {
+                toast.classList.add("is-hiding");
+                window.setTimeout(function() {
+                    toast.remove();
+                }, 220);
+            };
+
+            var closeButton = toast.querySelector("[data-toast-close]");
+            if (closeButton) {
+                closeButton.addEventListener("click", removeToast);
+            }
+
+            window.setTimeout(removeToast, 4200);
+        }
+
+        document.querySelectorAll("[data-toast]").forEach(initToast);
+
+        window.showToast = function(title, message, type = 'success') {
+            const stack = document.getElementById('globalToastStack');
+            if (!stack) return;
+
+            const toast = document.createElement('div');
+            toast.className = `global-toast global-toast-${type}`;
+            toast.setAttribute('data-toast', '');
+            
+            const iconName = type === 'success' ? 'check-circle' : (type === 'error' ? 'alert-circle' : 'info');
+            
+            toast.innerHTML = `
+                <div class="global-toast-icon">
+                    <i data-lucide="${iconName}"></i>
+                </div>
+                <div class="global-toast-copy">
+                    <strong>${title}</strong>
+                    <p>${message}</p>
+                </div>
+                <button type="button" class="global-toast-close" data-toast-close aria-label="Fechar aviso">
+                    <i data-lucide="x"></i>
+                </button>
+            `;
+            
+            stack.appendChild(toast);
+            lucide.createIcons({ props: { "data-lucide": true }, node: toast });
+            initToast(toast);
+        };
+    </script>
+    <style>
+        .global-toast-stack {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: min(380px, calc(100vw - 24px));
+        }
+
+        .global-toast {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 12px;
+            align-items: start;
+            padding: 16px 16px 16px 14px;
+            border-radius: 18px;
+            border: 1px solid #dbeafe;
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+            backdrop-filter: blur(14px);
+            animation: toast-in .22s ease-out;
+            transition: opacity .2s ease, transform .2s ease;
+        }
+
+        .global-toast.is-hiding {
+            opacity: 0;
+            transform: translateY(-8px);
+        }
+
+        .global-toast-success {
+            border-color: #bbf7d0;
+        }
+
+        .global-toast-error {
+            border-color: #fecaca;
+        }
+
+        .global-toast-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #eff6ff;
+            color: #2563eb;
+        }
+
+        .global-toast-success .global-toast-icon {
+            background: #ecfdf5;
+            color: #059669;
+        }
+
+        .global-toast-error .global-toast-icon {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+
+        .global-toast-icon i,
+        .global-toast-close i {
+            width: 18px;
+            height: 18px;
+        }
+
+        .global-toast-copy strong {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 13px;
+            color: #0f172a;
+        }
+
+        .global-toast-copy p {
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #475569;
+        }
+
+        .global-toast-close {
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        @keyframes toast-in {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .global-toast-stack {
+                top: 12px;
+                right: 12px;
+                left: 12px;
+                width: auto;
+            }
+        }
+    </style>
+    {% if request.GET.tv == '1' and request.GET.slide %}
+    <div id="tv-bar">
+        <span id="tv-counter">Slide {{ request.GET.slide|add:1 }}/{{ request.GET.total }}</span>
+        <button onclick="window.tvPrev()" class="tv-btn" title="Anterior"><i data-lucide="chevron-left"></i></button>
+        <button onclick="window.tvToggle()" class="tv-btn" id="tv-play-btn" title="Pausar"><i data-lucide="pause"></i></button>
+        <button onclick="window.tvNext()" class="tv-btn" title="Proximo"><i data-lucide="chevron-right"></i></button>
+        <span id="tv-timer">30</span>
+        <a href="{% url 'core:map' %}" class="tv-close"><i data-lucide="x"></i></a>
+    </div>
+    <script>
+    (function(){
+        var idx = parseInt('{{ request.GET.slide }}') || 0;
+        var total = parseInt('{{ request.GET.total }}') || 0;
+        if(!total) return;
+        var playing = true, secs = 30, timer = document.getElementById('tv-timer');
+        var apiUrl = '{% url "core:tv-api-urls" %}';
+        var slides = [];
+        fetch(apiUrl).then(function(r){return r.json()}).then(function(data){
+            slides = data.slides || [];
+        }).catch(function(){});
+
+        function go(n) {
+            var i = (n + total) % total;
+            if(slides.length) { window.location.href = slides[i][0]; }
+        }
+        window.tvNext = function(){ go(idx+1); };
+        window.tvPrev = function(){ go(idx-1); };
+        window.tvToggle = function(){
+            playing = !playing;
+            var btn = document.getElementById('tv-play-btn');
+            btn.innerHTML = playing ? '<i data-lucide="pause"></i>' : '<i data-lucide="play"></i>';
+            try { lucide.createIcons(); } catch(e){}
+        };
+        setInterval(function(){
+            if(!playing) return;
+            secs--;
+            timer.textContent = secs < 10 ? '0' + secs : '' + secs;
+            if(secs <= 0) { go(idx+1); }
+        }, 1000);
+        try { lucide.createIcons(); } catch(e){}
+    })();
+    </script>
+    <style>
+        /* ── Barra de controle TV ────────────────────────────────────── */
+        #tv-bar{position:fixed;bottom:0;left:0;right:0;z-index:9999;display:flex;align-items:center;gap:8px;padding:6px 14px;background:rgba(0,0,0,.65);backdrop-filter:blur(8px);color:#fff;font-family:Inter,sans-serif}
+        #tv-bar .tv-btn{background:none;border:1px solid rgba(255,255,255,.15);border-radius:7px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(255,255,255,.5);transition:.2s}
+        #tv-bar .tv-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+        #tv-bar .tv-btn i{width:16px;height:16px}
+        #tv-counter{font-size:11px;font-weight:700;color:rgba(255,255,255,.45);min-width:60px}
+        #tv-timer{font-size:13px;font-weight:800;color:#3b82f6;min-width:24px;text-align:center}
+        .tv-close{margin-left:auto;color:rgba(255,255,255,.25);text-decoration:none;transition:.2s}
+        .tv-close:hover{color:#f87171}
+        .tv-close i{width:18px;height:18px}
+
+        /* ── Layout: faz o conteúdo preencher o viewport ────────────── */
+        /* Garante body ocupa 100vh sem scroll */
+        body{padding:0!important;margin:0!important;background:#f8fafc!important;overflow:hidden!important;height:100vh!important}
+        /* app-shell preenche body completamente */
+        .app-shell{height:100vh!important;min-height:0!important;overflow:hidden!important}
+        /* dashboard-main ocupa todo o espaço restante após a navbar (oculta) */
+        .dashboard-main,.beneficios-main,.cras-main,.monitoring-detail-shell{padding-top:2px!important;padding-bottom:0!important;flex:1!important;min-height:0!important;display:flex!important;flex-direction:column!important}
+        /* Header colorido comprimido */
+        .monitoring-header-container,.dashboard-header-premium,.monitoring-detail-header,.benefits-hero,.benefits-quick-grid{margin-top:0!important;padding-top:4px!important;padding-bottom:4px!important;border-radius:0!important;flex-shrink:0!important}
+        /* management-overlay oculto em TV */
+        .management-overlay{display:none!important}
+        /* Card principal preenche o resto da tela até a barra TV */
+        .monitoring-main-card{flex:1!important;min-height:0!important;display:flex!important;flex-direction:column!important;margin:0 6px 44px!important;padding:6px 14px!important;box-shadow:none!important;border-radius:12px!important;width:auto!important;overflow:hidden!important}
+        /* Grid preenche o card — linha única ocupa 100% da altura */
+        body.dashboard-fit-vh .dashboard-split-layout,.dashboard-split-layout{flex:1!important;min-height:0!important;display:grid!important;grid-template-rows:1fr!important;align-items:stretch!important;margin-top:0!important;padding-top:0!important;gap:8px!important;border-radius:0!important}
+        /* Colunas do grid preenchem a linha */
+        .metrics-stack{gap:4px!important;min-height:0!important;height:100%!important}
+        .charts-stack{flex:1!important;min-height:0!important;height:100%!important;gap:6px!important}
+        /* Linhas de gráficos se expandem igualmente */
+        .charts-row-inner,.benefits-chart-grid{flex:1!important;min-height:0!important;gap:6px!important}
+        /* Painéis de gráfico preenchem as linhas */
+        .chart-panel{flex:1!important;min-height:0!important;height:auto!important;padding:6px 10px!important}
+        .chart-panel h2{font-size:12px!important;margin:0 0 2px!important}
+        .chart-subtitle{display:none!important}
+        /* Canvas dos gráficos ocupa espaço restante no painel */
+        .monitoring-chart-wrap,.monitoring-chart-wrap-line,.monitoring-chart-wrap-bar{flex:1!important;min-height:0!important;height:auto!important;position:relative!important}
+
+        /* ── Compressão de elementos de texto/UI ─────────────────────── */
+        .eyebrow,.header-title-group p:first-child,.subtitle-muted{display:none!important}
+        header h1{font-size:18px!important;margin:0!important}
+        header+.metrics-stack{margin-top:4px!important}
+        .metric-card-modern,.monitoring-kpi-card{padding:6px 10px!important;min-height:auto!important;gap:2px!important;flex:1!important}
+        .metric-card-modern strong{font-size:22px!important;margin:0!important}
+        .metric-card-modern .metric-context{font-size:9px!important}
+        .metric-card-modern .metric-top{margin-bottom:2px!important}
+        .metric-card-modern .icon-circle{width:22px!important;height:22px!important}
+        .metric-card-modern .icon-circle i{width:12px!important;height:12px!important}
+        .variation{padding:2px 4px!important;font-size:9px!important}
+        .variation i{width:10px!important;height:10px!important}
+        .sparkline-box{display:none!important}
+        .header-controls{gap:6px!important}
+        .header-controls .btn-premium-action{padding:6px 10px!important;font-size:10px!important}
+        .filter-group-modern{padding:2px!important;gap:4px!important}
+        .pill-select{padding:0 6px!important}
+        .pill-select span{font-size:8px!important}
+        .pill-select select{font-size:11px!important}
+        .btn-icon-apply{width:28px!important;height:28px!important}
+        .mon-action-cards,.monitoring-kpi-grid{gap:6px!important}
+        .mon-action-card{padding:12px!important;min-height:auto!important}
+        .mon-action-card span{font-size:10px!important}
+        .mac-icon{width:32px!important;height:32px!important}
+        .mac-icon i{width:16px!important;height:16px!important}
+        .monitoring-progress-panel,.monitoring-visits-panel{display:none!important}
+
+        /* ── SINE/CP específico ──────────────────────────────────────── */
+        .sinecp-header-card{padding:8px!important;flex-shrink:0!important}
+        .sinecp-title-block h1{font-size:18px!important}
+        .sinecp-cards-grid{gap:6px!important}
+        .sinecp-metric-card{min-height:0!important;flex:1!important;padding:10px!important}
+        .sinecp-metric-card strong{font-size:28px!important}
+        .sinecp-chart-grid{flex:1!important;min-height:0!important;gap:8px!important}
+        .sinecp-chart-panel{flex:1!important;min-height:0!important;padding:10px!important}
+        .sinecp-tabs-premium .tab-chip{padding:4px 8px!important;font-size:9px!important}
+        .sinecp-controls{gap:6px!important}
+        .sinecp-filter-row{gap:6px!important}
+    </style>
+    {% endif %}
+</body>
+</html>

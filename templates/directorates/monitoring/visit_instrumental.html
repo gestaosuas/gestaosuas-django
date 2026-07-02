@@ -1,0 +1,3739 @@
+{% extends "base.html" %}
+{% load static %}
+{% load directorate_extras %}
+
+{% block title %}{% if is_new %}Nova Visita{% elif object.status == 'finalized' or object.status == 'completed' %}Visualizar{% else %}Editar{% endif %} Instrumental | {{ system_name }}{% endblock %}
+
+{% block content %}
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<div class="monitoring-header-container no-print visit-hero">
+    <div class="monitoring-header-content visit-hero-content">
+        <div class="monitoring-title-area">
+            <div class="visit-hero-badge-row">
+                <div class="visit-hero-icon">
+                    <i class="ph-duotone ph-{% if is_new %}calendar-plus{% elif object.status == 'finalized' or object.status == 'completed' %}file-check{% else %}file-text{% endif %}" style="font-size: 24px;"></i>
+                </div>
+                <div>
+                    <h1>{% if is_new %}Nova Visita{% elif object.status == 'finalized' or object.status == 'completed' %}Visualizar{% else %}Editar{% endif %} Instrumental</h1>
+                    <p>{% if is_new %}{{ directorate.name }}{% else %}{{ object.osc.name }} | {{ object.visit_date|date:"d/m/Y" }} {% if object.visit_time %}as {{ object.visit_time|time:"H:i" }}{% endif %}{% endif %}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if object.status == 'finalized' or object.status == 'completed' %}
+<div class="locked-banner no-print visit-locked-banner">
+    <i data-lucide="lock"></i>
+    <span>Documento finalizado. O formulario esta em modo somente leitura.</span>
+</div>
+{% endif %}
+
+<div class="visit-page-shell">
+    <form method="post" id="instrumentalForm" class="visit-form-stack" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ return_url }}">
+
+        <div class="visit-main-panel-card">
+            <section class="visit-top-actions-section no-print">
+                <div class="visit-top-actions">
+                    <a href="{{ return_url }}" class="visit-top-action-btn visit-top-action-back">
+                        <i class="ph ph-arrow-left"></i> Voltar
+                    </a>
+                    <a href="{% url 'directorates:plan-list' directorate.pk %}{% if not is_new %}?osc={{ object.osc.pk }}{% endif %}" class="visit-top-action-btn" id="planButton" data-plan-base="{% url 'directorates:plan-list' directorate.pk %}" data-preview-base="{% url 'directorates:plan-preview' directorate.pk %}" onclick="return openPlanPreview(event)">
+                        <i class="ph ph-file-text"></i> Plano de Trabalho
+                    </a>
+                    <button type="button" onclick="printProfessionalReport()" class="visit-top-action-btn" {% if is_new %}id="printReportButton"{% endif %}>
+                        <i class="ph ph-printer"></i> Imprimir Relatorio
+                    </button>
+                    {% if object.status != 'finalized' and object.status != 'completed' %}
+                    <button type="button" onclick="submitVisit('draft')" class="visit-top-action-btn">
+                        <i class="ph ph-floppy-disk"></i> Salvar Rascunho
+                    </button>
+                    <button type="button" onclick="openFinalizeModal()" class="visit-top-action-btn visit-top-action-primary">
+                        <i class="ph ph-check-circle"></i> Finalizar Visita
+                    </button>
+                    {% endif %}
+                </div>
+            </section>
+        <section class="visit-section-content">
+            <div class="visit-section-header">
+                <div class="section-icon visit-section-icon-blue"><i class="ph-duotone ph-buildings"></i></div>
+                <div>
+                    <h2>I. Identificacao da OSC</h2>
+
+                </div>
+            </div>
+            <div class="visit-section-body">
+                {% if is_new %}
+                <div class="visit-field">
+                    <label class="premium-label">Selecione a Organizacao Social Civil (OSC)</label>
+                    <select name="osc" required class="form-input-premium">
+                        <option value="">Selecione a OSC...</option>
+                        {% for osc in oscs %}
+                        <option value="{{ osc.pk }}" data-subsidized="{{ osc.subsidized_count|default:0 }}">{{ osc.name }} - {{ osc.activity_type|default:'' }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="section-divider"><span>Dados da visita</span></div>
+                {% else %}
+                <div class="visit-grid visit-grid-two">
+                    <div class="visit-field">
+                        <label class="premium-label">Instituicao</label>
+                        <input type="text" value="{{ object.osc.name }}" disabled class="form-input-premium is-readonly">
+                    </div>
+                    <div class="visit-field">
+                        <label class="premium-label">Atividade</label>
+                        <input type="text" value="{{ object.osc.activity_type|default:'Nao informado' }}" disabled class="form-input-premium is-readonly">
+                    </div>
+                </div>
+                <div class="visit-grid visit-grid-two">
+                    <div class="visit-field">
+                        <label class="premium-label">Endereco</label>
+                        <input type="text" value="{{ object.osc.address }}{% if object.osc.number %}, {{ object.osc.number }}{% endif %} - {{ object.osc.neighborhood|default:'' }}" disabled class="form-input-premium is-readonly">
+                    </div>
+                    <div class="visit-field">
+                        <label class="premium-label">Telefone</label>
+                        <input type="text" value="{{ object.osc.phone|default:'Nao informado' }}" disabled class="form-input-premium is-readonly">
+                    </div>
+                </div>
+                <div class="section-divider"><span>Dados da visita</span></div>
+                {% endif %}
+
+                <div class="visit-grid visit-grid-three visit-grid-align-end">
+                    <div class="visit-field">
+                        <label class="premium-label">Data da Visita</label>
+                        {% if not is_new %}<input type="hidden" name="osc" value="{{ object.osc.pk }}">{% endif %}
+                        <input type="date" name="identificacao[visit_date_1]" value="{% firstof object.identificacao.visit_date_1 object.visit_date|date:'Y-m-d' now|date:'Y-m-d' %}" class="form-input-premium" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                    </div>
+                    <div class="visit-field">
+                        <label class="premium-label">Turno</label>
+                        <select name="identificacao[visit_shift_1]" class="form-input-premium" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                            <option value="">Selecione...</option>
+                            <option value="manha" {% if object.identificacao.visit_shift_1 == 'manha' %}selected{% endif %}>Manha</option>
+                            <option value="tarde" {% if object.identificacao.visit_shift_1 == 'tarde' %}selected{% endif %}>Tarde</option>
+                            <option value="integral" {% if object.identificacao.visit_shift_1 == 'integral' %}selected{% endif %}>Integral</option>
+                        </select>
+                    </div>
+                        {% if object.status != 'finalized' and object.status != 'completed' %}
+                    <div class="visit-field visit-field-action">
+                        <button type="button" class="btn-toggle-segunda" id="btnAdicionarVisita" onclick="addExtraVisit()">
+                            <i data-lucide="plus"></i> Adicionar Visita
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div id="extraVisitsContainer"></div>
+            </div>
+        </section>
+
+        <section class="visit-section-content">
+            <div class="visit-section-header">
+                <div class="section-icon visit-section-icon-green"><i class="ph-duotone ph-clipboard-text"></i></div>
+                <div>
+                    <h2>II. Atendimento</h2>
+
+                </div>
+            </div>
+            <div class="visit-section-body">
+                <div class="attendance-top-grid">
+                    <div class="visit-field">
+                        <label class="premium-label">Tipo de Horario</label>
+                        <div class="attendance-radio-row">
+                            <label>
+                                <input type="radio" name="atendimento[tipo_horario]" value="periodo" {% if object.atendimento.tipo_horario != '24h' %}checked{% endif %} {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                                <span>Periodo</span>
+                            </label>
+                            <label>
+                                <input type="radio" name="atendimento[tipo_horario]" value="24h" {% if object.atendimento.tipo_horario == '24h' %}checked{% endif %} {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                                <span>24hrs</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="visit-field">
+                        <label class="premium-label">Horario Inicio</label>
+                        <input type="time" name="atendimento[horario_inicio]" value="{{ object.atendimento.horario_inicio|default:'' }}" class="form-input-premium" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                    </div>
+                    <div class="visit-field">
+                        <label class="premium-label">Horario Fim</label>
+                        <input type="time" name="atendimento[horario_fim]" value="{{ object.atendimento.horario_fim|default:'' }}" class="form-input-premium" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                    </div>
+                    <div class="visit-field">
+                        <label class="premium-label">Total / Mes</label>
+                        <input type="number" name="atendimento[total_mes]" value="{{ object.atendimento.total_mes|default:0 }}" class="form-input-premium attendance-total-month" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                    </div>
+                    <div class="visit-field">
+                        <label class="premium-label">Subvencionados</label>
+                        <input type="text" name="atendimento[subvencionados]" value="{% if object %}{% if object.osc.subsidized_count == -1 %}Conforme Demanda{% else %}{{ object.osc.subsidized_count|default:0 }}{% endif %}{% else %}0{% endif %}" class="form-input-premium is-readonly" id="attendanceSubsidizedInput" readonly>
+                    </div>
+                </div>
+
+                <div class="attendance-present-card">
+                    <div class="attendance-subtitle">Usuarios presentes no momento da visita</div>
+                    <div class="attendance-present-grid">
+                        <div class="visit-field">
+                            <label class="micro-label">Manha</label>
+                            <input type="number" name="atendimento[presentes][manha]" value="{{ object.atendimento.presentes.manha|default:0 }}" class="form-input-premium attendance-present-input" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                        </div>
+                        <div class="visit-field">
+                            <label class="micro-label">Tarde</label>
+                            <input type="number" name="atendimento[presentes][tarde]" value="{{ object.atendimento.presentes.tarde|default:0 }}" class="form-input-premium attendance-present-input" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                        </div>
+                        <div class="attendance-waiting-list" style="flex-direction: row;">
+                            <span class="premium-label">Lista de Espera?</span>
+                            <div class="attendance-radio-group">
+                                <label>
+                                    <input type="radio" name="atendimento[lista_espera]" value="sim" class="attendance-waiting-radio" {% if object.atendimento.lista_espera == 'sim' %}checked{% endif %} {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                                    <span>Sim</span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="atendimento[lista_espera]" value="nao" class="attendance-waiting-radio" {% if object.atendimento.lista_espera != 'sim' %}checked{% endif %} {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                                    <span>Nao</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div id="attendanceWaitingQuantityField" style="{% if object.atendimento.lista_espera != 'sim' %}visibility: hidden;{% else %}visibility: visible;{% endif %}">
+                            <label class="micro-label">Quant. Espera</label>
+                            <input type="number" name="atendimento[lista_espera_quantidade]" value="{{ object.atendimento.lista_espera_quantidade|default:'' }}" class="form-input-premium attendance-present-input" placeholder="Qtd" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                        </div>
+                        <div class="attendance-present-total-col">
+                            <label class="micro-label">Total</label>
+                            <div class="attendance-present-total-box">
+                                <strong id="attendancePresentTotal">0</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+
+                {% if is_subvencao_visit %}
+                <div class="visit-grid visit-grid-two">
+                    <div class="visit-field">
+                        <label class="premium-label">Tipos de atividades desenvolvidas</label>
+                        <textarea name="atendimento[atividades_momento]" rows="5" class="form-textarea-premium" placeholder="Descreva os tipos de atividades desenvolvidas..." {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.atividades_momento|default:'' }}</textarea>
+                    </div>
+                    <div class="visit-field">
+                        <label class="premium-label">Atividades em execucao no momento da visita</label>
+                        <textarea name="atendimento[atividades_execucao]" rows="5" class="form-textarea-premium" placeholder="Descreva as atividades em execucao..." {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.atividades_execucao|default:'' }}</textarea>
+                    </div>
+                </div>
+                {% else %}
+                <div class="visit-field">
+                    <label class="premium-label">Aplicacao do Recurso, Conforme Objeto Estabelecido e Prestacao de Contas: (Contribuicoes)</label>
+                    <textarea name="atendimento[aplicacao_recurso]" rows="4" class="form-textarea-premium" placeholder="Descreva a aplicacao do recurso..." {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.aplicacao_recurso|default:'' }}</textarea>
+                </div>
+                <div class="visit-field">
+                    <label class="premium-label">Resultados da Aplicacao dos Recursos no Atendimento: (Contribuicoes)</label>
+                    <textarea name="atendimento[resultados_recursos]" rows="4" class="form-textarea-premium" placeholder="Descreva os resultados..." {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.resultados_recursos|default:'' }}</textarea>
+                </div>
+                <div class="visit-field">
+                    <label class="premium-label">Itens Identificados no Momento da Visita Tecnica na OSC, Conforme Objeto Estabelecido e Prestacao de Contas. (Anexar Foto) (Auxilios)</label>
+                    <textarea name="atendimento[itens_identificados]" rows="4" class="form-textarea-premium" placeholder="Liste os itens identificados..." {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.itens_identificados|default:'' }}</textarea>
+                </div>
+                <div class="visit-field">
+                    <label class="premium-label">Itens Nao Identificados na OSC no Momento da Visita Tecnica (se houver): (Auxilios)</label>
+                    <textarea name="atendimento[itens_nao_identificados]" rows="4" class="form-textarea-premium" placeholder="Liste os itens nao identificados, se houver..." {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.itens_nao_identificados|default:'' }}</textarea>
+                </div>
+                {% endif %}
+
+                {% if not is_subvencao_visit %}
+                <div class="visit-grid visit-grid-two">
+                    <div class="visit-field">
+                        <label class="premium-label">Observacoes</label>
+                        <textarea name="atendimento[observacoes_atendimento]" rows="4" class="form-textarea-premium" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.observacoes_atendimento|default:'' }}</textarea>
+                    </div>
+                    <div class="visit-field">
+                        <label class="premium-label">Recomendacoes</label>
+                        <textarea name="atendimento[recomendacoes_atendimento]" rows="4" class="form-textarea-premium" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.recomendacoes_atendimento|default:'' }}</textarea>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+
+        {% if not is_subvencao_visit %}
+        <section class="visit-section-content">
+            <div class="visit-section-header visit-section-header-compact">
+                <div>
+                    <h2>Balanço Financeiro</h2>
+                </div>
+            </div>
+            <div class="visit-section-body">
+                <label class="visit-upload-dropzone">
+                    <input type="file" name="balanco_financeiro" accept="application/pdf,.pdf" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                    <span class="visit-upload-icon"><i data-lucide="plus"></i></span>
+                    <span>
+                        <strong>Fazer Upload de Balanço Financeiro</strong>
+                        <small>Apenas arquivos .PDF</small>
+                    </span>
+                </label>
+            </div>
+        </section>
+        {% endif %}
+
+        {% if not is_subvencao_visit %}
+        <section class="visit-section-content">
+            <div class="visit-section-header visit-section-header-compact">
+                <div>
+                    <h2>Fotos / Evidências</h2>
+                </div>
+            </div>
+            <div class="visit-section-body">
+                <div class="visit-evidence-grid">
+                    <label class="visit-evidence-option">
+                        <input type="file" name="fotos_camera" accept="image/*" capture="environment" multiple onchange="handleEvidencePreview(this, 'camera')" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                        <span><i data-lucide="camera"></i></span>
+                        <strong>Abrir Câmera</strong>
+                    </label>
+                    <label class="visit-evidence-option">
+                        <input type="file" name="fotos_galeria" accept="image/*" multiple onchange="handleEvidencePreview(this, 'galeria')" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                        <span><i data-lucide="image-plus"></i></span>
+                        <strong>Selecionar da Galeria</strong>
+                    </label>
+                </div>
+
+                <div id="evidencePreviewContainer" class="evidence-preview-list"></div>
+
+                {% if object.documents %}
+                <div class="section-divider"><span>Fotos Salvas</span></div>
+                <div class="evidence-gallery">
+                    {% for doc in object.documents %}
+                        {% if doc.type == "Foto / Evidência" %}
+                        <div class="evidence-item" id="doc-{{ forloop.counter0 }}">
+                            <img src="{{ doc.url }}" alt="{{ doc.name }}">
+                            <div class="evidence-overlay">
+                                <button type="button" class="evidence-action-btn" onclick="openLightbox('{{ doc.url|escapejs }}')" title="Visualizar">
+                                    <i class="ph ph-magnifying-glass-plus"></i>
+                                </button>
+                                <a href="{{ doc.url }}" download="{{ doc.name }}" class="evidence-action-btn" title="Baixar" onclick="event.stopPropagation()">
+                                    <i class="ph ph-download-simple"></i>
+                                </a>
+                                {% if object.status != 'finalized' and object.status != 'completed' %}
+                                <button type="button" class="evidence-action-btn delete" onclick="deleteSavedDocument('{{ forloop.counter0 }}', this)" title="Excluir">
+                                    <i class="ph ph-trash"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </section>
+        {% endif %}
+
+        <section class="visit-section-content">
+            <div class="visit-section-header">
+                <div class="section-icon visit-section-icon-amber"><i class="ph-duotone ph-user-list"></i></div>
+                <div>
+                    <h2>III. Forma de Acesso dos Usuarios</h2>
+
+                </div>
+            </div>
+            <div class="visit-section-body">
+                <div class="visit-check-grid">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="forma_acesso[demanda_espontanea]" {% if object.forma_acesso.demanda_espontanea %}checked{% endif %} {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                        <span>Demanda Espontanea</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="forma_acesso[busca_ativa]" {% if object.forma_acesso.busca_ativa %}checked{% endif %} {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                        <span>Busca Ativa</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="forma_acesso[encaminhamento]" {% if object.forma_acesso.encaminhamento %}checked{% endif %} {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                        <span>Encaminhamento</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="forma_acesso[outros]" {% if object.forma_acesso.outros %}checked{% endif %} {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                        <span>Outros</span>
+                    </label>
+                </div>
+                <div id="encaminhamentoField" class="visit-field visit-conditional-field" {% if not object.forma_acesso.encaminhamento %}style="display:none;"{% endif %}>
+                    <label class="premium-label">Quem encaminha?</label>
+                    <input type="text" name="forma_acesso[quem_encaminha]" value="{{ object.forma_acesso.quem_encaminha|default:'' }}" class="form-input-premium" placeholder="Origem do encaminhamento" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                </div>
+            </div>
+        </section>
+
+        <section class="visit-section-content">
+            <div class="visit-section-header">
+                <div class="section-icon visit-section-icon-violet"><i class="ph-duotone ph-identification-badge"></i></div>
+                <div>
+                    <h2>IV. {% if is_subvencao_visit %}Colaboradores{% else %}Recursos Humanos{% endif %}</h2>
+
+                </div>
+            </div>
+            <div class="visit-section-body visit-table-body">
+                <div class="visit-table-toolbar">
+
+                    {% if object.status != 'finalized' and object.status != 'completed' %}
+                    <button type="button" onclick="addRhRow()" class="btn-outline-monitoring visit-add-row-btn">
+                        <i data-lucide="plus"></i> Adicionar cargo
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="visit-table-wrap">
+                    <table class="table-monitoring visit-rh-table" id="rhTable">
+                        <thead>
+                            <tr>
+                                <th>Cargo / Funcao</th>
+                                <th class="text-center">Tercerizados</th>
+                                <th class="text-center">Outros</th>
+                                <th class="text-center">Subvencao</th>
+                                <th class="text-center">Quantidade</th>
+                                <th>Nomes / Observacoes</th>
+                                {% if object.status != 'finalized' and object.status != 'completed' %}
+                                <th class="text-center">Acao</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="visit-section-content">
+            <div class="visit-section-header">
+                <div class="section-icon visit-section-icon-red"><i class="ph-duotone ph-chat-centered-text"></i></div>
+                <div>
+                    <h2>V. Observacoes e Recomendacoes</h2>
+
+                </div>
+            </div>
+            <div class="visit-section-body">
+                <div class="visit-grid visit-grid-two">
+                    <div class="visit-field">
+                        <label class="premium-label">Observacoes da Equipe Tecnica</label>
+                        <textarea name="observacoes" rows="5" class="form-textarea-premium" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.observacoes|default:'' }}</textarea>
+                    </div>
+                    <div class="visit-field">
+                        <label class="premium-label">Recomendacoes e Encaminhamentos</label>
+                        <textarea name="recomendacoes" rows="5" class="form-textarea-premium" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.recomendacoes|default:'' }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        {% if is_subvencao_visit %}
+        <div class="pse-toggle-wrap">
+            <button type="button" class="pse-toggle-btn" id="pseToggleButton" onclick="togglePseSection()" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                <span class="pse-toggle-remove"><i data-lucide="x"></i></span>
+                <strong id="pseToggleText">Habilitar PSE</strong>
+            </button>
+        </div>
+
+        <section class="visit-section-content pse-section-content" id="pseSection" style="display:none;">
+            <input type="hidden" name="atendimento[pse_habilitado]" id="pseEnabledInput" value="{{ object.atendimento.pse_habilitado|default:'nao' }}">
+            <div class="visit-section-header visit-section-header-compact">
+                <div>
+                    <h2>Dados PSE (Proteção Social Especial)</h2>
+                </div>
+            </div>
+            <div class="visit-section-body">
+                <div class="pse-subsection-title">Qualitativos (preencher referente ao trimestre)</div>
+                <div class="pse-period-row">
+                    <label class="premium-label">Período:</label>
+                    <input type="text" name="atendimento[pse_periodo]" value="{{ object.atendimento.pse_periodo|default:'' }}" class="form-input-premium" placeholder="Ex: Janeiro a Março" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                </div>
+                <div class="pse-table-wrap">
+                    <table class="pse-table pse-qualitative-table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Situação Encontrada</th>
+                                <th>Recomendações</th>
+                                <th>Observação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in "1234" %}
+                            <tr>
+                                <td><input type="text" name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][data]" value="{{ object.atendimento.pse_qualitativos|get_item:forloop.counter0|get_item:'data'|default:'' }}" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></td>
+                                <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][situacao]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.pse_qualitativos|get_item:forloop.counter0|get_item:'situacao'|default:'' }}</textarea></td>
+                                <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][recomendacoes]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.pse_qualitativos|get_item:forloop.counter0|get_item:'recomendacoes'|default:'' }}</textarea></td>
+                                <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][observacao]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.pse_qualitativos|get_item:forloop.counter0|get_item:'observacao'|default:'' }}</textarea></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pse-subsection-title">Quantitativos (Trimestral)</div>
+                <div class="pse-table-wrap">
+                    <table class="pse-table pse-quantitative-table">
+                        <thead>
+                            <tr>
+                                <th>Indicadores</th>
+                                <th>Jan</th>
+                                <th>Fev</th>
+                                <th>Mar</th>
+                                <th>Abr</th>
+                                <th>Mai</th>
+                                <th>Jun</th>
+                                <th>Jul</th>
+                                <th>Ago</th>
+                                <th>Set</th>
+                                <th>Out</th>
+                                <th>Nov</th>
+                                <th>Dez</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th>Total de usuários do serviço no 1º dia do mês</th>
+                                {% for month in "jan,fev,mar,abr,mai,jun,jul,ago,set,out,nov,dez"|split:"," %}
+                                <td><input type="number" name="atendimento[pse_quantitativos][usuarios_primeiro_dia][{{ month }}]" value="{{ object.atendimento.pse_quantitativos|get_item:'usuarios_primeiro_dia'|get_item:month|default:'' }}" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></td>
+                                {% endfor %}
+                            </tr>
+                            <tr>
+                                <th>Total de usuários inseridos no mês (novos)</th>
+                                {% for month in "jan,fev,mar,abr,mai,jun,jul,ago,set,out,nov,dez"|split:"," %}
+                                <td><input type="number" name="atendimento[pse_quantitativos][usuarios_inseridos][{{ month }}]" value="{{ object.atendimento.pse_quantitativos|get_item:'usuarios_inseridos'|get_item:month|default:'' }}" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></td>
+                                {% endfor %}
+                            </tr>
+                            <tr>
+                                <th>Total de usuários desligados no mês</th>
+                                {% for month in "jan,fev,mar,abr,mai,jun,jul,ago,set,out,nov,dez"|split:"," %}
+                                <td><input type="number" name="atendimento[pse_quantitativos][usuarios_desligados][{{ month }}]" value="{{ object.atendimento.pse_quantitativos|get_item:'usuarios_desligados'|get_item:month|default:'' }}" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></td>
+                                {% endfor %}
+                            </tr>
+                            <tr>
+                                <th>Total de usuários do serviço no último dia do mês</th>
+                                {% for month in "jan,fev,mar,abr,mai,jun,jul,ago,set,out,nov,dez"|split:"," %}
+                                <td><input type="number" name="atendimento[pse_quantitativos][usuarios_ultimo_dia][{{ month }}]" value="{{ object.atendimento.pse_quantitativos|get_item:'usuarios_ultimo_dia'|get_item:month|default:'' }}" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></td>
+                                {% endfor %}
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="visit-section-content">
+            <div class="visit-section-header visit-section-header-compact">
+                <div>
+                    <h2>Fotos / Evidências</h2>
+                </div>
+            </div>
+            <div class="visit-section-body">
+                <div class="visit-evidence-grid">
+                    <label class="visit-evidence-option">
+                        <input type="file" name="fotos_camera" accept="image/*" capture="environment" multiple onchange="handleEvidencePreview(this, 'camera')" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                        <span><i class="ph-duotone ph-camera"></i></span>
+                        <strong>Abrir Câmera</strong>
+                    </label>
+                    <label class="visit-evidence-option">
+                        <input type="file" name="fotos_galeria" accept="image/*" multiple onchange="handleEvidencePreview(this, 'galeria')" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                        <span><i class="ph-duotone ph-image-plus"></i></span>
+                        <strong>Selecionar da Galeria</strong>
+                    </label>
+                </div>
+
+                <!-- Lista de Previews (Antes de Salvar) -->
+                <div id="evidencePreviewContainer" class="evidence-preview-list"></div>
+
+                <!-- Galeria de Fotos Salvas -->
+                {% if object.documents %}
+                <div class="section-divider"><span>Fotos Salvas</span></div>
+                <div class="evidence-gallery">
+                    {% for doc in object.documents %}
+                        {% if doc.type == "Foto / Evidência" %}
+                        <div class="evidence-item" id="doc-{{ forloop.counter0 }}">
+                            <img src="{{ doc.url }}" alt="{{ doc.name }}">
+                            <div class="evidence-overlay">
+                                <button type="button" class="evidence-action-btn" onclick="openLightbox('{{ doc.url|escapejs }}')" title="Visualizar">
+                                    <i class="ph ph-magnifying-glass-plus"></i>
+                                </button>
+                                <a href="{{ doc.url }}" download="{{ doc.name }}" class="evidence-action-btn" title="Baixar" onclick="event.stopPropagation()">
+                                    <i class="ph ph-download-simple"></i>
+                                </a>
+                                {% if object.status != 'finalized' and object.status != 'completed' %}
+                                <button type="button" class="evidence-action-btn delete" onclick="deleteSavedDocument('{{ forloop.counter0 }}', this)" title="Excluir">
+                                    <i class="ph ph-trash"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </section>
+        {% endif %}
+
+        <section class="visit-section-content no-print">
+            <div class="visit-section-header">
+                <div class="section-icon visit-section-icon-rose"><i class="ph-duotone ph-signature"></i></div>
+                <div>
+                    <h2>VI. Assinaturas Digitais</h2>
+
+                </div>
+            </div>
+            <div class="visit-section-body">
+                <div class="signature-grid">
+                    <div class="signature-block">
+                        <label class="premium-label">Tecnico Responsavel 1</label>
+                        <input type="text" name="assinaturas[tecnico1_nome]" value="{{ object.assinaturas.tecnico1_nome|default:'' }}" placeholder="Nome completo" class="form-input-premium signature-name-input" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                        <div class="signature-pad-container" id="pad-tecnico1"><canvas></canvas></div>
+                        {% if object.status != 'finalized' and object.status != 'completed' %}
+                        <div class="signature-actions">
+                            <button type="button" onclick="clearSignature('tecnico1')" class="signature-action-link signature-action-muted">Limpar assinatura</button>
+                        </div>
+                        {% endif %}
+                        <input type="hidden" name="assinaturas[tecnico1]" id="val-tecnico1" value="{{ object.assinaturas.tecnico1|default:'' }}">
+                    </div>
+
+                    <div class="signature-block">
+                        <label class="premium-label">Tecnico Responsavel 2</label>
+                        <input type="text" name="assinaturas[tecnico2_nome]" value="{{ object.assinaturas.tecnico2_nome|default:'' }}" placeholder="Nome completo" class="form-input-premium signature-name-input" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                        <div class="signature-pad-container" id="pad-tecnico2"><canvas></canvas></div>
+                        {% if object.status != 'finalized' and object.status != 'completed' %}
+                        <div class="signature-actions">
+                            <button type="button" onclick="clearSignature('tecnico2')" class="signature-action-link signature-action-muted">Limpar assinatura</button>
+                        </div>
+                        {% endif %}
+                        <input type="hidden" name="assinaturas[tecnico2]" id="val-tecnico2" value="{{ object.assinaturas.tecnico2|default:'' }}">
+                    </div>
+
+                    <div class="signature-block">
+                        <label class="premium-label">Representante da OSC</label>
+                        <input type="text" name="assinaturas[responsavel_nome]" value="{{ object.assinaturas.responsavel_nome|default:'' }}" placeholder="Nome completo" class="form-input-premium signature-name-input" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                        <div class="signature-pad-container" id="pad-responsavel"><canvas></canvas></div>
+                        {% if object.status != 'finalized' and object.status != 'completed' %}
+                        <div class="signature-actions">
+                            <button type="button" onclick="clearSignature('responsavel')" class="signature-action-link signature-action-muted">Limpar assinatura</button>
+                        </div>
+                        {% endif %}
+                        <input type="hidden" name="assinaturas[responsavel]" id="val-responsavel" value="{{ object.assinaturas.responsavel|default:'' }}">
+                    </div>
+                </div>
+            </div>
+        </section>
+        </div>
+
+        <input type="hidden" name="status" id="finalStatus" value="{% if object and object.status %}{{ object.status }}{% else %}draft{% endif %}">
+        <input type="hidden" name="rh_data" id="id_rh_data">
+
+        {% if object.status != 'finalized' and object.status != 'completed' %}
+        <div class="sticky-footer-actions no-print visit-footer-actions">
+            <div class="visit-footer-actions-inner">
+                <button type="button" onclick="submitVisit('draft')" class="btn-outline-monitoring visit-save-draft-btn">
+                    <i data-lucide="save"></i> Salvar rascunho
+                </button>
+                <button type="button" onclick="openFinalizeModal()" class="btn-primary-premium visit-finish-btn">
+                    <i data-lucide="check-circle"></i> Finalizar e bloquear
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </form>
+
+    <!-- VISÃO DE IMPRESSÃO (Oculta na tela, visível apenas no papel) -->
+    <div id="reportPrintView">
+        <div class="report-header">
+            <div class="report-logo-placeholder">
+                <img src="/static/img/logo_prefeitura.png" alt="Prefeitura de Uberlândia" style="max-height: 70px; display: block; margin: 0 auto;" onerror="this.parentElement.innerHTML='<strong>Prefeitura de Uberlândia / Desenvolvimento Social</strong>'">
+            </div>
+            <h1 class="report-title">Instrumental de Monitoramento e Avaliação</h1>
+            <div class="report-subtitle">Sistema Vigilância Socioassistencial 2026</div>
+        </div>
+
+        <div class="report-section">
+            <h2 class="report-section-title">Identificação</h2>
+            <div class="report-data-row">
+                <span class="report-label">OSC:</span>
+                <span class="report-value" id="print-osc-name">-</span>
+            </div>
+            <div class="report-data-row">
+                <span class="report-label">1ª Visita:</span>
+                <span class="report-value" id="print-date-1">-</span>
+            </div>
+            <div class="report-data-row">
+                <span class="report-label">Tipo de Atividade:</span>
+                <span class="report-value">{{ object.osc.activity_type|default:'-' }}</span>
+            </div>
+            <div class="report-data-row">
+                <span class="report-label">Endereço:</span>
+                <span class="report-value">{{ object.osc.address|default:'-' }}</span>
+            </div>
+        </div>
+
+        <div class="report-section">
+            <h2 class="report-section-title">Atendimento</h2>
+            <div class="report-data-row">
+                <span class="report-label">Total / Mês:</span>
+                <span class="report-value" id="print-total-mes">0</span>
+            </div>
+            <div class="report-data-row">
+                <span class="report-label">Subvencionados:</span>
+                <span class="report-value">{% if object.osc.subsidized_count == -1 %}Conforme Demanda{% else %}{{ object.osc.subsidized_count|default:0 }}{% endif %}</span>
+            </div>
+
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th colspan="3">Usuários Presentes no Momento da Visita (Conferência)</th>
+                    </tr>
+                    <tr>
+                        <th>Manhã</th>
+                        <th>Tarde</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td id="print-presentes-manha">0</td>
+                        <td id="print-presentes-tarde">0</td>
+                        <td id="print-presentes-total">0</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="report-data-row">
+                <span class="report-label">Há lista de espera?</span>
+                <div class="report-check-group">
+                    <div class="report-check-item">
+                        <span class="report-check-box" id="print-check-espera-sim"></span> <span>Sim <small id="print-espera-info"></small></span>
+                    </div>
+                    <div class="report-check-item">
+                        <span class="report-check-box" id="print-check-espera-nao"></span> <span>Não</span>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <span class="report-label">Tipos de atividades desenvolvidas (descritivo):</span>
+                <div class="report-text-block" id="print-atividades-desenvolvidas">Nao detalhado</div>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <span class="report-label">Atividades em execução no momento da visita:</span>
+                <div class="report-text-block" id="print-atividades-execucao">Nao detalhado</div>
+            </div>
+        </div>
+
+        <div class="report-section">
+            <h2 class="report-section-title">Forma de Acesso do Usuário</h2>
+            <div class="report-check-group" style="flex-direction: column; gap: 8px;">
+                <div class="report-check-item">
+                    <span class="report-check-box" id="print-check-acesso-demanda_espontanea"></span> <span>Demanda Espontânea</span>
+                </div>
+                <div class="report-check-item">
+                    <span class="report-check-box" id="print-check-acesso-busca_ativa"></span> <span>Busca Ativa</span>
+                </div>
+                <div class="report-check-item">
+                    <span class="report-check-box" id="print-check-acesso-encaminhamento"></span> <span>Encaminhamento</span>
+                </div>
+                <div class="report-check-item">
+                    <span class="report-check-box" id="print-check-acesso-outros"></span> <span>Outros</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="report-section">
+            <h2 class="report-section-title">Observações e Recomendações</h2>
+            <div style="margin-top: 10px;">
+                <span class="report-label">Observações da Equipe Técnica:</span>
+                <div class="report-text-block" id="print-observacoes">Nao informado</div>
+            </div>
+            <div style="margin-top: 10px;">
+                <span class="report-label">Recomendações e Encaminhamentos:</span>
+                <div class="report-text-block" id="print-recomendacoes">Nao informado</div>
+            </div>
+        </div>
+
+        <div class="report-signature-grid">
+            <div class="report-signature-box">
+                <img src="" id="print-sig-img-tecnico1" class="report-signature-img">
+                <div class="report-signature-line" id="print-sig-name-tecnico1">Técnico Responsável 1</div>
+            </div>
+            <div class="report-signature-box">
+                <img src="" id="print-sig-img-tecnico2" class="report-signature-img">
+                <div class="report-signature-line" id="print-sig-name-tecnico2">Técnico Responsável 2</div>
+            </div>
+            <div class="report-signature-box">
+                <img src="" id="print-sig-img-responsavel" class="report-signature-img">
+                <div class="report-signature-line" id="print-sig-name-responsavel">Representante da OSC</div>
+            </div>
+        </div>
+
+        <div class="report-footer-note">
+            Documento gerado eletronicamente pelo Sistema Vigilância Socioassistencial 2026 em {% now "d/m/Y H:i" %}
+        </div>
+    </div>
+</div>
+
+<div id="finalizeVisitModal" class="visit-confirm-modal" style="display:none;">
+    <div class="visit-confirm-dialog">
+        <div class="visit-confirm-icon">
+            <i data-lucide="lock-keyhole"></i>
+        </div>
+        <div class="visit-confirm-copy">
+            <span>Finalizar visita</span>
+            <h3>Deseja finalizar e bloquear este instrumental?</h3>
+            <p>Depois da finalizacao, o formulario ficara em modo somente leitura. Voce ainda podera visualizar e imprimir o documento.</p>
+        </div>
+        <div class="visit-confirm-actions">
+            <button type="button" class="visit-confirm-secondary" onclick="closeFinalizeModal()">Continuar editando</button>
+            <button type="button" class="visit-confirm-primary" id="confirmFinalizeButton" onclick="confirmFinalizeVisit()">
+                <i data-lucide="check-circle"></i> Finalizar visita
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="planPreviewModal" class="plan-preview-modal" style="display:none;">
+    <div class="plan-preview-dialog">
+        <div class="plan-preview-modal-header">
+            <div>
+                <span class="plan-preview-modal-eyebrow">Plano de trabalho</span>
+                <h3 id="planPreviewTitle">Visualizacao do documento</h3>
+            </div>
+            <button type="button" class="plan-preview-close" onclick="closePlanPreview()" aria-label="Fechar visualizacao">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div id="planPreviewBody" class="plan-preview-modal-body"></div>
+        <div class="plan-preview-modal-actions">
+            <button type="button" class="visit-top-action-btn" onclick="closePlanPreview()">Fechar</button>
+            <a href="#" target="_blank" rel="noopener noreferrer" id="planPreviewOpenLink" class="visit-top-action-btn visit-top-action-primary">Abrir em nova guia</a>
+        </div>
+    </div>
+</div>
+
+{% if is_new %}
+<div id="selectOscModal" class="visit-confirm-modal" style="display: flex;">
+    <div class="visit-confirm-dialog" style="max-width: 500px;">
+        <div class="visit-confirm-icon" style="background: #eff6ff; color: #2563eb;">
+            <i data-lucide="building-2"></i>
+        </div>
+        <div class="visit-confirm-copy">
+            <span>Inicio da Visita</span>
+            <h3>Selecione a Instituicao</h3>
+        </div>
+        <div style="padding: 0 24px 10px;">
+            <label class="premium-label">Organizacao Social Civil (OSC)</label>
+            <select id="modalOscSelect" class="form-input-premium" onchange="syncOscSelection(this.value)">
+                <option value="">Selecione a OSC...</option>
+                {% for osc in oscs %}
+                <option value="{{ osc.pk }}" data-subsidized="{{ osc.subsidized_count|default:0 }}">{{ osc.name }} - {{ osc.activity_type|default:'' }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="visit-confirm-actions" style="justify-content: center;">
+            <button type="button" class="visit-confirm-primary" id="confirmOscButton" onclick="closeOscModal()" disabled>
+                <i data-lucide="check"></i> Iniciar Instrumental
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{{ object.rh_data|json_script:"rh-data-json" }}
+{{ object.identificacao|json_script:"identificacao-json" }}
+<script>
+    // --- Lightbox com navegação e zoom ---
+    var lbImages = [], lbIdx = 0, lbScale = 1;
+
+    function openLightbox(url) {
+        if (event) { try { event.preventDefault(); event.stopPropagation(); } catch(e){} }
+        lbImages = [];
+        document.querySelectorAll('.evidence-gallery .evidence-item img').forEach(function(img) {
+            lbImages.push(img.getAttribute('src'));
+        });
+        lbIdx = lbImages.indexOf(url);
+        if (lbIdx < 0) { lbImages = [url]; lbIdx = 0; }
+        lbScale = 1;
+        lbRender();
+        var m = document.getElementById('lightboxModal');
+        m.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+        document.getElementById('lightboxModal').style.display = 'none';
+        document.body.style.overflow = '';
+        lbScale = 1;
+        var img = document.getElementById('lbImg');
+        if (img) img.style.transform = 'scale(1)';
+        var wrap = document.getElementById('lbImageWrap');
+        if (wrap) wrap.classList.remove('zoomed');
+    }
+
+    function lbRender() {
+        var img = document.getElementById('lbImg');
+        var counter = document.getElementById('lbCounter');
+        var prev = document.getElementById('lbPrev');
+        var next = document.getElementById('lbNext');
+        img.src = lbImages[lbIdx];
+        var single = lbImages.length <= 1;
+        counter.textContent = single ? '' : (lbIdx + 1) + ' / ' + lbImages.length;
+        prev.style.visibility = single ? 'hidden' : 'visible';
+        next.style.visibility = single ? 'hidden' : 'visible';
+    }
+
+    function lbNav(dir) {
+        lbIdx = (lbIdx + dir + lbImages.length) % lbImages.length;
+        lbScale = 1;
+        var img = document.getElementById('lbImg');
+        if (img) img.style.transform = 'scale(1)';
+        var wrap = document.getElementById('lbImageWrap');
+        if (wrap) wrap.classList.remove('zoomed');
+        lbRender();
+    }
+
+    function lbZoom(delta) {
+        lbScale = Math.min(5, Math.max(0.5, lbScale + delta));
+        document.getElementById('lbImg').style.transform = 'scale(' + lbScale.toFixed(2) + ')';
+        document.getElementById('lbImageWrap').classList.toggle('zoomed', lbScale > 1.05);
+    }
+
+    function lbToggleZoom(e) {
+        e.stopPropagation();
+        if (lbScale > 1.05) {
+            lbScale = 1;
+            document.getElementById('lbImg').style.transform = 'scale(1)';
+            document.getElementById('lbImageWrap').classList.remove('zoomed');
+        } else {
+            lbZoom(1.5);
+        }
+    }
+
+    document.addEventListener('keydown', function(e) {
+        var m = document.getElementById('lightboxModal');
+        if (!m || m.style.display !== 'flex') return;
+        if (e.key === 'Escape') { closeLightbox(); return; }
+        if (e.key === 'ArrowLeft')  { lbNav(-1); return; }
+        if (e.key === 'ArrowRight') { lbNav(1);  return; }
+        if (e.key === '+') lbZoom(0.3);
+        if (e.key === '-') lbZoom(-0.3);
+    });
+
+    function deleteSavedDocument(idx, element) {
+        event.preventDefault();
+        event.stopPropagation();
+        if(!confirm('Deseja realmente excluir esta foto?')) return;
+        
+        const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        fetch(window.location.pathname + 'delete-document/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ index: idx })
+        }).then(res => {
+            if (res.ok) {
+                const item = element.closest('.evidence-item');
+                if (item) item.remove();
+            } else {
+                alert('Erro ao excluir foto.');
+            }
+        });
+    }
+
+    function handleEvidencePreview(input, s) {
+        const c = document.getElementById('evidencePreviewContainer');
+        if(!c || !input.files) return;
+        Array.from(input.files).forEach(f => {
+            const r = new FileReader();
+            r.onload = e => {
+                const i = document.createElement('div');
+                i.className = 'evidence-item preview-new';
+                i.innerHTML = '<img src="'+e.target.result+'"><div class="evidence-badge">'+s+'</div><div class="evidence-overlay"><button type="button" class="evidence-action-btn" onclick="openLightbox(\''+e.target.result.replace(/'/g, "\\'")+'\')"><i class="ph ph-magnifying-glass-plus"></i></button><button type="button" class="evidence-action-btn delete" onclick="this.closest(\'.evidence-item\').remove()"><i class="ph ph-x"></i></button></div>';
+                c.appendChild(i);
+            };
+            r.readAsDataURL(f);
+        });
+    }
+    // Recupera os dados de RH salvos ou usa o padrao se for novo
+    // Recupera os dados de RH salvos usando o metodo seguro do Django
+    var rhData = [];
+    const rhDataElement = document.getElementById('rh-data-json');
+    if (rhDataElement) {
+        try {
+            rhData = JSON.parse(rhDataElement.textContent);
+        } catch (e) {
+            console.error("Erro ao processar JSON de RH:", e);
+        }
+    }
+
+    if (!Array.isArray(rhData) || rhData.length === 0) {
+        rhData = [
+            { cargo: "Coordenador", voluntario: false, terceirizado: false, subvencao: false, quantidade: "", observacoes: "" },
+            { cargo: "Assistente Social", voluntario: false, terceirizado: false, subvencao: false, quantidade: "", observacoes: "" },
+            { cargo: "Psicologo", voluntario: false, terceirizado: false, subvencao: false, quantidade: "", observacoes: "" },
+            { cargo: "Instrutor", voluntario: false, terceirizado: false, subvencao: false, quantidade: "", observacoes: "" },
+            { cargo: "Educador Fisico", voluntario: false, terceirizado: false, subvencao: false, quantidade: "", observacoes: "" },
+            { cargo: "Aux. Administrativo", voluntario: false, terceirizado: false, subvencao: false, quantidade: "", observacoes: "" },
+            { cargo: "Monitor", voluntario: false, terceirizado: false, subvencao: false, quantidade: "", observacoes: "" },
+            { cargo: "Servico Geral", voluntario: false, terceirizado: false, subvencao: false, quantidade: "", observacoes: "" },
+            { cargo: "Cozinheiro", voluntario: false, terceirizado: false, subvencao: false, quantidade: "", observacoes: "" }
+        ];
+    }
+
+    var pads = {};
+    var signatureSnapshots = {};
+    var signatureResizeTimer = null;
+    var initialSignatures = {
+        tecnico1: "{{ object.assinaturas.tecnico1|default:''|escapejs }}",
+        tecnico2: "{{ object.assinaturas.tecnico2|default:''|escapejs }}",
+        responsavel: "{{ object.assinaturas.responsavel|default:''|escapejs }}"
+    };
+    var readOnlyVisit = {% if object.status == 'finalized' or object.status == 'completed' %}true{% else %}false{% endif %};
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function updateAttendanceTotal() {
+        var manhaInput = document.getElementsByName("atendimento[presentes][manha]")[0];
+        var tardeInput = document.getElementsByName("atendimento[presentes][tarde]")[0];
+        var totalMonthInput = document.getElementsByName("atendimento[total_mes]")[0];
+        var totalElement = document.getElementById("attendancePresentTotal");
+        var manha = Number(manhaInput ? manhaInput.value || 0 : 0);
+        var tarde = Number(tardeInput ? tardeInput.value || 0 : 0);
+        var total = manha + tarde;
+
+        if (totalElement) {
+            totalElement.textContent = total;
+        }
+
+        if (totalMonthInput) {
+            totalMonthInput.value = total;
+        }
+    }
+
+    function updateWaitingListQuantityVisibility() {
+        var selected = document.querySelector("input[name='atendimento[lista_espera]']:checked");
+        var quantityField = document.getElementById("attendanceWaitingQuantityField");
+
+        if (!quantityField) {
+            return;
+        }
+
+        quantityField.style.visibility = selected && selected.value === "sim" ? "visible" : "hidden";
+    }
+
+    function setPseSectionState(enabled) {
+        var section = document.getElementById("pseSection");
+        var input = document.getElementById("pseEnabledInput");
+        var text = document.getElementById("pseToggleText");
+        var button = document.getElementById("pseToggleButton");
+
+        if (!section || !input || !text || !button) {
+            return;
+        }
+
+        section.style.display = enabled ? "block" : "none";
+        input.value = enabled ? "sim" : "nao";
+        text.textContent = enabled ? "Remover PSE" : "Habilitar PSE";
+        button.classList.toggle("is-enabled", enabled);
+    }
+
+    function togglePseSection() {
+        var input = document.getElementById("pseEnabledInput");
+        setPseSectionState(!(input && input.value === "sim"));
+    }
+
+    function setupAttachmentLabels() {
+        document.querySelectorAll(".visit-upload-dropzone input[type='file'], .visit-evidence-option input[type='file']").forEach(function(input) {
+            input.addEventListener("change", function() {
+                var label = this.closest("label");
+                var text = label ? label.querySelector("strong") : null;
+                var fileCount = this.files ? this.files.length : 0;
+
+                if (text && fileCount) {
+                    text.textContent = fileCount === 1 ? this.files[0].name : fileCount + " arquivos selecionados";
+                }
+            });
+        });
+    }
+
+    function updateSubsidizedFromOsc() {
+        var oscSelect = document.querySelector("select[name='osc']");
+        var subsidizedInput = document.getElementById("attendanceSubsidizedInput");
+
+        if (!oscSelect || !subsidizedInput) {
+            return;
+        }
+
+        var selectedOption = oscSelect.options[oscSelect.selectedIndex];
+        if (selectedOption && selectedOption.dataset.subsidized !== undefined) {
+            subsidizedInput.value = selectedOption.dataset.subsidized === "-1" ? "Conforme Demanda" : selectedOption.dataset.subsidized || 0;
+        }
+    }
+
+    function renderRhRows() {
+        var tbody = document.querySelector("#rhTable tbody");
+        tbody.innerHTML = "";
+
+        rhData.forEach(function(row, index) {
+            var tr = document.createElement("tr");
+            var disabledAttr = readOnlyVisit ? "disabled" : "";
+            tr.innerHTML =
+                "<td><input type='text' value='" + escapeHtml(row.cargo) + "' onchange=\"updateRh(" + index + ", 'cargo', this.value)\" class='form-input-premium visit-table-input' " + disabledAttr + "></td>" +
+                "<td class='text-center'><input type='checkbox' " + (row.terceirizado ? "checked" : "") + " onchange=\"updateRh(" + index + ", 'terceirizado', this.checked)\" class='rh-checkbox' " + disabledAttr + "></td>" +
+                "<td class='text-center'><input type='checkbox' " + (row.outros ? "checked" : "") + " onchange=\"updateRh(" + index + ", 'outros', this.checked)\" class='rh-checkbox' " + disabledAttr + "></td>" +
+                "<td class='text-center'><input type='checkbox' " + (row.subvencao ? "checked" : "") + " onchange=\"updateRh(" + index + ", 'subvencao', this.checked)\" class='rh-checkbox' " + disabledAttr + "></td>" +
+                "<td><input type='number' value='" + escapeHtml(row.quantidade) + "' onchange=\"updateRh(" + index + ", 'quantidade', this.value)\" class='form-input-premium visit-table-input visit-table-input-center' " + disabledAttr + "></td>" +
+                "<td><input type='text' value='" + escapeHtml(row.observacoes || '') + "' onchange=\"updateRh(" + index + ", 'observacoes', this.value)\" class='form-input-premium visit-table-input' placeholder='...' " + disabledAttr + "></td>" +
+                (readOnlyVisit ? "" : "<td class='text-center'><button type='button' onclick='removeRhRow(" + index + ")' class='visit-delete-row-btn'><i data-lucide='trash-2'></i></button></td>");
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById("id_rh_data").value = JSON.stringify(rhData);
+        lucide.createIcons();
+    }
+
+    function addRhRow() {
+        rhData.push({ cargo: "", terceirizado: false, outros: false, subvencao: false, quantidade: "", observacoes: "" });
+        renderRhRows();
+    }
+
+    function removeRhRow(index) {
+        rhData.splice(index, 1);
+        renderRhRows();
+    }
+
+    function updateRh(index, field, value) {
+        rhData[index][field] = value;
+        document.getElementById("id_rh_data").value = JSON.stringify(rhData);
+    }
+
+    function drawExistingSignature(pad, dataUrl) {
+        if (!dataUrl) {
+            return;
+        }
+
+        var image = new Image();
+        image.onload = function() {
+            pad.context.clearRect(0, 0, pad.width, pad.height);
+            pad.context.drawImage(image, 0, 0, pad.width, pad.height);
+            pad.hasDrawing = true;
+        };
+        image.src = dataUrl;
+    }
+
+    function getCanvasPoint(canvas, event) {
+        var rect = canvas.getBoundingClientRect();
+        var clientX = event.clientX;
+        var clientY = event.clientY;
+
+        var scaleX = canvas.width / rect.width;
+        var scaleY = canvas.height / rect.height;
+
+        return {
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY
+        };
+    }
+
+    function createSignaturePad(canvas, width, height, ratio) {
+        var context = canvas.getContext("2d");
+        var pad = {
+            canvas: canvas,
+            context: context,
+            width: width,
+            height: height,
+            drawing: false,
+            hasDrawing: false,
+            clear: function() {
+                this.context.clearRect(0, 0, this.width, this.height);
+                this.hasDrawing = false;
+            },
+            isEmpty: function() {
+                return !this.hasDrawing;
+            },
+            toDataURL: function() {
+                return this.canvas.toDataURL("image/png");
+            },
+            persist: function(id) {
+                if (this.hasDrawing || canvasHasInk(this.canvas)) {
+                    var dataUrl = this.toDataURL();
+                    document.getElementById("val-" + id).value = dataUrl;
+                    signatureSnapshots[id] = dataUrl;
+                }
+            }
+        };
+
+        context.lineWidth = 2.5 * (ratio || 1);
+        context.lineCap = "round";
+        context.lineJoin = "round";
+        context.strokeStyle = "#0f172a";
+
+        canvas.onpointerdown = function(event) {
+            if (readOnlyVisit) {
+                return;
+            }
+
+            event.preventDefault();
+            canvas.setPointerCapture(event.pointerId);
+            var point = getCanvasPoint(canvas, event);
+            pad.drawing = true;
+            pad.hasDrawing = true;
+            context.beginPath();
+            context.moveTo(point.x, point.y);
+        };
+
+        canvas.onpointermove = function(event) {
+            if (!pad.drawing || readOnlyVisit) {
+                return;
+            }
+
+            event.preventDefault();
+            var point = getCanvasPoint(canvas, event);
+            context.lineTo(point.x, point.y);
+            context.stroke();
+        };
+
+        canvas.onpointerup = canvas.onpointercancel = canvas.onpointerleave = function(event) {
+            if (!pad.drawing) {
+                return;
+            }
+
+            pad.drawing = false;
+            pad.persist(canvas.dataset.signatureId);
+            try {
+                canvas.releasePointerCapture(event.pointerId);
+            } catch (error) {
+                // Pointer may already be released by the browser.
+            }
+        };
+
+        return pad;
+    }
+
+    function setupSignaturePad(id) {
+        var canvas = document.querySelector("#pad-" + id + " canvas");
+        if (!canvas) {
+            return;
+        }
+
+        var container = canvas.parentElement;
+        var existingPad = pads[id];
+        if (existingPad && !existingPad.isEmpty()) {
+            signatureSnapshots[id] = existingPad.toDataURL();
+        } else if (document.getElementById("val-" + id).value) {
+            signatureSnapshots[id] = document.getElementById("val-" + id).value;
+        } else if (initialSignatures[id]) {
+            signatureSnapshots[id] = initialSignatures[id];
+        }
+
+        var rect = container.getBoundingClientRect();
+        var cssWidth = Math.max(Math.floor(rect.width), 1);
+        var cssHeight = Math.max(Math.floor(rect.height), 1);
+
+        if (cssWidth <= 1 || cssHeight <= 1) {
+            window.requestAnimationFrame(function() {
+                setupSignaturePad(id);
+            });
+            return;
+        }
+
+        // Evita que o canvas resete a imagem se a mudanca de tamanho for falsa ou imperceptivel (jitter)
+        if (canvas.dataset.lastCssWidth === String(cssWidth) && canvas.dataset.lastCssHeight === String(cssHeight)) {
+            return;
+        }
+        canvas.dataset.lastCssWidth = cssWidth;
+        canvas.dataset.lastCssHeight = cssHeight;
+
+        var ratio = Math.max(window.devicePixelRatio || 1, 1);
+        var physicalWidth = Math.round(cssWidth * ratio);
+        var physicalHeight = Math.round(cssHeight * ratio);
+
+        canvas.width = physicalWidth;
+        canvas.height = physicalHeight;
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+        canvas.style.touchAction = "none";
+        canvas.dataset.signatureId = id;
+        
+        var context = canvas.getContext("2d");
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, physicalWidth, physicalHeight);
+
+        pads[id] = createSignaturePad(canvas, physicalWidth, physicalHeight, ratio);
+        drawExistingSignature(pads[id], signatureSnapshots[id]);
+    }
+
+    function resizeSignaturePads() {
+        ["tecnico1", "tecnico2", "responsavel"].forEach(function(id) {
+            setupSignaturePad(id);
+        });
+    }
+
+    function queueSignaturePadResize() {
+        window.clearTimeout(signatureResizeTimer);
+        signatureResizeTimer = window.setTimeout(resizeSignaturePads, 120);
+    }
+
+    function clearSignature(id) {
+        if (pads[id]) {
+            pads[id].clear();
+            document.getElementById("val-" + id).value = "";
+            signatureSnapshots[id] = "";
+        }
+    }
+
+    function syncSignatureValues() {
+        ["tecnico1", "tecnico2", "responsavel"].forEach(function(id) {
+            var canvas = document.querySelector("#pad-" + id + " canvas");
+            if (pads[id] && canvas && (!pads[id].isEmpty() || canvasHasInk(canvas))) {
+                var dataUrl = pads[id].toDataURL();
+                document.getElementById("val-" + id).value = dataUrl;
+                signatureSnapshots[id] = dataUrl;
+            }
+        });
+    }
+
+    function canvasHasInk(canvas) {
+        var context = canvas.getContext("2d");
+        var pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        for (var index = 3; index < pixels.length; index += 4) {
+            if (pixels[index] > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function submitVisit(status) {
+        var form = document.getElementById("instrumentalForm");
+        document.getElementById("finalStatus").value = status;
+
+        try {
+            syncSignatureValues();
+        } catch (error) {
+            console.error("Erro ao preparar assinaturas antes do envio:", error);
+        }
+
+        HTMLFormElement.prototype.submit.call(form);
+    }
+
+    function openFinalizeModal() {
+        var modal = document.getElementById("finalizeVisitModal");
+        modal.style.display = "flex";
+        document.body.classList.add("modal-open");
+        lucide.createIcons();
+    }
+
+    function closeFinalizeModal() {
+        var modal = document.getElementById("finalizeVisitModal");
+        modal.style.display = "none";
+        document.body.classList.remove("modal-open");
+    }
+
+    function confirmFinalizeVisit() {
+        var button = document.getElementById("confirmFinalizeButton");
+        button.disabled = true;
+        button.innerHTML = "<i data-lucide='loader-circle'></i> Finalizando...";
+        lucide.createIcons();
+        submitVisit("completed");
+    }
+
+    // --- Múltiplas visitas ---
+    var identificacaoData = {};
+    var identificacaoEl = document.getElementById("identificacao-json");
+    if (identificacaoEl) {
+        try { identificacaoData = JSON.parse(identificacaoEl.textContent) || {}; } catch(e) {}
+    }
+    var extraVisits = [];
+    (function() {
+        var i = 2;
+        while (i <= 20) {
+            var d = identificacaoData["visit_date_" + i];
+            var s = identificacaoData["visit_shift_" + i];
+            if (!d && !s) break;
+            extraVisits.push({ date: d || "", shift: s || "" });
+            i++;
+        }
+    })();
+
+    function renderExtraVisits() {
+        var container = document.getElementById("extraVisitsContainer");
+        if (!container) return;
+        container.innerHTML = "";
+        extraVisits.forEach(function(v, idx) {
+            var num = idx + 2;
+            var div = document.createElement("div");
+            div.className = "visit-grid visit-grid-three visit-grid-align-end visit-secondary-grid";
+            div.style.marginTop = "8px";
+            var disAttr = readOnlyVisit ? " disabled" : "";
+            div.innerHTML =
+                '<div class="visit-field">' +
+                    '<label class="premium-label">' + num + 'ª Visita — Data</label>' +
+                    '<input type="date" name="identificacao[visit_date_' + num + ']" value="' + escapeHtml(v.date) + '" class="form-input-premium"' + disAttr + '>' +
+                '</div>' +
+                '<div class="visit-field">' +
+                    '<label class="premium-label">Turno</label>' +
+                    '<select name="identificacao[visit_shift_' + num + ']" class="form-input-premium"' + disAttr + '>' +
+                        '<option value="">Selecione...</option>' +
+                        '<option value="manha"' + (v.shift === "manha" ? " selected" : "") + '>Manhã</option>' +
+                        '<option value="tarde"' + (v.shift === "tarde" ? " selected" : "") + '>Tarde</option>' +
+                        '<option value="integral"' + (v.shift === "integral" ? " selected" : "") + '>Integral</option>' +
+                    '</select>' +
+                '</div>' +
+                (!readOnlyVisit
+                    ? '<div class="visit-field visit-field-action"><button type="button" class="btn-toggle-segunda" onclick="removeExtraVisit(' + idx + ')" style="background:#fef2f2;border-color:#fecaca;color:#dc2626;"><i data-lucide="x"></i> Remover</button></div>'
+                    : '<div></div>');
+            container.appendChild(div);
+        });
+        lucide.createIcons();
+    }
+
+    function addExtraVisit() {
+        extraVisits.push({ date: "", shift: "" });
+        renderExtraVisits();
+    }
+
+    function removeExtraVisit(idx) {
+        extraVisits.splice(idx, 1);
+        renderExtraVisits();
+    }
+
+    // --- Horário 24hrs ---
+    function setupTipoHorario() {
+        function applyTipoHorario(val) {
+            var is24h = val === "24h";
+            var inicio = document.querySelector("input[name='atendimento[horario_inicio]']");
+            var fim = document.querySelector("input[name='atendimento[horario_fim]']");
+            if (!readOnlyVisit) {
+                if (inicio) { inicio.disabled = is24h; if (is24h) inicio.value = ""; }
+                if (fim) { fim.disabled = is24h; if (is24h) fim.value = ""; }
+            }
+            if (inicio && inicio.closest) inicio.closest(".visit-field").style.opacity = is24h ? "0.4" : "";
+            if (fim && fim.closest) fim.closest(".visit-field").style.opacity = is24h ? "0.4" : "";
+        }
+        document.querySelectorAll("input[name='atendimento[tipo_horario]']").forEach(function(r) {
+            r.addEventListener("change", function() { applyTipoHorario(this.value); });
+        });
+        var checked = document.querySelector("input[name='atendimento[tipo_horario]']:checked");
+        if (checked) applyTipoHorario(checked.value);
+    }
+
+    function updatePlanButtonLink() {
+        var planButton = document.getElementById("planButton");
+        if (!planButton) {
+            return;
+        }
+
+        var baseUrl = planButton.getAttribute("data-plan-base");
+        var oscSelect = document.querySelector("select[name='osc']");
+        if (!oscSelect) {
+            return;
+        }
+
+        var oscId = oscSelect.value;
+        planButton.href = oscId ? (baseUrl + "?osc=" + encodeURIComponent(oscId)) : baseUrl;
+        planButton.classList.toggle("is-disabled", !oscId);
+        planButton.setAttribute("aria-disabled", !oscId ? "true" : "false");
+    }
+
+    function getSelectedOscId() {
+        var oscSelect = document.querySelector("select[name='osc']");
+        if (oscSelect) {
+            return oscSelect.value;
+        }
+
+        var hiddenOsc = document.querySelector("input[name='osc']");
+        return hiddenOsc ? hiddenOsc.value : "";
+    }
+
+    function openPlanPreview(event) {
+        if (event) {
+            event.preventDefault();
+        }
+
+        var planButton = document.getElementById("planButton");
+        if (!planButton || planButton.classList.contains("is-disabled")) {
+            return false;
+        }
+
+        var oscId = getSelectedOscId();
+        if (!oscId) {
+            alert("Selecione uma OSC para visualizar o plano de trabalho.");
+            return false;
+        }
+
+        var modal = document.getElementById("planPreviewModal");
+        var body = document.getElementById("planPreviewBody");
+        var title = document.getElementById("planPreviewTitle");
+        var openLink = document.getElementById("planPreviewOpenLink");
+        var previewUrl = planButton.getAttribute("data-preview-base") + "?osc=" + encodeURIComponent(oscId);
+
+        title.textContent = "Carregando plano de trabalho...";
+        body.innerHTML = "<div class='plan-preview-loading'><i data-lucide='loader-circle'></i><span>Montando visualizacao do plano...</span></div>";
+        openLink.href = planButton.href;
+        modal.style.display = "flex";
+        document.body.classList.add("modal-open");
+        lucide.createIcons();
+
+        fetch(previewUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+            .then(function(response) {
+                return response.json().then(function(data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function(result) {
+                if (!result.ok || !result.data.success) {
+                    throw new Error(result.data.error || "Nao foi possivel carregar o plano de trabalho.");
+                }
+
+                title.textContent = result.data.title;
+                body.innerHTML = result.data.html;
+                openLink.href = result.data.open_url;
+                lucide.createIcons();
+            })
+            .catch(function(error) {
+                title.textContent = "Plano de trabalho indisponivel";
+                body.innerHTML = "<div class='plan-preview-empty-state'><i data-lucide='file-x2'></i><p>" + escapeHtml(error.message) + "</p></div>";
+                openLink.href = planButton.href;
+                lucide.createIcons();
+            });
+
+        return false;
+    }
+
+    function closePlanPreview() {
+        var modal = document.getElementById("planPreviewModal");
+        modal.style.display = "none";
+        document.body.classList.remove("modal-open");
+    }
+
+    function syncOscSelection(val) {
+        var mainSelect = document.querySelector("select[name='osc']");
+        var confirmBtn = document.getElementById("confirmOscButton");
+        
+        if (mainSelect) {
+            mainSelect.value = val;
+            // Disparar eventos manuais para atualizar outras partes (Plano de Trabalho, etc)
+            mainSelect.dispatchEvent(new Event('change'));
+        }
+        
+        if (confirmBtn) {
+            confirmBtn.disabled = !val;
+        }
+    }
+
+    function closeOscModal() {
+        var modal = document.getElementById("selectOscModal");
+        if (modal) {
+            modal.style.display = "none";
+            document.body.classList.remove("modal-open");
+        }
+    }
+
+    // Abrir modal de OSC se for nova visita
+    if (document.getElementById("selectOscModal")) {
+        document.body.classList.add("modal-open");
+    }
+
+    var chkEncaminhamento = document.querySelector("input[name='forma_acesso[encaminhamento]']");
+    if (chkEncaminhamento) {
+        chkEncaminhamento.addEventListener("change", function() {
+            document.getElementById("encaminhamentoField").style.display = this.checked ? "block" : "none";
+        });
+    }
+
+    var oscSelectField = document.querySelector("select[name='osc']");
+    if (oscSelectField) {
+        oscSelectField.addEventListener("change", updatePlanButtonLink);
+        oscSelectField.addEventListener("change", updateSubsidizedFromOsc);
+    }
+
+    document.querySelectorAll(".attendance-present-input").forEach(function(input) {
+        input.addEventListener("input", updateAttendanceTotal);
+        input.addEventListener("change", updateAttendanceTotal);
+    });
+
+    document.querySelectorAll(".attendance-waiting-radio").forEach(function(input) {
+        input.addEventListener("change", updateWaitingListQuantityVisibility);
+    });
+
+    document.getElementById("instrumentalForm").addEventListener("submit", function() {
+        syncSignatureValues();
+    });
+
+    document.getElementById("planPreviewModal").addEventListener("click", function(event) {
+        if (event.target.id === "planPreviewModal") {
+            closePlanPreview();
+        }
+    });
+
+    document.getElementById("finalizeVisitModal").addEventListener("click", function(event) {
+        if (event.target.id === "finalizeVisitModal") {
+            closeFinalizeModal();
+        }
+    });
+
+    renderRhRows();
+    renderExtraVisits();
+    setupTipoHorario();
+    updateAttendanceTotal();
+    updateWaitingListQuantityVisibility();
+    setupAttachmentLabels();
+    updateSubsidizedFromOsc();
+    setPseSectionState(document.getElementById("pseEnabledInput")?.value === "sim");
+    window.requestAnimationFrame(resizeSignaturePads);
+    updatePlanButtonLink();
+    window.addEventListener("resize", queueSignaturePadResize);
+
+    if (window.ResizeObserver) {
+        var resizeObserver = new ResizeObserver(function() {
+            queueSignaturePadResize();
+        });
+        document.querySelectorAll('.signature-pad-container').forEach(function(container) {
+            resizeObserver.observe(container);
+        });
+    }
+</script>
+
+<style>
+    .visit-hero {
+        padding-bottom: 104px;
+    }
+
+    .visit-hero-content {
+        align-items: flex-end;
+    }
+
+    .visit-hero-badge-row {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 18px;
+    }
+
+    .visit-hero-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.16);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(14px);
+    }
+
+    .visit-hero-icon i {
+        width: 28px;
+        height: 28px;
+    }
+
+    .visit-hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .visit-page-shell {
+        max-width: 1120px;
+        margin: -54px auto 140px;
+        padding: 0 24px;
+        position: relative;
+        z-index: 12;
+    }
+
+    .visit-form-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .visit-top-actions-card,
+    .visit-main-panel-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 28px;
+        box-shadow: 0 18px 50px rgba(15, 23, 42, 0.06);
+        overflow: hidden;
+    }
+
+    .visit-section-content {
+        background: transparent;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .visit-section-content + .visit-section-content {
+        border-top: 1px solid #edf2f7;
+    }
+
+    .visit-top-actions-section {
+        padding: 24px 28px;
+        background: #ffffff;
+        border-bottom: 1px solid #edf2f7;
+        border-radius: 28px 28px 0 0;
+    }
+
+    .visit-top-actions {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .visit-top-action-btn {
+        min-height: 44px;
+        padding: 8px 16px;
+        border-radius: 14px;
+        border: 1px solid #dbe4ee;
+        background: #f8fafc;
+        color: #0f172a;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        text-align: center;
+        text-decoration: none;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(148, 163, 184, 0.08);
+    }
+
+    .visit-top-action-btn:hover {
+        transform: translateY(-1px);
+        border-color: #bfdbfe;
+        background: #ffffff;
+    }
+
+    .visit-top-action-btn i {
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+
+    .visit-top-action-back {
+        border-radius: 999px;
+        justify-content: flex-start;
+        padding-left: 16px;
+        background: #ffffff;
+    }
+
+    .visit-top-action-primary {
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+        color: #ffffff;
+        border-color: transparent;
+        box-shadow: 0 14px 30px rgba(37, 99, 235, 0.25);
+    }
+
+    .visit-top-action-primary:hover {
+        background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+        border-color: transparent;
+    }
+
+    .visit-top-action-btn.is-disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    .visit-confirm-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 1400;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 22px;
+        background: rgba(15, 23, 42, 0.5);
+        backdrop-filter: blur(8px);
+    }
+
+    .visit-confirm-dialog {
+        width: min(460px, 100%);
+        border-radius: 24px;
+        border: 1px solid #dbe4ee;
+        background: #ffffff;
+        box-shadow: 0 28px 70px rgba(15, 23, 42, 0.26);
+        padding: 28px;
+        text-align: center;
+    }
+
+    .visit-confirm-icon {
+        width: 58px;
+        height: 58px;
+        margin: 0 auto 18px;
+        border-radius: 18px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .visit-confirm-icon i {
+        width: 26px;
+        height: 26px;
+    }
+
+    .visit-confirm-copy span {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #64748b;
+    }
+
+    .visit-confirm-copy h3 {
+        margin: 0 0 10px;
+        font-size: 22px;
+        line-height: 1.25;
+        color: #0f172a;
+    }
+
+    .visit-confirm-copy p {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.65;
+        color: #475569;
+    }
+
+    .visit-confirm-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 24px;
+    }
+
+    .visit-confirm-secondary,
+    .visit-confirm-primary {
+        min-height: 46px;
+        border-radius: 14px;
+        border: 1px solid #dbe4ee;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        cursor: pointer;
+    }
+
+    .visit-confirm-secondary {
+        background: #ffffff;
+        color: #475569;
+    }
+
+    .visit-confirm-primary {
+        border-color: transparent;
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+        color: #ffffff;
+    }
+
+    .visit-confirm-primary:disabled {
+        opacity: 0.72;
+        cursor: wait;
+    }
+
+    .visit-confirm-primary i {
+        width: 15px;
+        height: 15px;
+    }
+
+    .plan-preview-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 1300;
+        background: rgba(15, 23, 42, 0.48);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 22px;
+        backdrop-filter: blur(6px);
+    }
+
+    .plan-preview-dialog {
+        width: min(980px, 100%);
+        max-height: min(88vh, 920px);
+        background: #ffffff;
+        border-radius: 24px;
+        border: 1px solid #dbe4ee;
+        box-shadow: 0 30px 60px rgba(15, 23, 42, 0.24);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .plan-preview-modal-header,
+    .plan-preview-modal-actions {
+        padding: 18px 22px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .plan-preview-modal-header {
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .plan-preview-modal-actions {
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .plan-preview-modal-eyebrow {
+        display: inline-block;
+        margin-bottom: 6px;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #64748b;
+    }
+
+    .plan-preview-modal-header h3 {
+        margin: 0;
+        font-size: 20px;
+        color: #0f172a;
+    }
+
+    .plan-preview-close {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        border: 1px solid #dbe4ee;
+        background: #f8fafc;
+        color: #475569;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .plan-preview-close i {
+        width: 18px;
+        height: 18px;
+    }
+
+    .plan-preview-modal-body {
+        flex: 1;
+        overflow: auto;
+        background: #f8fafc;
+        padding: 22px;
+    }
+
+    .plan-preview-loading,
+    .plan-preview-empty-state {
+        min-height: 240px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        text-align: center;
+        color: #64748b;
+    }
+
+    .plan-preview-loading i,
+    .plan-preview-empty-state i {
+        width: 28px;
+        height: 28px;
+    }
+
+    .plan-preview-doc {
+        max-width: 820px;
+        margin: 0 auto;
+        padding: 34px 38px;
+        border-radius: 22px;
+        background: #ffffff;
+        border: 1px solid #dbe4ee;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+    }
+
+    .plan-preview-doc-header {
+        text-align: center;
+        padding-bottom: 24px;
+        border-bottom: 1px solid #e2e8f0;
+        margin-bottom: 24px;
+    }
+
+    .plan-preview-doc-logo {
+        display: block;
+        max-width: 300px;
+        width: 100%;
+        margin: 0 auto 18px;
+    }
+
+    .plan-preview-doc-header h3 {
+        margin: 0 0 8px;
+        font-size: 22px;
+        line-height: 1.25;
+        color: #1e40af;
+        text-transform: uppercase;
+    }
+
+    .plan-preview-doc-header p {
+        margin: 0;
+        font-size: 14px;
+        color: #64748b;
+    }
+
+    .plan-preview-doc-section + .plan-preview-doc-section {
+        margin-top: 22px;
+    }
+
+    .plan-preview-doc-section h4 {
+        margin: 0 0 14px;
+        font-size: 15px;
+        font-weight: 900;
+        text-transform: uppercase;
+        color: #1e3a8a;
+    }
+
+    .plan-preview-info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .plan-preview-info-grid div,
+    .plan-preview-text-stack div,
+    .plan-preview-table-card {
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid #dbe4ee;
+        background: #f8fbff;
+    }
+
+    .plan-preview-info-grid span,
+    .plan-preview-text-stack span,
+    .plan-preview-table-card span {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #64748b;
+    }
+
+    .plan-preview-info-grid strong,
+    .plan-preview-text-stack p,
+    .plan-preview-blocks p,
+    .plan-preview-empty {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.7;
+        color: #0f172a;
+    }
+
+    .plan-preview-blocks h5 {
+        margin: 20px 0 10px;
+        font-size: 16px;
+        color: #1e3a8a;
+    }
+
+    .plan-preview-table-card p {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #475569;
+    }
+
+    body.modal-open {
+        overflow: hidden;
+    }
+
+    .visit-section-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 30px 28px 10px;
+    }
+
+    .visit-section-header h2 {
+        margin: 0 0 4px;
+        font-size: 15px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #0f172a;
+    }
+
+    .visit-section-header p {
+        margin: 0;
+        font-size: 13px;
+        color: #64748b;
+    }
+
+    .section-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid transparent;
+        flex-shrink: 0;
+    }
+
+    .section-icon i {
+        font-size: 20px;
+    }
+
+    .visit-section-icon-blue {
+        background: #eff6ff;
+        color: #2563eb;
+        border-color: #bfdbfe;
+    }
+
+    .visit-section-icon-green {
+        background: #ecfdf5;
+        color: #059669;
+        border-color: #a7f3d0;
+    }
+
+    .visit-section-icon-amber {
+        background: #fffbeb;
+        color: #d97706;
+        border-color: #fde68a;
+    }
+
+    .visit-section-icon-violet {
+        background: #f5f3ff;
+        color: #7c3aed;
+        border-color: #ddd6fe;
+    }
+
+    .visit-section-icon-red {
+        background: #fef2f2;
+        color: #dc2626;
+        border-color: #fecaca;
+    }
+
+    .visit-section-icon-rose {
+        background: #fff1f2;
+        color: #e11d48;
+        border-color: #fecdd3;
+    }
+
+    .visit-section-body {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        padding: 10px 28px 34px;
+    }
+
+    .visit-grid {
+        display: grid;
+        gap: 18px;
+    }
+
+    .visit-grid-two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .visit-grid-three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    /* Otimizacao para Tablets e Mobile */
+    @media (max-width: 1024px) {
+        .visit-page-shell {
+            margin-top: -30px;
+            padding: 0 16px;
+        }
+
+        .visit-grid-three {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .attendance-top-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .visit-grid-two, 
+        .visit-grid-three,
+        .visit-inline-fields,
+        .attendance-top-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .visit-section-header {
+            padding: 24px 20px 10px;
+        }
+
+        .visit-section-body {
+            padding: 10px 20px 24px;
+        }
+
+        .visit-top-actions {
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .visit-top-action-btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .signature-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .visit-grid-align-end {
+        align-items: end;
+    }
+
+    .visit-secondary-grid {
+        margin-top: -6px;
+        padding: 18px;
+        border-radius: 18px;
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+    }
+
+    .visit-field {
+        min-width: 0;
+    }
+
+    .visit-field-action {
+        display: flex;
+        align-items: flex-end;
+    }
+
+    .premium-label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #94a3b8;
+    }
+
+    .form-input-premium,
+    .form-textarea-premium {
+        width: 100%;
+        border: 1px solid #dbe4ee;
+        background: #fcfdff;
+        color: #0f172a;
+        border-radius: 14px;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+
+    .form-input-premium {
+        height: 48px;
+        padding: 0 15px;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .form-textarea-premium {
+        min-height: 140px;
+        padding: 14px 15px;
+        font-size: 14px;
+        line-height: 1.6;
+        resize: vertical;
+    }
+
+    select.form-input-premium {
+        padding-right: 44px;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 14px center;
+    }
+
+    .form-input-premium:focus,
+    .form-textarea-premium:focus {
+        outline: none;
+        border-color: #60a5fa;
+        background: #ffffff;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+    }
+
+    .form-input-premium:disabled,
+    .form-textarea-premium:disabled,
+    .form-input-premium.is-readonly {
+        background: #f8fafc;
+        color: #64748b;
+    }
+
+    .visit-inline-fields {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .attendance-top-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 16px;
+        align-items: end;
+    }
+
+    .attendance-waiting-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .attendance-radio-group {
+        display: flex;
+        gap: 12px;
+    }
+
+    .attendance-radio-row label,
+    .attendance-radio-group label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #334155;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .attendance-radio-row input,
+    .attendance-radio-group input {
+        width: 17px;
+        height: 17px;
+        accent-color: #1d4ed8;
+    }
+
+    .attendance-subsidized-field {
+        width: 100%;
+    }
+
+    .attendance-subsidized-field input,
+    .attendance-total-month,
+    .attendance-present-input {
+        text-align: center;
+        font-weight: 900;
+    }
+
+    .attendance-present-card {
+        border: 1px solid #bfdbfe;
+        border-radius: 16px;
+        padding: 20px 24px;
+        background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+    }
+
+    .attendance-subtitle {
+        padding-bottom: 14px;
+        margin-bottom: 16px;
+        border-bottom: 1px solid #e0edff;
+        color: #6477b6;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+    }
+
+    .attendance-present-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1fr);
+        gap: 16px;
+        align-items: end;
+    }
+
+    .micro-label {
+        display: block;
+        margin-bottom: 5px;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 9px;
+        font-weight: 800;
+    }
+
+    .attendance-present-total-col {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .attendance-present-total-box {
+        height: 48px;
+        border-radius: 13px;
+        background: #f8fafc;
+        border: 1px solid #dbe4ee;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .attendance-present-total-box strong {
+        color: #1e293b;
+        font-size: 18px;
+        font-weight: 900;
+    }
+
+    .attendance-waiting-list {
+        min-height: auto;
+        height: 48px;
+        gap: 12px;
+        justify-content: center;
+        border: 1px solid #dbe4ee;
+        border-radius: 13px;
+        background: #ffffff;
+        padding: 0 12px;
+    }
+
+    .attendance-waiting-list .premium-label {
+        margin: 0 6px 0 0;
+        white-space: nowrap;
+    }
+
+    .attendance-waiting-quantity-row {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .visit-section-header-compact {
+        padding-bottom: 0;
+    }
+
+    .visit-section-header-compact h2 {
+        display: inline-block;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #0f172a;
+    }
+
+    .visit-upload-dropzone {
+        min-height: 130px;
+        border: 1px dashed #cbd5e1;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        cursor: pointer;
+        background: #ffffff;
+        transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .visit-upload-dropzone:hover,
+    .visit-evidence-option:hover {
+        border-color: #93c5fd;
+        background: #f8fbff;
+    }
+
+    .visit-upload-dropzone input,
+    .visit-evidence-option input {
+        display: none;
+    }
+
+    .visit-upload-icon,
+    .visit-evidence-option span {
+        width: 58px;
+        height: 58px;
+        border-radius: 999px;
+        background: #f8fafc;
+        color: #94a3b8;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .visit-upload-icon i {
+        width: 24px;
+        height: 24px;
+    }
+
+    .visit-upload-dropzone strong,
+    .visit-evidence-option strong {
+        display: block;
+        color: #0f172a;
+        font-size: 12px;
+        font-weight: 900;
+        text-transform: none;
+    }
+
+    .visit-upload-dropzone small {
+        display: block;
+        margin-top: 3px;
+        color: #64748b;
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    .visit-evidence-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(180px, 250px));
+        gap: 18px;
+    }
+
+    .visit-evidence-option {
+        min-height: 190px;
+        border: 1px dashed #cbd5e1;
+        border-radius: 14px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        text-align: center;
+        cursor: pointer;
+        background: #ffffff;
+        transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .visit-evidence-option span {
+        width: 46px;
+        height: 46px;
+    }
+
+    .visit-evidence-option i {
+        width: 20px;
+        height: 20px;
+    }
+
+    .visit-evidence-option strong {
+        color: #94a3b8;
+        font-size: 9px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .pse-toggle-wrap {
+        display: flex;
+        justify-content: center;
+        padding: 24px 28px;
+        background: #f8fafc;
+        border-top: 1px solid #edf2f7;
+        border-bottom: 1px solid #edf2f7;
+    }
+
+    .pse-toggle-btn {
+        width: min(100%, 1040px);
+        min-height: 42px;
+        border: 1px solid #0f172a;
+        border-radius: 12px;
+        background: transparent;
+        color: #020617;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .pse-toggle-btn strong {
+        font-size: 11px;
+        font-weight: 900;
+    }
+
+    .pse-toggle-remove {
+        display: none;
+        width: 54px;
+        height: 54px;
+        margin-left: -72px;
+        border-radius: 999px;
+        background: #4b5563;
+        color: #ffffff;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+    }
+
+    .pse-toggle-remove i {
+        width: 22px;
+        height: 22px;
+    }
+
+    .pse-toggle-btn.is-enabled {
+        border-color: transparent;
+    }
+
+    .pse-toggle-btn.is-enabled .pse-toggle-remove {
+        display: inline-flex;
+    }
+
+    .pse-section-card {
+        overflow: hidden;
+    }
+
+    /* Galeria de Evidencias e Previews */
+    .evidence-preview-list,
+    .evidence-gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 14px;
+        margin-top: 20px;
+    }
+
+    .evidence-item {
+        position: relative;
+        aspect-ratio: 1;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        transition: transform 0.2s ease;
+    }
+
+    .evidence-item:hover {
+        transform: scale(1.02);
+    }
+
+    .evidence-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .evidence-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        backdrop-filter: blur(2px);
+    }
+
+    .evidence-item:hover .evidence-overlay {
+        opacity: 1;
+    }
+
+    .evidence-action-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: white;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .evidence-action-btn:hover {
+        transform: translateY(-2px);
+        background: #f1f5f9;
+    }
+
+    .evidence-action-btn.delete {
+        color: #ef4444;
+    }
+
+    .evidence-badge {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        padding: 4px 8px;
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 6px;
+        font-size: 9px;
+        font-weight: 800;
+        color: #64748b;
+        text-transform: uppercase;
+        pointer-events: none;
+    }
+
+    /* Lightbox */
+    .lightbox-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,0.93);
+        backdrop-filter: blur(8px);
+    }
+    .lb-image-wrap {
+        max-width: 88vw;
+        max-height: 80vh;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: zoom-in;
+        border-radius: 10px;
+    }
+    .lb-image-wrap.zoomed { cursor: zoom-out; }
+    .lb-image-wrap img {
+        max-width: 88vw;
+        max-height: 80vh;
+        object-fit: contain;
+        border-radius: 8px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        transition: transform 0.2s ease;
+        user-select: none;
+        pointer-events: none;
+        display: block;
+    }
+    .lb-btn {
+        background: rgba(255,255,255,0.12);
+        border: 1px solid rgba(255,255,255,0.18);
+        color: #fff;
+        cursor: pointer;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s;
+        line-height: 1;
+        font-family: inherit;
+    }
+    .lb-btn:hover { background: rgba(255,255,255,0.28); }
+    .lb-close {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 40px;
+        height: 40px;
+        font-size: 26px;
+        border-radius: 50%;
+    }
+    .lb-prev, .lb-next {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 48px;
+        height: 80px;
+        font-size: 42px;
+        font-weight: 200;
+    }
+    .lb-prev { left: 12px; }
+    .lb-next { right: 12px; }
+    .lb-footer {
+        position: absolute;
+        bottom: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        white-space: nowrap;
+    }
+    #lbCounter {
+        color: rgba(255,255,255,0.75);
+        font-size: 13px;
+        font-weight: 500;
+        min-width: 48px;
+        text-align: center;
+    }
+    .lb-zoom-btns { display: flex; gap: 4px; }
+    .lb-zoom-btn {
+        width: 34px;
+        height: 34px;
+        font-size: 20px;
+        border-radius: 8px;
+    }
+
+
+    /* Galeria de Evidencias e Previews */
+    .evidence-preview-list,
+    .evidence-gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 14px;
+        margin-top: 20px;
+    }
+
+    .evidence-item {
+        position: relative;
+        aspect-ratio: 1;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        transition: transform 0.2s ease;
+    }
+
+    .evidence-item:hover {
+        transform: scale(1.02);
+    }
+
+    .evidence-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .evidence-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        backdrop-filter: blur(2px);
+    }
+
+    .evidence-item:hover .evidence-overlay {
+        opacity: 1;
+    }
+
+    .evidence-action-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: white;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .evidence-action-btn:hover {
+        transform: translateY(-2px);
+        background: #f1f5f9;
+    }
+
+    .evidence-action-btn.delete {
+        color: #ef4444;
+    }
+
+    .evidence-badge {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        padding: 4px 8px;
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 6px;
+        font-size: 9px;
+        font-weight: 800;
+        color: #64748b;
+        text-transform: uppercase;
+        pointer-events: none;
+    }
+
+    /* Lightbox */
+    .lightbox-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,0.93);
+        backdrop-filter: blur(8px);
+    }
+    .lb-image-wrap {
+        max-width: 88vw;
+        max-height: 80vh;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: zoom-in;
+        border-radius: 10px;
+    }
+    .lb-image-wrap.zoomed { cursor: zoom-out; }
+    .lb-image-wrap img {
+        max-width: 88vw;
+        max-height: 80vh;
+        object-fit: contain;
+        border-radius: 8px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        transition: transform 0.2s ease;
+        user-select: none;
+        pointer-events: none;
+        display: block;
+    }
+    .lb-btn {
+        background: rgba(255,255,255,0.12);
+        border: 1px solid rgba(255,255,255,0.18);
+        color: #fff;
+        cursor: pointer;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s;
+        line-height: 1;
+        font-family: inherit;
+    }
+    .lb-btn:hover { background: rgba(255,255,255,0.28); }
+    .lb-close {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 40px;
+        height: 40px;
+        font-size: 26px;
+        border-radius: 50%;
+    }
+    .lb-prev, .lb-next {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 48px;
+        height: 80px;
+        font-size: 42px;
+        font-weight: 200;
+    }
+    .lb-prev { left: 12px; }
+    .lb-next { right: 12px; }
+    .lb-footer {
+        position: absolute;
+        bottom: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        white-space: nowrap;
+    }
+    #lbCounter {
+        color: rgba(255,255,255,0.75);
+        font-size: 13px;
+        font-weight: 500;
+        min-width: 48px;
+        text-align: center;
+    }
+    .lb-zoom-btns { display: flex; gap: 4px; }
+    .lb-zoom-btn {
+        width: 34px;
+        height: 34px;
+        font-size: 20px;
+        border-radius: 8px;
+    }
+
+    .pse-subsection-title {
+        padding-bottom: 8px;
+        border-bottom: 2px solid #0f172a;
+        color: #020617;
+        font-size: 13px;
+        font-weight: 900;
+        text-transform: uppercase;
+    }
+
+    .pse-period-row {
+        display: grid;
+        grid-template-columns: 72px 1fr;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .pse-period-row .premium-label {
+        margin: 0;
+    }
+
+    .pse-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        background: #ffffff;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+    }
+
+    .pse-table {
+        width: 100%;
+        min-width: 900px;
+        border-collapse: collapse;
+    }
+
+    .pse-table th,
+    .pse-table td {
+        border-right: 1px solid #edf2f7;
+        border-bottom: 1px solid #edf2f7;
+        padding: 0;
+    }
+
+    .pse-table th:last-child,
+    .pse-table td:last-child {
+        border-right: none;
+    }
+
+    .pse-table tr:last-child td,
+    .pse-table tr:last-child th {
+        border-bottom: none;
+    }
+
+    .pse-table thead th {
+        height: 50px;
+        padding: 0 12px;
+        border-bottom: 1px solid #0f172a;
+        color: #64748b;
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+    }
+
+    .pse-table tbody th {
+        width: 310px;
+        padding: 12px 16px;
+        text-align: left;
+        color: #334155;
+        font-size: 9px;
+        font-weight: 900;
+        text-transform: uppercase;
+        line-height: 1.3;
+    }
+
+    .pse-table input,
+    .pse-table textarea {
+        width: 100%;
+        min-height: 78px;
+        border: none;
+        background: transparent;
+        color: #0f172a;
+        font-size: 12px;
+        font-weight: 700;
+        outline: none;
+        resize: vertical;
+    }
+
+    .pse-table input {
+        min-height: 48px;
+        padding: 0 10px;
+        text-align: center;
+    }
+
+    .pse-table textarea {
+        padding: 12px;
+    }
+
+    .pse-quantitative-table {
+        min-width: 800px;
+        table-layout: fixed;
+    }
+
+    .pse-quantitative-table th:first-child {
+        width: 280px;
+    }
+
+    .pse-quantitative-table thead th {
+        font-size: 9px;
+        padding: 0 4px;
+        height: 40px;
+    }
+
+    .pse-quantitative-table td input {
+        min-height: 42px;
+        padding: 0 2px;
+        font-size: 11px;
+    }
+
+    .section-divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #94a3b8;
+    }
+
+    .section-divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: #e2e8f0;
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 54px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        font-size: 14px;
+        font-weight: 700;
+        color: #334155;
+        cursor: pointer;
+        transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .checkbox-label:hover {
+        border-color: #93c5fd;
+        transform: translateY(-1px);
+        box-shadow: 0 10px 24px rgba(148, 163, 184, 0.12);
+    }
+
+    .checkbox-label input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: #2563eb;
+        flex-shrink: 0;
+    }
+
+    .visit-check-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+    }
+
+    .rh-checkbox {
+        width: 22px;
+        height: 22px;
+        accent-color: #1e293b;
+        cursor: pointer;
+    }
+
+    .visit-rh-table th {
+        background: #f8fafc;
+        color: #64748b;
+        font-size: 9px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 12px 15px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .visit-rh-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+    }
+
+    .visit-rh-table tr:hover td {
+        background: #fbfcfe;
+    }
+
+    .visit-table-input-center {
+        text-align: center;
+    }
+
+    .visit-delete-row-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: 1px solid #fee2e2;
+        background: #fef2f2;
+        color: #ef4444;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .visit-delete-row-btn:hover {
+        background: #ef4444;
+        color: white;
+    }
+
+    .visit-conditional-field {
+        padding: 18px;
+        border-radius: 18px;
+        background: #f8fbff;
+        border: 1px dashed #bfdbfe;
+    }
+
+    .btn-toggle-segunda {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 48px;
+        padding: 0 18px;
+        border: 1px dashed #cbd5e1;
+        border-radius: 14px;
+        background: #f8fafc;
+        color: #475569;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-toggle-segunda:hover {
+        border-color: #60a5fa;
+        background: #eff6ff;
+        color: #2563eb;
+    }
+
+    .btn-toggle-segunda:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+
+    .visit-table-body {
+        gap: 18px;
+    }
+
+    .visit-table-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .visit-table-toolbar p {
+        margin: 0;
+        font-size: 13px;
+        color: #64748b;
+    }
+
+    .visit-table-wrap {
+        overflow-x: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+    }
+
+    .visit-rh-table {
+        min-width: 700px;
+        margin: 0;
+    }
+
+    .visit-rh-table th,
+    .visit-rh-table td {
+        vertical-align: middle;
+    }
+
+    .visit-table-input {
+        height: 40px;
+        min-width: 120px;
+        border-radius: 10px;
+        font-size: 13px;
+    }
+
+    .visit-table-input-center {
+        text-align: center;
+    }
+
+    .visit-delete-row-btn {
+        width: 34px;
+        height: 34px;
+        border: none;
+        border-radius: 999px;
+        background: #fef2f2;
+        color: #dc2626;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .visit-delete-row-btn i {
+        width: 15px;
+        height: 15px;
+    }
+
+    .visit-add-row-btn {
+        white-space: nowrap;
+    }
+
+    .signature-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+    }
+
+    .signature-block {
+        padding: 18px;
+        border-radius: 20px;
+        border: 1px solid #e2e8f0;
+        background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+    }
+
+    .signature-name-input {
+        margin-bottom: 12px;
+    }
+
+    .signature-pad-container {
+        height: 130px;
+        border: 1px dashed #cbd5e1;
+        border-radius: 16px;
+        background: #ffffff;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .signature-pad-container canvas {
+        display: block !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        touch-action: none !important;
+        user-select: none !important;
+        object-fit: fill !important;
+        z-index: 5;
+    }
+
+    .signature-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 12px;
+    }
+
+    .signature-action-link {
+        border: none;
+        background: none;
+        padding: 0;
+        color: #2563eb;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        cursor: pointer;
+    }
+
+    .signature-action-muted {
+        color: #94a3b8;
+    }
+
+    .visit-footer-actions {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 18px 24px;
+        background: rgba(255, 255, 255, 0.88);
+        backdrop-filter: blur(16px);
+        border-top: 1px solid rgba(226, 232, 240, 0.96);
+    }
+
+    .visit-footer-actions-inner {
+        max-width: 1120px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+
+    .visit-save-draft-btn,
+    .visit-finish-btn {
+        min-height: 48px;
+    }
+
+    .visit-finish-btn {
+        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+        border: none;
+    }
+
+    .visit-finish-btn:hover {
+        background: linear-gradient(135deg, #047857 0%, #059669 100%);
+    }
+
+    .visit-locked-banner {
+        max-width: 1120px;
+        margin: 0 auto 14px;
+        padding: 14px 24px;
+        border-radius: 18px;
+    }
+
+    .btn-ghost-white {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 16px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: rgba(255, 255, 255, 0.78);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        background: transparent;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .btn-ghost-white:hover {
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.42);
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .btn-ghost-white i {
+        width: 14px;
+        height: 14px;
+    }
+
+    @media (max-width: 1024px) {
+        .visit-top-actions,
+        .signature-grid,
+        .visit-grid-two,
+        .visit-grid-three,
+        .attendance-top-grid,
+        .visit-check-grid,
+        .attendance-present-grid,
+        .visit-evidence-grid,
+        .plan-preview-info-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .visit-table-toolbar,
+        .visit-footer-actions-inner {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .visit-field-action {
+            align-items: stretch;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .visit-hero {
+            padding: 28px 20px 88px;
+        }
+
+        .visit-hero-badge-row {
+            align-items: flex-start;
+        }
+
+        .visit-page-shell {
+            margin: -42px auto 120px;
+            padding: 0 14px;
+        }
+
+        .visit-section-header,
+        .visit-section-body {
+            padding-left: 18px;
+            padding-right: 18px;
+        }
+
+        .visit-inline-fields {
+            grid-template-columns: 1fr;
+        }
+
+        .visit-footer-actions {
+            padding: 14px;
+        }
+
+        .plan-preview-dialog {
+            max-height: 92vh;
+        }
+
+        .plan-preview-doc {
+            padding: 22px 18px;
+        }
+    }
+
+    @media print {
+        @page {
+            size: A4;
+            margin: 15mm;
+        }
+
+        body {
+            background: white !important;
+            color: black !important;
+        }
+
+        .no-print, .visit-hero, .locked-banner, .visit-top-actions-section, .visit-footer-actions, .visit-confirm-modal, .signature-actions, .visit-add-row-btn, .btn-toggle-segunda {
+            display: none !important;
+        }
+
+        .visit-page-shell {
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+        }
+
+        .visit-main-panel-card {
+            box-shadow: none !important;
+            border: none !important;
+            padding: 0 !important;
+        }
+
+        /* Esconder o formulário original na impressão */
+        #instrumentalForm {
+            display: none !important;
+        }
+
+        /* Mostrar apenas o container do relatório */
+        #reportPrintView {
+            display: block !important;
+        }
+
+        .report-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .report-logo-placeholder {
+            height: 80px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px dashed #ccc;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .report-title {
+            font-size: 18pt;
+            font-weight: 900;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .report-subtitle {
+            font-size: 10pt;
+            color: #666;
+            margin-bottom: 20px;
+            border-bottom: 2px solid black;
+            padding-bottom: 10px;
+        }
+
+        .report-section-title {
+            font-size: 14pt;
+            font-weight: 900;
+            margin: 25px 0 10px;
+            border-bottom: 1.5px solid black;
+            text-transform: uppercase;
+        }
+
+        .report-data-row {
+            display: flex;
+            margin: 8px 0;
+            font-size: 10pt;
+            line-height: 1.4;
+        }
+
+        .report-label {
+            font-weight: 900;
+            min-width: 140px;
+            text-transform: uppercase;
+        }
+
+        .report-value {
+            flex: 1;
+            border-bottom: 1px dotted #999;
+            padding-left: 10px;
+        }
+
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        .report-table th, .report-table td {
+            border: 1.5px solid black;
+            padding: 8px;
+            text-align: center;
+            font-size: 9pt;
+        }
+
+        .report-table th {
+            background: #f0f0f0 !important;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .report-check-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .report-check-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 10pt;
+        }
+
+        .report-check-box {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 1.5px solid black;
+            display: inline-block;
+        }
+
+        .report-check-box.checked {
+            background-color: black !important;
+        }
+
+        .report-footer-note {
+            margin-top: 40px;
+            font-size: 8pt;
+            color: #888;
+            text-align: center;
+            font-style: italic;
+        }
+
+        .report-signature-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 40px;
+        }
+
+        .report-signature-box {
+            text-align: center;
+        }
+
+        .report-signature-line {
+            border-top: 1px solid black;
+            margin-top: 50px;
+            padding-top: 5px;
+            font-size: 9pt;
+            font-weight: 900;
+        }
+
+        .report-signature-img {
+            max-height: 60px;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .report-text-block {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            font-size: 10pt;
+            min-height: 60px;
+            line-height: 1.5;
+        }
+    }
+
+    #reportPrintView {
+        display: none;
+    }
+
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function printProfessionalReport() {
+        // 1. Sincronizar dados do formulário com a visão de impressão
+        syncFormToReport();
+        
+        // 2. Disparar a impressão
+        window.print();
+    }
+
+    function syncFormToReport() {
+        const form = document.getElementById('instrumentalForm');
+        const report = document.getElementById('reportPrintView');
+        if (!form || !report) return;
+
+        // Mapear campos simples
+        const mapping = {
+            'identificacao[visit_date_1]': 'print-date-1',
+            'atendimento[total_mes]': 'print-total-mes',
+            'atendimento[atividades_momento]': 'print-atividades-desenvolvidas',
+            'atendimento[atividades_execucao]': 'print-atividades-execucao',
+            'observacoes': 'print-observacoes',
+            'recomendacoes': 'print-recomendacoes'
+        };
+
+        for (let [name, id] of Object.entries(mapping)) {
+            const input = form.querySelector(`[name="${name}"]`);
+            const target = document.getElementById(id);
+            if (input && target) {
+                target.innerText = input.value || 'Nao informado';
+            }
+        }
+
+        // OSC e Infos fixas (ja estao no template, mas pegamos se houver alteracao)
+        document.getElementById('print-osc-name').innerText = "{{ object.osc.name|default:'-' }}";
+
+        // Atendimento - Presentes
+        document.getElementById('print-presentes-manha').innerText = form.querySelector('[name="atendimento[presentes][manha]"]').value || '0';
+        document.getElementById('print-presentes-tarde').innerText = form.querySelector('[name="atendimento[presentes][tarde]"]').value || '0';
+        document.getElementById('print-presentes-total').innerText = document.getElementById('attendancePresentTotal').innerText;
+
+        // Lista de Espera
+        const listaSim = form.querySelector('[name="atendimento[lista_espera]"][value="sim"]').checked;
+        const qndEspera = form.querySelector('[name="atendimento[lista_espera_quantidade]"]').value;
+        document.getElementById('print-check-espera-sim').classList.toggle('checked', listaSim);
+        document.getElementById('print-check-espera-nao').classList.toggle('checked', !listaSim);
+        document.getElementById('print-espera-info').innerText = listaSim ? `(${qndEspera} pessoas)` : '';
+
+        // Formas de Acesso
+        const acessos = ['demanda_espontanea', 'busca_ativa', 'encaminhamento', 'outros'];
+        acessos.forEach(tipo => {
+            const checked = form.querySelector(`[name="forma_acesso[${tipo}]"]`).checked;
+            document.getElementById(`print-check-acesso-${tipo}`).classList.toggle('checked', checked);
+        });
+
+        // Assinaturas
+        const pads = ['tecnico1', 'tecnico2', 'responsavel'];
+        pads.forEach(id => {
+            const nameInput = form.querySelector(`[name="assinaturas[${id}_nome]"]`);
+            const signatureData = document.getElementById(`val-${id}`).value;
+            
+            document.getElementById(`print-sig-name-${id}`).innerText = nameInput ? nameInput.value : '';
+            const sigImg = document.getElementById(`print-sig-img-${id}`);
+            if (signatureData && signatureData.length > 100) {
+                sigImg.src = signatureData;
+                sigImg.style.display = 'block';
+            } else {
+                sigImg.style.display = 'none';
+            }
+        });
+    }
+    // Fechar lightbox ao clicar no backdrop; scroll para zoom
+    document.getElementById('lightboxModal').addEventListener('click', function(e) {
+        if (e.target === this) closeLightbox();
+    });
+    document.getElementById('lbImageWrap').addEventListener('wheel', function(e) {
+        e.preventDefault();
+        lbZoom(e.deltaY < 0 ? 0.2 : -0.2);
+    }, { passive: false });
+</script>
+
+<div id="lightboxModal" class="lightbox-modal">
+    <button class="lb-btn lb-close" onclick="closeLightbox()" title="Fechar (Esc)">×</button>
+    <button class="lb-btn lb-prev" id="lbPrev" onclick="lbNav(-1)" title="Anterior (←)">&#8249;</button>
+    <div class="lb-image-wrap" id="lbImageWrap" onclick="lbToggleZoom(event)">
+        <img id="lbImg" src="" alt="">
+    </div>
+    <button class="lb-btn lb-next" id="lbNext" onclick="lbNav(1)" title="Próxima (→)">&#8250;</button>
+    <div class="lb-footer">
+        <span id="lbCounter"></span>
+        <div class="lb-zoom-btns">
+            <button class="lb-btn lb-zoom-btn" onclick="lbZoom(-0.3)" title="Diminuir (-)">−</button>
+            <button class="lb-btn lb-zoom-btn" onclick="lbZoom(0.3)"  title="Aumentar (+)">+</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

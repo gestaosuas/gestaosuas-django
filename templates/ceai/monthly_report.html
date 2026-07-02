@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Relatório Mensal - CEAI{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+    
+    <div class="dashboard-container">
+        <a class="back-link" href="{% url 'ceai:dashboard' %}">&larr; Voltar para o painel</a>
+
+        <header class="page-header">
+            <div class="header-info">
+                <p class="eyebrow">CEAI - RELATÓRIO NARRATIVO</p>
+                <h1>Relatório Mensal — {{ month }}/{{ year }}</h1>
+                <p class="section-description">Descreva as principais atividades, desafios e conquistas do mês.</p>
+            </div>
+            <div class="header-actions">
+                <form method="get" class="period-selector">
+                    <select name="month" class="select-pill">
+                        {% for m_val, m_name in months_range %}
+                        <option value="{{ m_val }}" {% if m_val == month %}selected{% endif %}>{{ m_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="year" class="select-pill">
+                        {% for y_val in years_range %}
+                        <option value="{{ y_val }}" {% if y_val == year %}selected{% endif %}>{{ y_val }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn-icon-only" title="Abrir Período">
+                        <i data-lucide="arrow-right"></i>
+                    </button>
+                </form>
+            </div>
+        </header>
+
+        <div class="report-layout">
+            <main class="report-main">
+                <form method="post" class="report-card">
+                    {% csrf_token %}
+                    <input type="hidden" name="month" value="{{ month }}">
+                    <input type="hidden" name="year" value="{{ year }}">
+                    
+                    <div class="editor-toolbar">
+                        <div class="toolbar-group">
+                            <i data-lucide="type"></i>
+                            <span>Editor de Texto</span>
+                        </div>
+                    </div>
+                    
+                    <textarea name="content" class="narrative-textarea" placeholder="Escreva aqui o relatório narrativo do mês...">{{ report.content|default:"" }}</textarea>
+                    
+                    <div class="report-footer">
+                        <div class="report-status">
+                            {% if report %}
+                            <span class="status-indicator active"></span>
+                            <span>Última atualização: {{ report.updated_at|date:"d/m/Y H:i" }}</span>
+                            {% else %}
+                            <span class="status-indicator inactive"></span>
+                            <span>Novo Relatório</span>
+                            {% endif %}
+                        </div>
+                        <button type="submit" class="btn-save">
+                            <i data-lucide="save"></i>
+                            Salvar Relatório
+                        </button>
+                    </div>
+                </form>
+            </main>
+
+            <aside class="report-sidebar">
+                <div class="sidebar-card">
+                    <h3>Histórico Recente</h3>
+                    <div class="history-list">
+                        {% for item in history %}
+                        <a href="?month={{ item.month }}&year={{ item.year }}" class="history-item {% if item.month == month and item.year == year %}active{% endif %}">
+                            <i data-lucide="file-text"></i>
+                            <div class="history-info">
+                                <strong>{{ item.month|stringformat:"02d" }}/{{ item.year }}</strong>
+                                <span>{{ item.updated_at|date:"d M Y" }}</span>
+                            </div>
+                            <i data-lucide="chevron-right" class="chevron"></i>
+                        </a>
+                        {% empty %}
+                        <p class="empty-text">Nenhum histórico encontrado.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .report-layout {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 24px;
+        align-items: start;
+    }
+
+    .report-card {
+        background: #fff;
+        border-radius: 20px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+
+    .editor-toolbar {
+        background: #f8fafc;
+        padding: 12px 24px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+    }
+
+    .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #475569;
+    }
+
+    .toolbar-group i { width: 16px; height: 16px; color: #3b82f6; }
+
+    .narrative-textarea {
+        width: 100%;
+        min-height: 500px;
+        padding: 24px;
+        border: none;
+        resize: vertical;
+        font-family: 'Inter', sans-serif;
+        font-size: 15px;
+        line-height: 1.6;
+        color: #1e293b;
+        outline: none;
+    }
+
+    .report-footer {
+        padding: 20px 24px;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .report-status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        color: #64748b;
+        font-weight: 600;
+    }
+
+    .status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+
+    .status-indicator.active { background: #22c55e; box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.1); }
+    .status-indicator.inactive { background: #cbd5e1; }
+
+    .period-selector {
+        display: flex;
+        gap: 8px;
+    }
+
+    .select-pill {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        padding: 8px 16px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #475569;
+        cursor: pointer;
+    }
+
+    .sidebar-card h3 {
+        font-size: 14px;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 16px;
+    }
+
+    .history-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .history-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 12px;
+        text-decoration: none;
+        color: #475569;
+        transition: all 0.2s;
+        border: 1px solid transparent;
+    }
+
+    .history-item:hover {
+        background: #f8fafc;
+        border-color: #e2e8f0;
+    }
+
+    .history-item.active {
+        background: #eff6ff;
+        border-color: #3b82f6;
+        color: #3b82f6;
+    }
+
+    .history-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .history-info strong { font-size: 14px; }
+    .history-info span { font-size: 11px; color: #94a3b8; }
+
+    .history-item i { width: 18px; height: 18px; }
+    .history-item .chevron { width: 14px; height: 14px; opacity: 0; transition: opacity 0.2s; }
+    .history-item:hover .chevron { opacity: 1; }
+</style>
+{% endblock %}

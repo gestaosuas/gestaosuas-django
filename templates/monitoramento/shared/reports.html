@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Relatorios {{ module_title }} | {{ directorate.name }}{% endblock %}
+
+{% block content %}
+<section class="simple-shell benefits-shell">
+    <a class="back-link" href="{{ back_url }}">&larr; Voltar para o painel</a>
+
+    <div class="benefits-hero">
+        <div>
+            <p class="eyebrow">Historico de Documentos</p>
+            <h1>{{ module_title }}</h1>
+            <p class="section-description">{{ directorate.name }}</p>
+        </div>
+    </div>
+
+    <div class="report-history-grid">
+        {% for report in reports %}
+            <article class="history-card">
+                <p class="eyebrow">Relatorio Mensal</p>
+                <h2>{{ report.month }}/{{ report.year }}</h2>
+                <p>Status: {{ report.get_status_display|default:report.status }}</p>
+                <a class="secondary-button" href="{{ monthly_report_base_url }}?year={{ report.year }}&month={{ report.month }}">Abrir</a>
+            </article>
+        {% empty %}
+            <article class="panel">
+                <p>Nenhum relatorio encontrado para o ano filtrado.</p>
+            </article>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

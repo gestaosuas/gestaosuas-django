@@ -1,0 +1,75 @@
+# ─── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# ─── Django ──────────────────────────────────────────────────────────────────
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+staticfiles/
+static_root/
+
+# Media enviada por usuários (nunca versionar)
+media/
+
+# ─── Variáveis de ambiente ───────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# Manter os exemplos no repositório
+!.env.example
+!.env.docker.example
+
+# ─── Docker ──────────────────────────────────────────────────────────────────
+postgres_data/
+
+# ─── Dependências locais (dev sem venv) ──────────────────────────────────────
+# Instaladas via: pip install --target=.deps <pacote>
+.deps/
+.wheelhouse/
+
+# ─── IDEs ────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ─── Sistema Operacional ─────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ─── Virtualenvs ─────────────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ─── Arquivos temporários / gerados ──────────────────────────────────────────
+*.tmp
+*.bak
+*.orig
+*.rej
+=*

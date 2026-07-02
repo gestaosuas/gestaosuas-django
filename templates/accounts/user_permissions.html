@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+{% load static custom_filters %}
+
+{% block title %}Permissões de Usuário | {{ system_name }}{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+
+    <main class="dashboard-main">
+        <header class="dashboard-header">
+            <div class="header-content">
+                <a href="{% url 'accounts:user_list' %}" class="back-link">
+                    <i data-lucide="arrow-left"></i>
+                    Voltar para lista
+                </a>
+                <h1>Permissões de {{ profile.full_name }}</h1>
+                <p class="header-description">Configure o nível de acesso e o escopo de atuação do membro.</p>
+            </div>
+        </header>
+
+        <section class="permissions-section animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <form method="post" class="permissions-form">
+                {% csrf_token %}
+                
+                <div class="form-grid">
+                    <div class="form-card main-settings">
+                        <h3>Configurações Básicas</h3>
+                        
+                        <div class="form-group">
+                            <label for="id_full_name">Nome Completo</label>
+                            <input type="text" name="full_name" id="id_full_name" value="{{ profile.full_name }}" class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="id_role">Nível de Acesso (Papel)</label>
+                            <select name="role" id="id_role" class="form-select">
+                                {% for val, label in profile.ROLE_CHOICES %}
+                                    <option value="{{ val }}" {% if profile.role == val %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="role-info">
+                                <p id="role-desc-admin" class="role-desc {% if profile.role != 'admin' %}hidden{% endif %}">
+                                    <strong>Admin:</strong> Acesso total a todas as diretorias, configurações e usuários.
+                                </p>
+                                <p id="role-desc-diretor" class="role-desc {% if profile.role != 'diretor' %}hidden{% endif %}">
+                                    <strong>Diretor:</strong> Vê todos os dados da diretoria primária e unidades delegadas.
+                                </p>
+                                <p id="role-desc-agente" class="role-desc {% if profile.role != 'agente' and profile.role != 'user' %}hidden{% endif %}">
+                                    <strong>Agente:</strong> Vê apenas os dados que ele mesmo criou ou que foram delegados.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="id_primary_directorate">Diretoria Primária (Lotação)</label>
+                            <select name="primary_directorate" id="id_primary_directorate" class="form-select">
+                                <option value="">Nenhuma</option>
+                                {% for dir in all_directorates %}
+                                    <option value="{{ dir.pk }}" {% if profile.primary_directorate_id == dir.pk %}selected{% endif %}>{{ dir.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-card access-settings">
+                        <div class="card-header">
+                            <h3>Acessos Adicionais</h3>
+                            <span class="badge-count">{{ all_directorates|length }} áreas</span>
+                        </div>
+                        <p class="card-help">Selecione outras diretorias que este usuário pode acessar e monitore.</p>
+
+                        <div class="directorate-list">
+                            {% for dir in all_directorates %}
+                            <div class="directorate-item">
+                                <label class="checkbox-group">
+                                    <input type="checkbox" name="directorates" value="{{ dir.pk }}" 
+                                           class="dir-checkbox" data-dir-id="{{ dir.pk }}"
+                                           {% if dir.pk in current_links %}checked{% endif %}>
+                                    <span class="checkbox-label">{{ dir.name }}</span>
+                                </label>
+                                
+                                <div id="units-field-{{ dir.pk }}" class="units-field {% if dir.pk not in current_links %}hidden{% endif %}">
+                                    {% with dir_pk=dir.pk|stringformat:"s" %}
+                                    {% with options=unit_options_map|get_item:dir_pk %}
+                                    {% if options %}
+                                        <div class="units-checkbox-grid">
+                                            {% with link=current_links|get_item:dir.pk %}
+                                            {% for unit in options %}
+                                            <label class="unit-checkbox-item">
+                                                <input type="checkbox" name="units_{{ dir.pk }}" value="{{ unit }}"
+                                                       {% if link and unit in link %}checked{% endif %}>
+                                                <span>{{ unit }}</span>
+                                            </label>
+                                            {% endfor %}
+                                            {% endwith %}
+                                        </div>
+                                        <small>Selecione as unidades que o usuário poderá acessar.</small>
+                                    {% else %}
+                                        <input type="text" name="units_{{ dir.pk }}" 
+                                               value="{% with link=current_links|get_item:dir.pk %}{% if link %}{{ link|join:', ' }}{% endif %}{% endwith %}"
+                                               placeholder="Ex: Unidade 1, Unidade 2"
+                                               class="form-control-sm">
+                                        <small>Separe por vírgula para restringir o acesso apenas a certas unidades.</small>
+                                    {% endif %}
+                                    {% endwith %}
+                                    {% endwith %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-save">
+                        <i data-lucide="check-circle-2"></i>
+                        Salvar Alterações
+                    </button>
+                </div>
+            </form>
+        </section>
+    </main>
+</div>
+
+<style>
+    @media (min-width: 1025px) {
+        .dashboard-main {
+            padding-top: 80px !important;
+        }
+    }
+
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #64748b;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        transition: color 0.2s;
+    }
+
+    .back-link:hover {
+        color: #2563eb;
+    }
+
+    .back-link i {
+        width: 16px;
+        height: 16px;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: 400px 1fr;
+        gap: 24px;
+        align-items: start;
+    }
+
+    @media (max-width: 1024px) {
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .form-card {
+        background: #fff;
+        border-radius: 20px;
+        border: 1px solid #e2e8f0;
+        padding: 32px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    .form-card h3 {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 24px;
+    }
+
+    .form-group {
+        margin-bottom: 24px;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 8px;
+    }
+
+    .form-control, .form-select {
+        width: 100%;
+        height: 44px;
+        padding: 0 12px;
+        border-radius: 10px;
+        border: 1px solid #cbd5e1;
+        background: #f8fafc;
+        font-size: 14px;
+        transition: all 0.2s;
+    }
+
+    .form-control:focus, .form-select:focus {
+        outline: none;
+        border-color: #2563eb;
+        background: #fff;
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+    }
+
+    .role-info {
+        margin-top: 12px;
+        padding: 12px;
+        background: #f1f5f9;
+        border-radius: 8px;
+    }
+
+    .role-desc {
+        font-size: 12px;
+        color: #475569;
+        line-height: 1.5;
+        margin: 0;
+    }
+
+    .hidden { display: none !important; }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .badge-count {
+        font-size: 11px;
+        font-weight: 700;
+        background: #f1f5f9;
+        color: #64748b;
+        padding: 2px 8px;
+        border-radius: 12px;
+    }
+
+    .card-help {
+        font-size: 13px;
+        color: #64748b;
+        margin-bottom: 24px;
+    }
+
+    .directorate-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 16px;
+    }
+
+    .directorate-item {
+        padding: 16px;
+        border-radius: 12px;
+        border: 1px solid #f1f5f9;
+        background: #f8fafc;
+        transition: all 0.2s;
+    }
+
+    .directorate-item:hover {
+        border-color: #e2e8f0;
+        background: #fff;
+    }
+
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+    }
+
+    .checkbox-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #334155;
+    }
+
+    .units-field {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px dashed #e2e8f0;
+    }
+
+    .units-field label {
+        font-size: 12px;
+        color: #64748b;
+    }
+
+    .form-control-sm {
+        width: 100%;
+        height: 36px;
+        padding: 0 10px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        font-size: 13px;
+    }
+
+    .units-field small {
+        display: block;
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 4px;
+    }
+
+    .units-checkbox-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        margin: 12px 0;
+    }
+
+    .unit-checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .unit-checkbox-item:hover {
+        border-color: #2563eb;
+        background: #f8fafc;
+    }
+
+    .unit-checkbox-item input {
+        width: 14px;
+        height: 14px;
+        border-radius: 4px;
+        border: 1.5px solid #cbd5e1;
+        cursor: pointer;
+    }
+
+    .unit-checkbox-item span {
+        font-size: 12px;
+        color: #475569;
+        font-weight: 500;
+    }
+
+    .form-actions {
+        margin-top: 40px;
+        padding-top: 24px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .btn-save {
+        height: 52px;
+        padding: 0 40px;
+        background: #2563eb;
+        color: #fff;
+        border: none;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: all 0.2s;
+        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+    }
+
+    .btn-save:hover {
+        background: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+    }
+</style>
+
+<script>
+    // Handle role description visibility
+    const roleSelect = document.getElementById('id_role');
+    const roleDescs = document.querySelectorAll('.role-desc');
+    
+    roleSelect.addEventListener('change', (e) => {
+        const selectedRole = e.target.value;
+        roleDescs.forEach(desc => desc.classList.add('hidden'));
+        
+        const target = document.getElementById(`role-desc-${selectedRole}`);
+        if (target) target.classList.remove('hidden');
+        else if (selectedRole === 'user') document.getElementById('role-desc-agente').classList.remove('hidden');
+    });
+
+    // Handle units field visibility based on checkbox
+    const dirCheckboxes = document.querySelectorAll('.dir-checkbox');
+    dirCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+            const dirId = e.target.dataset.dirId;
+            const unitsField = document.getElementById(`units-field-${dirId}`);
+            if (e.target.checked) {
+                unitsField.classList.remove('hidden');
+            } else {
+                unitsField.classList.add('hidden');
+            }
+        });
+    });
+</script>
+{% endblock %}

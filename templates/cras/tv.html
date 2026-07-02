@@ -1,0 +1,50 @@
+{% extends "base_tv.html" %}
+
+{% block title %}CRAS{% endblock %}
+{% block header_bg %}linear-gradient(100deg,#164e63,#0e7490){% endblock %}
+{% block module_name %}CRAS — Proteção Social Básica{% endblock %}
+{% block module_sub %}{{ system_name }} • {{ selected_year }}{% endblock %}
+
+{% block kpis %}
+{% for card in cards|slice:":5" %}
+<div class="tv-kpi" style="--accent:{{ card.color|default:'#0e7490' }}">
+    <div class="tv-kpi-label">{{ card.label }}</div>
+    <div class="tv-kpi-value">{{ card.value }}</div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block charts %}
+<div class="tv-panel">
+    <h2>Atendimentos</h2>
+    <div class="tv-panel-body"><canvas id="c-atend"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Cadastros Novos</h2>
+    <div class="tv-panel-body"><canvas id="c-cad"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Admitidas</h2>
+    <div class="tv-panel-body"><canvas id="c-adm"></canvas></div>
+</div>
+<div class="tv-panel">
+    <h2>Desligadas</h2>
+    <div class="tv-panel-body"><canvas id="c-desl"></canvas></div>
+</div>
+{% endblock %}
+
+{{ line_chart_atendimentos|json_script:"d-atend" }}
+{{ line_chart_cadastros|json_script:"d-cad" }}
+{{ line_chart_admitidas|json_script:"d-adm" }}
+{{ line_chart_desligadas|json_script:"d-desl" }}
+
+{% block extra_js %}
+<script>
+(function () {
+    TV.makeLine('c-atend', JSON.parse(document.getElementById('d-atend').textContent), '#0e7490');
+    TV.makeLine('c-cad',   JSON.parse(document.getElementById('d-cad').textContent),   '#0284c7');
+    TV.makeLine('c-adm',   JSON.parse(document.getElementById('d-adm').textContent),   '#10b981');
+    TV.makeLine('c-desl',  JSON.parse(document.getElementById('d-desl').textContent),  '#f59e0b');
+})();
+</script>
+{% endblock %}

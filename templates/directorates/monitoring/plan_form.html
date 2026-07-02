@@ -1,0 +1,778 @@
+{% extends "base.html" %}
+
+{% block title %}{% if object %}Editar{% else %}Novo{% endif %} Plano de Trabalho | {{ system_name }}{% endblock %}
+
+{% block content %}
+<div class="plan-editor-shell">
+    <div class="plan-editor-hero no-print">
+        <div class="plan-editor-hero-inner">
+            <div class="plan-editor-title">
+                <a href="{{ return_url }}" class="plan-editor-back">
+                    <i data-lucide="arrow-left"></i> Voltar para planos
+                </a>
+                <h1>{% if object %}Editar{% else %}Novo{% endif %} Plano de Trabalho</h1>
+                <p>Editor de documento com estrutura mais limpa para criar, revisar e organizar o plano.</p>
+            </div>
+            <div class="plan-editor-header-actions">
+                <button type="button" class="plan-editor-save-btn" id="saveBtn">
+                    <i data-lucide="save"></i> Salvar Plano
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="plan-editor-layout">
+        <aside class="plan-editor-sidebar no-print">
+            <form id="planForm" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ return_url }}">
+                <div class="plan-editor-panel">
+                    <div class="plan-editor-panel-header">
+                        <span>Configuracao</span>
+                    </div>
+
+                    <div class="plan-form-group">
+                        <label>Titulo do plano</label>
+                        <input type="text" name="title" id="id_title" value="{{ object.title|default:'' }}" class="plan-editor-input" placeholder="Ex: PT - Nome da OSC - 2026">
+                    </div>
+
+                    <div class="plan-form-group">
+                        <label>OSC</label>
+                        <select name="osc" id="id_osc" class="plan-editor-input">
+                            {% for o in directorate.oscs.all %}
+                            <option value="{{ o.pk }}" {% if object.osc_id == o.pk or selected_osc_id == o.pk|stringformat:"s" %}selected{% endif %}>{{ o.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="plan-form-group">
+                        <label>Status</label>
+                        <select name="status" id="id_status" class="plan-editor-input">
+                            <option value="draft" {% if object.status == 'draft' or not object %}selected{% endif %}>Rascunho</option>
+                            <option value="finalized" {% if object.status == 'finalized' %}selected{% endif %}>Finalizado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="plan-editor-panel">
+                    <div class="plan-editor-panel-header">
+                        <span>Blocos</span>
+                    </div>
+
+                    <div class="plan-block-toolbar">
+                        <button type="button" class="plan-toolbar-btn" onclick="addBlock('title')">
+                            <i data-lucide="heading-1"></i> Titulo
+                        </button>
+                        <button type="button" class="plan-toolbar-btn" onclick="addBlock('paragraph')">
+                            <i data-lucide="pilcrow"></i> Paragrafo
+                        </button>
+                        <button type="button" class="plan-toolbar-btn" onclick="addBlock('table')">
+                            <i data-lucide="table"></i> Tabela
+                        </button>
+                    </div>
+
+                    <div class="plan-presets">
+                        <button type="button" class="plan-preset-btn" onclick="insertPreset('objeto')">Objeto</button>
+                        <button type="button" class="plan-preset-btn" onclick="insertPreset('metas')">Metas</button>
+                        <button type="button" class="plan-preset-btn" onclick="insertPreset('cronograma')">Cronograma</button>
+                    </div>
+                </div>
+
+                <input type="hidden" name="content" id="id_content">
+            </form>
+        </aside>
+
+        <section class="plan-document-stage">
+            <div class="plan-document-paper">
+                <div class="plan-document-top">
+                    <span class="plan-document-chip">Plano de Trabalho</span>
+                    <h2 id="documentTitleMirror">{{ object.title|default:"Novo Plano de Trabalho" }}</h2>
+                    <p id="documentOscMirror">
+                        {% for o in directorate.oscs.all %}
+                            {% if object.osc_id == o.pk or selected_osc_id == o.pk|stringformat:"s" %}{{ o.name }}{% endif %}
+                        {% endfor %}
+                    </p>
+                </div>
+
+                <div id="blocksContainer" class="plan-blocks-stack"></div>
+            </div>
+        </section>
+    </div>
+</div>
+
+<script>
+    let blocks = {{ object.content|default:"[]"|safe }};
+    if (!Array.isArray(blocks) || blocks.length === 0) {
+        blocks = [
+            { type: "title", content: "1. Objeto" },
+            { type: "paragraph", content: "Descreva aqui o objeto da parceria e a finalidade principal deste plano de trabalho." }
+        ];
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function normalizeTableContent(content) {
+        if (!content || typeof content !== "object") {
+            return { headers: ["Coluna 1", "Coluna 2"], rows: [["", ""]] };
+        }
+        if (!Array.isArray(content.headers) || content.headers.length === 0) {
+            content.headers = ["Coluna 1", "Coluna 2"];
+        }
+        if (!Array.isArray(content.rows) || content.rows.length === 0) {
+            content.rows = [["", ""]];
+        }
+        return content;
+    }
+
+    function updateDocumentMirror() {
+        const titleInput = document.getElementById("id_title");
+        const oscSelect = document.getElementById("id_osc");
+        document.getElementById("documentTitleMirror").textContent = titleInput.value.trim() || "Novo Plano de Trabalho";
+        document.getElementById("documentOscMirror").textContent = oscSelect.options[oscSelect.selectedIndex]?.text || "";
+    }
+
+    function renderBlocks() {
+        const container = document.getElementById("blocksContainer");
+        container.innerHTML = "";
+
+        blocks.forEach((block, index) => {
+            const card = document.createElement("article");
+            card.className = "plan-block-card";
+
+            let bodyHtml = "";
+            if (block.type === "title") {
+                bodyHtml = `
+                    <input
+                        type="text"
+                        value="${escapeHtml(block.content)}"
+                        class="plan-block-title-input"
+                        oninput="updateBlockField(${index}, 'content', this.value)"
+                        placeholder="Titulo da secao"
+                    >
+                `;
+            } else if (block.type === "paragraph") {
+                bodyHtml = `
+                    <textarea
+                        class="plan-block-paragraph-input"
+                        oninput="updateBlockField(${index}, 'content', this.value)"
+                        placeholder="Escreva o conteudo desta secao..."
+                    >${escapeHtml(block.content)}</textarea>
+                `;
+            } else if (block.type === "table") {
+                const tableContent = normalizeTableContent(block.content);
+                bodyHtml = renderTableEditor(index, tableContent);
+            }
+
+            card.innerHTML = `
+                <div class="plan-block-card-header">
+                    <div class="plan-block-type">
+                        <span>${block.type === "title" ? "Titulo" : block.type === "paragraph" ? "Paragrafo" : "Tabela"}</span>
+                    </div>
+                    <div class="plan-block-actions">
+                        <button type="button" class="plan-block-icon-btn" onclick="moveBlock(${index}, -1)" ${index === 0 ? "disabled" : ""} title="Mover para cima">
+                            <i data-lucide="arrow-up"></i>
+                        </button>
+                        <button type="button" class="plan-block-icon-btn" onclick="moveBlock(${index}, 1)" ${index === blocks.length - 1 ? "disabled" : ""} title="Mover para baixo">
+                            <i data-lucide="arrow-down"></i>
+                        </button>
+                        <button type="button" class="plan-block-icon-btn" onclick="duplicateBlock(${index})" title="Duplicar bloco">
+                            <i data-lucide="copy"></i>
+                        </button>
+                        <button type="button" class="plan-block-icon-btn danger" onclick="removeBlock(${index})" title="Remover bloco">
+                            <i data-lucide="trash-2"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="plan-block-card-body">${bodyHtml}</div>
+            `;
+            container.appendChild(card);
+        });
+
+        lucide.createIcons();
+    }
+
+    function renderTableEditor(index, tableContent) {
+        const headersHtml = tableContent.headers.map((header, headerIndex) => `
+            <th>
+                <input
+                    type="text"
+                    value="${escapeHtml(header)}"
+                    class="plan-table-cell-input plan-table-header-input"
+                    oninput="updateTableHeader(${index}, ${headerIndex}, this.value)"
+                    placeholder="Cabecalho"
+                >
+            </th>
+        `).join("");
+
+        const rowsHtml = tableContent.rows.map((row, rowIndex) => `
+            <tr>
+                ${tableContent.headers.map((_, cellIndex) => `
+                    <td>
+                        <textarea
+                            class="plan-table-cell-input"
+                            oninput="updateTableCell(${index}, ${rowIndex}, ${cellIndex}, this.value)"
+                            placeholder="Conteudo"
+                        >${escapeHtml((row || [])[cellIndex] || "")}</textarea>
+                    </td>
+                `).join("")}
+                <td class="plan-table-row-action">
+                    <button type="button" class="plan-block-icon-btn danger" onclick="removeTableRow(${index}, ${rowIndex})" title="Remover linha">
+                        <i data-lucide="trash-2"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join("");
+
+        return `
+            <div class="plan-table-editor">
+                <div class="plan-table-tools">
+                    <button type="button" class="plan-table-tool-btn" onclick="addTableColumn(${index})">
+                        <i data-lucide="columns-2"></i> Coluna
+                    </button>
+                    <button type="button" class="plan-table-tool-btn" onclick="addTableRow(${index})">
+                        <i data-lucide="rows-3"></i> Linha
+                    </button>
+                </div>
+                <div class="plan-table-wrap">
+                    <table class="plan-table-grid">
+                        <thead>
+                            <tr>${headersHtml}<th class="plan-table-row-action"></th></tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+
+    function addBlock(type) {
+        if (type === "table") {
+            blocks.push({ type: "table", content: { headers: ["Coluna 1", "Coluna 2"], rows: [["", ""]] } });
+        } else {
+            blocks.push({ type: type, content: "" });
+        }
+        renderBlocks();
+    }
+
+    function insertPreset(type) {
+        if (type === "objeto") {
+            blocks.push({ type: "title", content: "1. Objeto" });
+            blocks.push({ type: "paragraph", content: "Descreva o objeto da parceria, o foco do atendimento e o resultado esperado." });
+        } else if (type === "metas") {
+            blocks.push({ type: "title", content: "2. Metas e Resultados" });
+            blocks.push({ type: "paragraph", content: "Liste as metas qualitativas e quantitativas previstas para a execucao deste plano." });
+        } else if (type === "cronograma") {
+            blocks.push({ type: "title", content: "3. Cronograma de Execucao" });
+            blocks.push({ type: "table", content: { headers: ["Etapa", "Periodo", "Responsavel"], rows: [["", "", ""]] } });
+        }
+        renderBlocks();
+    }
+
+    function updateBlockField(index, field, value) {
+        blocks[index][field] = value;
+    }
+
+    function removeBlock(index) {
+        blocks.splice(index, 1);
+        renderBlocks();
+    }
+
+    function duplicateBlock(index) {
+        blocks.splice(index + 1, 0, JSON.parse(JSON.stringify(blocks[index])));
+        renderBlocks();
+    }
+
+    function moveBlock(index, direction) {
+        const nextIndex = index + direction;
+        if (nextIndex < 0 || nextIndex >= blocks.length) {
+            return;
+        }
+        const temp = blocks[index];
+        blocks[index] = blocks[nextIndex];
+        blocks[nextIndex] = temp;
+        renderBlocks();
+    }
+
+    function updateTableHeader(index, headerIndex, value) {
+        blocks[index].content = normalizeTableContent(blocks[index].content);
+        blocks[index].content.headers[headerIndex] = value;
+    }
+
+    function updateTableCell(index, rowIndex, cellIndex, value) {
+        blocks[index].content = normalizeTableContent(blocks[index].content);
+        if (!blocks[index].content.rows[rowIndex]) {
+            blocks[index].content.rows[rowIndex] = [];
+        }
+        blocks[index].content.rows[rowIndex][cellIndex] = value;
+    }
+
+    function addTableColumn(index) {
+        blocks[index].content = normalizeTableContent(blocks[index].content);
+        blocks[index].content.headers.push("Nova coluna");
+        blocks[index].content.rows = blocks[index].content.rows.map(row => {
+            const nextRow = Array.isArray(row) ? row.slice() : [];
+            nextRow.push("");
+            return nextRow;
+        });
+        renderBlocks();
+    }
+
+    function addTableRow(index) {
+        blocks[index].content = normalizeTableContent(blocks[index].content);
+        blocks[index].content.rows.push(new Array(blocks[index].content.headers.length).fill(""));
+        renderBlocks();
+    }
+
+    function removeTableRow(index, rowIndex) {
+        blocks[index].content = normalizeTableContent(blocks[index].content);
+        blocks[index].content.rows.splice(rowIndex, 1);
+        if (blocks[index].content.rows.length === 0) {
+            blocks[index].content.rows.push(new Array(blocks[index].content.headers.length).fill(""));
+        }
+        renderBlocks();
+    }
+
+    document.getElementById("id_title").addEventListener("input", updateDocumentMirror);
+    document.getElementById("id_osc").addEventListener("change", updateDocumentMirror);
+
+    document.getElementById("saveBtn").addEventListener("click", function() {
+        document.getElementById("id_content").value = JSON.stringify(blocks);
+        document.getElementById("planForm").submit();
+    });
+
+    renderBlocks();
+    updateDocumentMirror();
+</script>
+
+<style>
+    body {
+        background: linear-gradient(180deg, #eef4fb 0%, #f8fbff 100%);
+    }
+
+    .plan-editor-shell {
+        min-height: 100vh;
+    }
+
+    .plan-editor-hero {
+        background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        padding: 34px 30px 120px;
+        color: #ffffff;
+    }
+
+    .plan-editor-hero-inner {
+        max-width: 1380px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 24px;
+    }
+
+    .plan-editor-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 14px;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(255, 255, 255, 0.8);
+        text-decoration: none;
+    }
+
+    .plan-editor-back i {
+        width: 14px;
+        height: 14px;
+    }
+
+    .plan-editor-title h1 {
+        margin: 0 0 8px;
+        font-size: 34px;
+        font-weight: 900;
+    }
+
+    .plan-editor-title p {
+        margin: 0;
+        font-size: 15px;
+        color: rgba(255, 255, 255, 0.82);
+    }
+
+    .plan-editor-save-btn {
+        min-height: 48px;
+        padding: 0 22px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(255, 255, 255, 0.16);
+        color: #ffffff;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        cursor: pointer;
+        backdrop-filter: blur(12px);
+    }
+
+    .plan-editor-save-btn i {
+        width: 15px;
+        height: 15px;
+    }
+
+    .plan-editor-layout {
+        max-width: 1380px;
+        margin: -86px auto 40px;
+        padding: 0 26px;
+        display: grid;
+        grid-template-columns: 340px minmax(0, 1fr);
+        gap: 24px;
+        align-items: start;
+    }
+
+    .plan-editor-sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        position: sticky;
+        top: 20px;
+    }
+
+    .plan-editor-panel,
+    .plan-document-paper {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 24px;
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+    }
+
+    .plan-editor-panel {
+        padding: 20px;
+    }
+
+    .plan-editor-panel-header {
+        margin-bottom: 18px;
+    }
+
+    .plan-editor-panel-header span {
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #64748b;
+    }
+
+    .plan-form-group + .plan-form-group {
+        margin-top: 16px;
+    }
+
+    .plan-form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #94a3b8;
+    }
+
+    .plan-editor-input {
+        width: 100%;
+        min-height: 46px;
+        padding: 0 14px;
+        border-radius: 14px;
+        border: 1px solid #dbe4ee;
+        background: #fbfdff;
+        color: #0f172a;
+        font-size: 14px;
+        outline: none;
+    }
+
+    .plan-editor-input:focus {
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+    }
+
+    .plan-block-toolbar,
+    .plan-presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .plan-presets {
+        margin-top: 12px;
+    }
+
+    .plan-toolbar-btn,
+    .plan-preset-btn {
+        min-height: 40px;
+        padding: 0 14px;
+        border-radius: 12px;
+        border: 1px solid #dbe4ee;
+        background: #f8fafc;
+        color: #334155;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .plan-toolbar-btn i {
+        width: 15px;
+        height: 15px;
+    }
+
+    .plan-document-stage {
+        min-width: 0;
+    }
+
+    .plan-document-paper {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 42px 46px;
+    }
+
+    .plan-document-top {
+        margin-bottom: 28px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: center;
+    }
+
+    .plan-document-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 28px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: #2563eb;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+
+    .plan-document-top h2 {
+        margin: 14px 0 8px;
+        font-size: 28px;
+        line-height: 1.2;
+        color: #0f172a;
+    }
+
+    .plan-document-top p {
+        margin: 0;
+        font-size: 14px;
+        color: #64748b;
+    }
+
+    .plan-blocks-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    .plan-block-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+        background: #ffffff;
+        overflow: hidden;
+    }
+
+    .plan-block-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        border-bottom: 1px solid #eef2f7;
+        background: #f8fafc;
+    }
+
+    .plan-block-type span {
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #64748b;
+    }
+
+    .plan-block-actions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .plan-block-icon-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        border: 1px solid #dbe4ee;
+        background: #ffffff;
+        color: #64748b;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+
+    .plan-block-icon-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .plan-block-icon-btn.danger {
+        color: #dc2626;
+    }
+
+    .plan-block-icon-btn i {
+        width: 15px;
+        height: 15px;
+    }
+
+    .plan-block-card-body {
+        padding: 18px;
+    }
+
+    .plan-block-title-input,
+    .plan-block-paragraph-input,
+    .plan-table-cell-input {
+        width: 100%;
+        border: 1px solid #dbe4ee;
+        border-radius: 14px;
+        background: #ffffff;
+        color: #0f172a;
+        outline: none;
+    }
+
+    .plan-block-title-input {
+        min-height: 52px;
+        padding: 0 16px;
+        font-size: 20px;
+        font-weight: 800;
+    }
+
+    .plan-block-paragraph-input {
+        min-height: 180px;
+        padding: 16px;
+        resize: vertical;
+        font-size: 15px;
+        line-height: 1.75;
+    }
+
+    .plan-table-editor {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .plan-table-tools {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .plan-table-tool-btn {
+        min-height: 38px;
+        padding: 0 12px;
+        border-radius: 10px;
+        border: 1px solid #dbe4ee;
+        background: #f8fafc;
+        color: #334155;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .plan-table-tool-btn i {
+        width: 15px;
+        height: 15px;
+    }
+
+    .plan-table-wrap {
+        overflow-x: auto;
+    }
+
+    .plan-table-grid {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 8px;
+    }
+
+    .plan-table-grid th,
+    .plan-table-grid td {
+        vertical-align: top;
+    }
+
+    .plan-table-header-input {
+        min-height: 42px;
+        padding: 0 12px;
+        font-weight: 700;
+    }
+
+    .plan-table-grid td textarea {
+        min-height: 90px;
+        padding: 12px;
+        resize: vertical;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .plan-table-row-action {
+        width: 52px;
+        text-align: center;
+    }
+
+    @media (max-width: 1100px) {
+        .plan-editor-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .plan-editor-sidebar {
+            position: static;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .plan-editor-hero {
+            padding: 26px 18px 110px;
+        }
+
+        .plan-editor-hero-inner {
+            flex-direction: column;
+        }
+
+        .plan-editor-title h1 {
+            font-size: 28px;
+        }
+
+        .plan-editor-layout {
+            margin-top: -78px;
+            padding: 0 14px 28px;
+        }
+
+        .plan-document-paper {
+            padding: 24px 18px;
+        }
+
+        .plan-document-top h2 {
+            font-size: 22px;
+        }
+    }
+</style>
+{% endblock %}

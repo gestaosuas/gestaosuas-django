@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Relatorio Mensal NAICA | {{ directorate.name }}{% endblock %}
+
+{% block content %}
+<section class="simple-shell benefits-shell">
+    <a class="back-link" href="{% url 'naica:home' directorate.pk %}?year={{ selected_year }}">&larr; Voltar para o painel</a>
+
+    <div class="benefits-hero">
+        <div>
+            <p class="eyebrow">Relatorio Narrativo</p>
+            <h1>NAICA &mdash; {{ selected_month }}/{{ selected_year }}</h1>
+            <p class="section-description">Analise descritiva mensal dos indicadores.</p>
+        </div>
+    </div>
+
+    {% if monthly_report %}
+    <div class="panel" style="margin-top:24px;">
+        <h2>Relatorio de {{ selected_month }}/{{ selected_year }}</h2>
+        <div class="rich-report">
+            {{ monthly_report.content|safe }}
+        </div>
+        <p style="color:var(--muted);font-size:12px;margin-top:16px;">
+            Status: {{ monthly_report.get_status_display }} |
+            Atualizado em: {{ monthly_report.updated_at|date:"d/m/Y H:i" }}
+        </p>
+    </div>
+    {% else %}
+    <div class="panel" style="margin-top:24px;text-align:center;padding:48px;">
+        <i data-lucide="file-text" style="width:48px;height:48px;color:#94a3b8;margin-bottom:16px;"></i>
+        <h2>Nenhum relatorio</h2>
+        <p style="color:var(--muted);">Nao ha relatorio narrativo para {{ selected_month }}/{{ selected_year }}.</p>
+    </div>
+    {% endif %}
+
+    {% if history %}
+    <div class="panel" style="margin-top:24px;">
+        <h2>Historico Recente</h2>
+        <ul class="panel-list">
+            {% for item in history %}
+                <li>
+                    <strong>{{ item.month }}/{{ item.year }}</strong>
+                    {% if item.created_at %}&mdash; {{ item.created_at|date:"d/m/Y" }}{% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

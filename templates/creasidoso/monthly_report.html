@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Relatorio Mensal CREAS | {{ directorate.name }}{% endblock %}
+
+{% block content %}
+<section class="simple-shell benefits-shell">
+    <a class="back-link" href="{% url 'creasidoso:home' directorate.pk %}">&larr; Voltar</a>
+    <div class="benefits-hero"><div><p class="eyebrow">Relatorio Narrativo</p><h1>CREAS {{ selected_month }}/{{ selected_year }}</h1></div></div>
+    {% if monthly_report %}
+    <div class="panel" style="margin-top:24px"><h2>{{ selected_month }}/{{ selected_year }}</h2><div class="rich-report">{{ monthly_report.content|safe }}</div>
+        <p style="color:#64748b;font-size:12px;margin-top:16px">Status: {{ monthly_report.get_status_display }} | {{ monthly_report.updated_at|date:"d/m/Y H:i" }}</p></div>
+    {% else %}
+    <div class="panel" style="margin-top:24px;text-align:center;padding:48px"><i data-lucide="file-text" style="width:48px;height:48px;color:#94a3b8;margin-bottom:16px"></i><h2>Nenhum relatorio</h2></div>
+    {% endif %}
+    {% if history %}<div class="panel" style="margin-top:24px"><h2>Historico</h2><ul class="panel-list">{% for h in history %}<li><strong>{{ h.month }}/{{ h.year }}</strong></li>{% endfor %}</ul></div>{% endif %}
+</section>
+{% endblock %}

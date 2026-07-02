@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Preencher {{ subcategory|title }} | {{ directorate.name }}{% endblock %}
+
+{% block content %}
+<section class="simple-shell benefits-shell">
+    <a class="back-link" href="{% url 'protecaoespecial:home' directorate.pk %}?year={{ selected_year }}">&larr; Voltar</a>
+    <div class="benefits-hero">
+        <div>
+            <p class="eyebrow">Formulário Mensal</p>
+            <h1>Atualizar Dados - {{ subcategory|title }}</h1>
+        </div>
+        <div class="benefits-filter-bar static-bar">
+            <span class="pill">Ano {{ selected_year }}</span>
+            <span class="pill">Mês {{ selected_month }}</span>
+        </div>
+    </div>
+    <form method="post" class="report-form-shell" style="margin-top:24px">{% csrf_token %}
+        {% if form.non_field_errors %}<div class="error-text">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="report-period-grid">
+            <div class="field-group"><label for="{{ form.month.id_for_label }}">{{ form.month.label }}</label>{{ form.month }}</div>
+            <div class="field-group"><label for="{{ form.year.id_for_label }}">{{ form.year.label }}</label>{{ form.year }}</div>
+        </div>
+        {% for s in section_items %}
+        <div class="report-section-card">
+            <div class="section-head">
+                <div class="section-line"></div>
+                <h2>{{ s.title }}</h2>
+            </div>
+            <div class="report-form-grid">
+                {% for f in s.fields %}
+                <div class="field-group">
+                    <label for="{{ f.id_for_label }}">{{ f.label }}</label>
+                    {{ f }}
+                    {% if f.errors %}<div class="error-text">{{ f.errors }}</div>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        <div class="form-actions-row">
+            <a class="secondary-button" href="{% url 'protecaoespecial:home' directorate.pk %}">Voltar</a>
+            <button type="submit" class="primary-button">Salvar</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

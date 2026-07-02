@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+    
+    <main class="dashboard-main">
+        <section class="dashboard-container-inner" style="padding-top: 10px;">
+            <div class="monitoring-header">
+                <div class="header-main">
+                    <a href="{% url 'poprua:dashboard' %}?year={{ selected_year }}" class="back-link">
+                        <i data-lucide="arrow-left"></i>
+                    </a>
+                    <div>
+                        <h1 class="monitoring-title">{{ directorate.name }}</h1>
+                        <p class="monitoring-subtitle">Visualização Analítica de Dados - {{ selected_year }}</p>
+                    </div>
+                </div>
+                
+                <div class="header-actions">
+                    <form method="get" class="filter-group-modern">
+                        <label class="pill-select">
+                            <span>Ano</span>
+                            <select name="year" onchange="this.form.submit()">
+                                {% for y in years_range %}
+                                    <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                    </form>
+                    <a href="{% url 'poprua:update_data' %}" class="btn-premium-action">
+                        <i data-lucide="plus"></i> Novo Lançamento
+                    </a>
+                </div>
+            </div>
+
+            <div class="matrix-stack-container" style="margin-top: 24px;">
+                {% for section in matrix_data %}
+                <div class="matrix-card-modern" style="margin-bottom: 24px; background: white; border-radius: 24px; border: 1px solid #f1f5f9; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);">
+                    <div class="matrix-header" style="padding: 20px 24px; background: #f8fafc; border-bottom: 1px solid #f1f5f9;">
+                        <h2 class="matrix-title" style="font-size: 14px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.05em;">{{ section.title }}</h2>
+                    </div>
+                    <div class="matrix-container-modern" style="overflow-x: auto;">
+                        <table class="matrix-table" style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #fff;">
+                                    <th style="padding: 16px 24px; text-align: left; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; border-bottom: 2px solid #f1f5f9;">INDICADOR</th>
+                                    {% for month in month_headers %}
+                                    <th style="padding: 16px; text-align: center; font-size: 11px; font-weight: 800; color: #94a3b8; border-bottom: 2px solid #f1f5f9;">{{ month }}</th>
+                                    {% endfor %}
+                                    <th style="padding: 16px 24px; text-align: center; font-size: 11px; font-weight: 800; color: #1e3a8a; background: #f8fafc; border-bottom: 2px solid #f1f5f9;">TOTAL</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in section.rows %}
+                                <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.2s;">
+                                    <td style="padding: 16px 24px; font-size: 13px; font-weight: 700; color: #334155; max-width: 300px;">{{ row.label }}</td>
+                                    {% for item in row.months %}
+                                    <td class="val-cell {% if request.user.profile.role == 'admin' %}editable-cell{% endif %}"
+                                        style="padding: 12px; text-align: center; font-size: 14px; font-weight: 700; color: #1e293b; min-width: 60px;"
+                                        {% if request.user.profile.role == 'admin' %}
+                                        contenteditable="true"
+                                        data-sub-id="{{ item.sub_id|default:'' }}"
+                                        data-month="{{ item.month }}"
+                                        data-year="{{ item.year }}"
+                                        data-key="{{ row.key }}"
+                                        {% endif %}>
+                                        {{ item.val|default:'' }}
+                                    </td>
+                                    {% endfor %}
+                                    <td style="padding: 16px 24px; text-align: center; font-size: 14px; font-weight: 900; color: #1e3a8a; background: #f8fafc;">{{ row.total }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+</div>
+
+<style>
+/* CSS copied/adapted from dashboard for consistency */
+.monitoring-header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 16px 24px; border-radius: 20px; border: 1px solid #e2e8f0; margin-bottom: 24px; }
+.header-main { display: flex; align-items: center; gap: 16px; }
+.back-link { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-radius: 12px; color: #64748b; transition: all 0.2s; }
+.back-link:hover { background: #eff6ff; color: #3b82f6; transform: translateX(-4px); }
+.monitoring-title { font-size: 24px; font-weight: 900; color: #1e3a8a; margin: 0; letter-spacing: -0.02em; }
+.monitoring-subtitle { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-top: 2px; }
+
+.header-actions { display: flex; align-items: center; gap: 16px; }
+.filter-group-modern { display: flex; align-items: center; background: #f1f5f9; padding: 6px; border-radius: 14px; gap: 4px; }
+.pill-select { display: flex; align-items: center; gap: 8px; padding: 4px 16px; }
+.pill-select span { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; }
+.pill-select select { background: transparent; border: none; font-size: 14px; font-weight: 800; color: #1e3a8a; outline: none; cursor: pointer; }
+
+.btn-premium-action { display: flex; align-items: center; gap: 10px; background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 16px; font-size: 14px; font-weight: 800; cursor: pointer; text-decoration: none; transition: all 0.2s; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); }
+.btn-premium-action:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3); background: #1d4ed8; }
+
+.val-cell.editable-cell { cursor: pointer; border-radius: 8px; }
+.val-cell.editable-cell:hover { background: #eff6ff; color: #3b82f6; outline: 2px solid #bfdbfe; }
+.val-cell.editable-cell:focus { background: white; outline: 2px solid #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+.val-cell.saving { position: relative; opacity: 0.6; }
+
+@media (max-width: 1000px) { .monitoring-header { flex-direction: column; gap: 20px; align-items: flex-start; } }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        lucide.createIcons();
+        
+        document.querySelectorAll('.editable-cell').forEach(cell => {
+            cell.addEventListener('focus', function() {
+                this.setAttribute('data-original', this.innerText.trim());
+            });
+
+            cell.addEventListener('blur', function() {
+                saveCell(this);
+            });
+
+            cell.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.blur();
+                }
+            });
+        });
+
+        function saveCell(cell) {
+            const subId = cell.dataset.subId;
+            const month = cell.dataset.month;
+            const year = cell.dataset.year;
+            const key = cell.dataset.key;
+            const value = cell.innerText.trim();
+            const originalValue = (cell.getAttribute('data-original') || '').trim();
+
+            if (value === originalValue) return;
+
+            cell.classList.add('saving');
+
+            const formData = new FormData();
+            formData.append('sub_id', subId);
+            formData.append('month', month);
+            formData.append('year', year);
+            formData.append('key', key);
+            formData.append('value', value || '0');
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('{% url "poprua:quick_edit" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                cell.classList.remove('saving');
+                if (data.status === 'success') {
+                    const newVal = data.value > 0 ? data.value : '';
+                    cell.innerText = newVal;
+                    cell.setAttribute('data-original', newVal);
+                    if (data.sub_id) {
+                        cell.setAttribute('data-sub-id', data.sub_id);
+                    }
+                    
+                    // Visual Success Flash
+                    cell.style.transition = 'none';
+                    cell.style.backgroundColor = '#4ade80';
+                    cell.style.color = 'white';
+                    
+                    setTimeout(() => {
+                        cell.style.transition = 'all 0.6s';
+                        cell.style.backgroundColor = '';
+                        cell.style.color = '';
+                    }, 400);
+                } else {
+                    cell.innerText = originalValue;
+                    alert('Erro ao salvar dados.');
+                }
+            })
+            .catch(err => {
+                cell.classList.remove('saving');
+                cell.innerText = originalValue;
+                console.error(err);
+            });
+        }
+    });
+</script>
+{% endblock %}

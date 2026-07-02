@@ -1,0 +1,60 @@
+{% extends "base_tv.html" %}
+
+{% block title %}NAICA{% endblock %}
+{% block header_bg %}linear-gradient(100deg,#4c1d95,#7c3aed){% endblock %}
+{% block module_name %}NAICA — Núcleo de Acolhimento{% endblock %}
+{% block module_sub %}{{ system_name }} • {{ selected_year }}{% endblock %}
+
+{% block kpis %}
+{% for card in cards %}
+<div class="tv-kpi" style="--accent:{{ card.color|default:'#7c3aed' }}">
+    <div class="tv-kpi-label">{{ card.label }}</div>
+    <div class="tv-kpi-value">{{ card.value }}</div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block charts %}
+<div class="tv-panel" style="grid-column: span 2;">
+    <h2>Total de Atendidas</h2>
+    <div class="tv-panel-body"><canvas id="c-total"></canvas></div>
+</div>
+<div class="tv-panel" style="grid-column: span 2;">
+    <h2>Admissões vs Desligamentos</h2>
+    <div class="tv-panel-body"><canvas id="c-adm-desl"></canvas></div>
+</div>
+{% endblock %}
+
+{{ line_chart_total|json_script:"d-total" }}
+{{ adm_desl_points|json_script:"d-adm-desl" }}
+
+{% block extra_js %}
+<script>
+(function () {
+    TV.makeLine('c-total', JSON.parse(document.getElementById('d-total').textContent), '#7c3aed');
+
+    var pts = JSON.parse(document.getElementById('d-adm-desl').textContent);
+    new Chart(document.getElementById('c-adm-desl'), {
+        type: 'line',
+        data: {
+            labels: pts.map(p => p.label),
+            datasets: [
+                { label: 'Admissões', data: pts.map(p => p.admitidos), borderColor: '#7c3aed', backgroundColor: '#7c3aed14', fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#7c3aed' },
+                { label: 'Desligamentos', data: pts.map(p => p.desligados), borderColor: '#f43f5e', backgroundColor: '#f43f5e14', fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#f43f5e' }
+            ]
+        },
+        options: {
+            maintainAspectRatio: false, animation: false,
+            plugins: {
+                legend: { display: true, position: 'top', labels: { font: { size: 10 }, color: '#475569', boxWidth: 10, padding: 8 } },
+                datalabels: { display: false }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 9, weight: '700' }, maxRotation: 0 } },
+                y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,0.12)' }, ticks: { color: '#94a3b8', font: { size: 9 } } }
+            }
+        }
+    });
+})();
+</script>
+{% endblock %}

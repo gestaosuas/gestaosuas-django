@@ -1,0 +1,487 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Relatórios e Pareceres | {{ directorate.name }} | {{ system_name }}{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+    <main class="dashboard-main">
+        <div class="mon-page-shell">
+
+            {# ── Header ── #}
+            <header class="mon-page-header">
+                <div class="mon-page-title">
+                    <a href="{% url 'directorates:detail' directorate.pk %}" class="back-link-modern">
+                        <i data-lucide="arrow-left"></i> {{ directorate.name }}
+                    </a>
+                    <p class="eyebrow">Monitoramento</p>
+                    <h1>Relatórios e Pareceres</h1>
+                    <p class="subtitle-muted">Visitas finalizadas — acesse os relatórios finais, pareceres técnicos e conclusivos</p>
+                </div>
+                <div class="mon-page-actions">
+                    {# Filtros ── #}
+                    <div class="mon-search-input-wrap" style="min-width:200px;">
+                        <i data-lucide="search"></i>
+                        <input type="text" id="report-search" placeholder="Buscar OSC..." autocomplete="off">
+                    </div>
+                    <select id="bimester-filter" class="filter-select-pill">
+                        <option value="all" {% if selected_bimester == 'all' %}selected{% endif %}>Todos os Bimestres</option>
+                        <option value="1" {% if selected_bimester == '1' %}selected{% endif %}>1º Bimestre (Jan-Fev)</option>
+                        <option value="2" {% if selected_bimester == '2' %}selected{% endif %}>2º Bimestre (Mar-Abr)</option>
+                        <option value="3" {% if selected_bimester == '3' %}selected{% endif %}>3º Bimestre (Mai-Jun)</option>
+                        <option value="4" {% if selected_bimester == '4' %}selected{% endif %}>4º Bimestre (Jul-Ago)</option>
+                        <option value="5" {% if selected_bimester == '5' %}selected{% endif %}>5º Bimestre (Set-Out)</option>
+                        <option value="6" {% if selected_bimester == '6' %}selected{% endif %}>6º Bimestre (Nov-Dez)</option>
+                    </select>
+                </div>
+            </header>
+
+            {# ── Visitas Finalizadas (com relatórios) ── #}
+            <div class="report-cards-grid" id="report-grid">
+                {% for visit in visits %}
+                {% if visit.status == 'finalized' or visit.status == 'completed' %}
+                <div class="report-card"
+                     data-osc="{{ visit.osc.name|lower }}"
+                     data-date="{{ visit.visit_date|date:'Y-m-d' }}">
+
+                    <div class="report-card-header">
+                        <div class="report-card-icon">
+                            <i data-lucide="file-check-2"></i>
+                        </div>
+                        <div class="report-card-status">
+                            <span class="badge-finalized-sm">Finalizado</span>
+                        </div>
+                    </div>
+
+                    <div class="report-card-body">
+                        <h3 class="report-osc-name" title="{{ visit.osc.name }}">{{ visit.osc.name }}</h3>
+                        <div class="report-date-row">
+                            <i data-lucide="calendar"></i>
+                            <span>{{ visit.visit_date|date:"d/m/Y" }}</span>
+                        </div>
+                        {% if visit.assinaturas.tecnico1_nome %}
+                        <div class="report-tech-row">
+                            <i data-lucide="user"></i>
+                            <span>{{ visit.assinaturas.tecnico1_nome }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="report-card-actions">
+                        {# Relatório Final ── #}
+                        <a href="{% url 'directorates:visit-report' visit.pk 'relatorio_final' %}"
+                           class="report-action-btn
+                           {% if visit.relatorio_final.status == 'finalized' %}btn-green
+                           {% elif visit.relatorio_final.status == 'draft' %}btn-amber
+                           {% else %}btn-neutral{% endif %}">
+                            <i data-lucide="file-check"></i>
+                            Relatório Final
+                            {% if visit.relatorio_final.status == 'finalized' %}
+                                <span class="btn-badge">✓</span>
+                            {% elif visit.relatorio_final.status == 'draft' %}
+                                <span class="btn-badge-draft">Rascunho</span>
+                            {% endif %}
+                        </a>
+
+                        {# Parecer Conclusivo ── #}
+                        <a href="{% url 'directorates:visit-report' visit.pk 'parecer_conclusivo' %}"
+                           class="report-action-btn
+                           {% if visit.parecer_conclusivo.status == 'finalized' %}btn-green
+                           {% elif visit.parecer_conclusivo.status == 'draft' %}btn-amber
+                           {% else %}btn-neutral{% endif %}">
+                            <i data-lucide="check-circle-2"></i>
+                            Parecer Conclusivo
+                            {% if visit.parecer_conclusivo.status == 'finalized' %}
+                                <span class="btn-badge">✓</span>
+                            {% elif visit.parecer_conclusivo.status == 'draft' %}
+                                <span class="btn-badge-draft">Rascunho</span>
+                            {% endif %}
+                        </a>
+
+                        {# Instrumental ── #}
+                        <a href="{% url 'directorates:visit-instrumental' visit.pk %}"
+                           class="report-action-btn btn-slate-light">
+                            <i data-lucide="clipboard-list"></i>
+                            Instrumental
+                        </a>
+
+                        {# Reverter ambos para rascunho ── #}
+                        <button type="button" class="report-action-btn btn-revert-both"
+                                id="revert-btn-{{ visit.pk }}"
+                                onclick="revertBothReports('{{ visit.pk }}', this)">
+                            <i data-lucide="rotate-ccw"></i>
+                            Reverter para Rascunho
+                        </button>
+
+                        {# Notificações (PDF) ── #}
+                        <div class="notif-section">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span class="notif-label"><i data-lucide="paperclip"></i> Notificações (PDF)</span>
+                                <div>
+                                    <input type="file" id="notif-input-{{ visit.pk }}" style="display: none;" accept=".pdf" onchange="uploadNotification('{{ visit.pk }}')">
+                                    <button type="button" class="btn-attach-pdf" onclick="document.getElementById('notif-input-{{ visit.pk }}').click()">
+                                        <i data-lucide="upload-cloud" style="width: 12px; height: 12px;"></i> Anexar PDF
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="notif-items-list" id="notif-list-{{ visit.pk }}">
+                                {% if visit.notificacoes %}
+                                    {% for notif in visit.notificacoes %}
+                                    <div class="notif-item">
+                                        <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; flex: 1;">
+                                            <i data-lucide="file-text" style="color:#ef4444; width: 13px; height: 13px; flex-shrink: 0;"></i>
+                                            <a href="{{ notif.url }}" target="_blank" class="notif-name" title="{{ notif.name }}">{{ notif.name }}</a>
+                                        </div>
+                                        <div style="display: flex; gap: 4px; flex-shrink: 0;">
+                                            <a href="{{ notif.url }}" target="_blank" class="btn-notif-action" title="Visualizar"><i data-lucide="external-link"></i></a>
+                                            <button type="button" class="btn-notif-action btn-notif-delete" onclick="removeNotification('{{ visit.pk }}', {{ forloop.index0 }})" title="Excluir"><i data-lucide="trash-2"></i></button>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="notif-empty-text">Nenhuma notificação anexada.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% empty %}
+                {% endfor %}
+            </div>
+
+            {# Empty state ── #}
+            <div id="no-results" style="display:none;" class="empty-fullpage">
+                <i data-lucide="file-x"></i>
+                <p>Nenhuma visita finalizada encontrada.</p>
+            </div>
+
+            {% with fin_count=visits|length %}
+            {% if fin_count == 0 %}
+            <div class="empty-fullpage">
+                <i data-lucide="file-x"></i>
+                <p>Nenhuma visita finalizada encontrada para esta diretoria.</p>
+                <a href="{% url 'directorates:visit-list' directorate.pk %}" class="btn-primary-premium" style="margin-top:16px;">
+                    <i data-lucide="clipboard-list"></i> Ver Instrumentais de Visita
+                </a>
+            </div>
+            {% endif %}
+            {% endwith %}
+
+        </div>
+    </main>
+</div>
+
+<script>
+function revertReport(visitId, reportType, btn) {
+    return fetch(`/directorias/visitas/${visitId}/relatorio/${reportType}/reverter/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    }).then(r => r.json());
+}
+
+async function revertBothReports(visitId, btn) {
+    if (!confirm('Reverter Relatório Final e Parecer Conclusivo para rascunho?\n\nAmbos poderão ser editados novamente.')) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader-circle" style="animation:spin 1s linear infinite;width:14px;height:14px;"></i> Revertendo...';
+    lucide.createIcons();
+
+    try {
+        const [r1, r2] = await Promise.all([
+            revertReport(visitId, 'relatorio_final', btn),
+            revertReport(visitId, 'parecer_conclusivo', btn)
+        ]);
+        if (r1.success || r2.success) {
+            window.location.reload();
+        } else {
+            alert('Erro ao reverter: ' + (r1.error || r2.error || 'tente novamente.'));
+            btn.disabled = false;
+        }
+    } catch {
+        alert('Erro de conexão. Tente novamente.');
+        btn.disabled = false;
+    }
+}
+
+function uploadNotification(visitId) {
+    const input = document.getElementById('notif-input-' + visitId);
+    const file = input?.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+        alert("Por favor, selecione apenas arquivos PDF.");
+        input.value = '';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+    // Show loading
+    const listContainer = document.getElementById('notif-list-' + visitId);
+    if (listContainer) {
+        listContainer.innerHTML = '<p style="text-align:center;font-size:10px;color:#64748b;margin:0;padding:8px;">Enviando...</p>';
+    }
+
+    fetch(`/directorias/visitas/${visitId}/upload-notification/`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(res => {
+        if (res.success) {
+            window.location.reload();
+        } else {
+            alert("Erro ao fazer upload da notificação: " + res.error);
+            window.location.reload();
+        }
+    })
+    .catch(err => {
+        alert("Erro de conexão ao enviar a notificação.");
+        window.location.reload();
+    });
+}
+
+function removeNotification(visitId, index) {
+    if (!confirm("Tem certeza que deseja remover esta notificação?")) return;
+
+    const data = { index: index };
+
+    fetch(`/directorias/visitas/${visitId}/remove-notification/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(res => {
+        if (res.success) {
+            window.location.reload();
+        } else {
+            alert("Erro ao remover notificação: " + res.error);
+        }
+    })
+    .catch(err => {
+        alert("Erro de conexão ao remover a notificação.");
+    });
+}
+
+// Filter by OSC name
+document.getElementById('report-search')?.addEventListener('input', function() {
+    filterCards();
+});
+document.getElementById('bimester-filter')?.addEventListener('change', function() {
+    const bim = this.value;
+    const url = new URL(window.location.href);
+    url.searchParams.set('bimestre', bim);
+    window.location.href = url.toString();
+});
+
+function getBimesterRange(bim) {
+    const year = new Date().getFullYear();
+    const b = parseInt(bim);
+    const start = new Date(year, (b - 1) * 2, 1);
+    const end = new Date(year, b * 2, 0);
+    return { start, end };
+}
+
+function filterCards() {
+    const q = document.getElementById('report-search').value.toLowerCase();
+    const bim = document.getElementById('bimester-filter').value;
+    let visible = 0;
+
+    document.querySelectorAll('.report-card').forEach(card => {
+        const nameMatch = !q || card.dataset.osc.includes(q);
+        let dateMatch = true;
+        if (bim !== 'all') {
+            const range = getBimesterRange(bim);
+            const d = new Date(card.dataset.date);
+            dateMatch = d >= range.start && d <= range.end;
+        }
+        const show = nameMatch && dateMatch;
+        card.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+
+    document.getElementById('no-results').style.display = visible === 0 ? 'flex' : 'none';
+}
+</script>
+
+<style>
+.btn-attach-pdf {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: transparent;
+    border: 1px solid #3b82f6;
+    border-radius: 8px;
+    color: #3b82f6;
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-attach-pdf:hover {
+    background: #eff6ff;
+}
+.notif-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 6px;
+}
+.btn-notif-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+}
+.btn-notif-action i {
+    width: 12px;
+    height: 12px;
+}
+.btn-notif-action:hover {
+    color: #3b82f6;
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+.btn-notif-delete:hover {
+    color: #ef4444;
+    border-color: #fca5a5;
+    background: #fef2f2;
+}
+.notif-empty-text {
+    font-size: 10px;
+    color: #94a3b8;
+    font-style: italic;
+    text-align: center;
+    margin: 4px 0 0 0;
+    padding: 8px;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+}
+.mon-page-shell { width: 96%; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.mon-page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; background: white; border-radius: 20px; padding: 24px 28px; box-shadow: 0 4px 20px rgba(47,104,230,.07); border: 1px solid #e8edf5; }
+.mon-page-title h1 { margin: 4px 0 4px; font-size: 22px; font-weight: 800; color: #1e3a8a; }
+.mon-page-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.filter-select-pill { padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-size: 12px; font-weight: 700; color: #475569; background: white; cursor: pointer; outline: none; }
+.filter-select-pill:focus { border-color: #3b82f6; }
+
+.report-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+
+.report-card {
+    background: white; border-radius: 20px; padding: 20px;
+    box-shadow: 0 4px 18px rgba(47,104,230,.06); border: 1px solid #e8edf5;
+    display: flex; flex-direction: column; gap: 16px;
+    transition: transform .2s, box-shadow .2s;
+}
+.report-card:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(47,104,230,.12); border-color: #10b981; }
+
+.report-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+.report-card-icon { width: 38px; height: 38px; border-radius: 10px; background: #ecfdf5; color: #10b981; display: flex; align-items: center; justify-content: center; }
+.report-card-icon i { width: 18px; height: 18px; }
+
+.badge-finalized-sm { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; padding: 3px 8px; border-radius: 6px; background: #ecfdf5; color: #059669; border: 1px solid #d1fae5; }
+
+.report-osc-name { font-size: 13px; font-weight: 800; color: #1e3a8a; margin: 0 0 6px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+.report-date-row, .report-tech-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #64748b; font-weight: 500; margin-bottom: 3px; }
+.report-date-row i, .report-tech-row i { width: 13px; height: 13px; color: #94a3b8; }
+
+.report-card-actions { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
+
+.report-action-btn {
+    display: flex; align-items: center; justify-content: flex-start; gap: 8px;
+    padding: 9px 14px; border-radius: 11px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    text-decoration: none; transition: all .2s;
+}
+.report-action-btn i { width: 14px; height: 14px; flex-shrink: 0; }
+.btn-badge { margin-left: auto; font-size: 10px; background: white; border-radius: 6px; padding: 1px 6px; color: #059669; font-weight: 900; }
+.btn-badge-draft { margin-left: auto; font-size: 9px; background: #fef3c7; border-radius: 6px; padding: 1px 6px; color: #92400e; font-weight: 900; }
+
+.btn-green { background: #ecfdf5; color: #059669; border: 1.5px solid #d1fae5; }
+.btn-green:hover { background: #059669; color: white; border-color: #059669; }
+.btn-amber { background: #fffbeb; color: #92400e; border: 1.5px solid #fef3c7; }
+.btn-amber:hover { background: #f59e0b; color: white; }
+.btn-neutral { background: #f8fafc; color: #475569; border: 1.5px solid #e2e8f0; }
+.btn-neutral:hover { background: #1e3a8a; color: white; border-color: #1e3a8a; }
+.btn-slate { background: #f1f5f9; color: #1e3a8a; border: 1.5px solid #e2e8f0; }
+.btn-slate:hover { background: #1e3a8a; color: white; border-color: #1e3a8a; }
+.btn-slate-light { background: #f8fafc; color: #64748b; border: 1.5px solid #e2e8f0; }
+.btn-slate-light:hover { background: #f1f5f9; color: #1e293b; }
+
+.btn-revert-both {
+    background: #fef2f2;
+    border: 1.5px solid #fecaca;
+    color: #dc2626;
+    cursor: pointer;
+    justify-content: center;
+}
+.btn-revert-both:hover { background: #dc2626; color: white; border-color: #dc2626; }
+.btn-revert-both:disabled { opacity: .5; cursor: not-allowed; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.notif-section { margin-top: 4px; padding: 10px 12px; background: #f8fafc; border-radius: 10px; border: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 6px; }
+.notif-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; display: flex; align-items: center; gap: 5px; }
+.notif-label i { width: 12px; height: 12px; }
+.notif-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; background: white; border: 1.5px solid #e2e8f0; border-radius: 12px; gap: 8px; }
+.notif-item i { width: 13px; height: 13px; flex-shrink: 0; }
+.notif-name { font-size: 11px; font-weight: 700; color: #475569; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notif-name:hover { color: #3b82f6; text-decoration: none; }
+
+.empty-fullpage { display: flex; flex-direction: column; align-items: center; padding: 80px 24px; color: #94a3b8; gap: 10px; background: white; border-radius: 20px; border: 1px solid #e8edf5; }
+.empty-fullpage i { width: 48px; height: 48px; opacity: .3; }
+.empty-fullpage p { font-size: 14px; font-weight: 600; margin: 0; }
+
+.mon-search-input-wrap { position: relative; }
+.mon-search-input-wrap i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: #94a3b8; pointer-events: none; }
+.mon-search-input-wrap input { width: 100%; padding: 10px 12px 10px 36px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-size: 13px; font-weight: 500; color: #1e293b; background: white; outline: none; transition: border-color .2s; }
+.mon-search-input-wrap input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+
+.back-link-modern{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;transition:color .2s;}
+.back-link-modern:hover{color:#3b82f6;}
+.back-link-modern i{width:14px;height:14px;}
+.subtitle-muted{font-size:13px;color:#64748b;font-weight:500;margin:0;}
+.eyebrow{text-transform:uppercase;letter-spacing:.24em;font-size:11px;color:#6d7f9c;font-weight:700;margin:0 0 4px;}
+.btn-primary-premium{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#3b82f6;color:white;border:none;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;box-shadow:0 8px 20px rgba(59,130,246,.25);transition:all .2s;text-decoration:none;}
+.btn-primary-premium:hover{background:#2563eb;transform:translateY(-1px);}
+.btn-primary-premium i{width:14px;height:14px;}
+
+@media (max-width: 1024px) {
+    .mon-page-shell { width: 92%; }
+    .mon-page-header { flex-direction: column; align-items: stretch; }
+    .mon-page-actions { justify-content: space-between; }
+    .mon-search-input-wrap { flex: 1; }
+}
+
+@media (max-width: 768px) {
+    .mon-page-shell { width: 100%; padding: 0 16px; }
+    .mon-page-header { padding: 20px; }
+    .mon-page-actions { flex-direction: column; align-items: stretch; }
+    .report-cards-grid { grid-template-columns: 1fr; }
+    .report-card { padding: 16px; }
+}
+</style>
+{% endblock %}
