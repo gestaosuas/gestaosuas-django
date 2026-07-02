@@ -36,6 +36,11 @@ media/
 # ─── Docker ──────────────────────────────────────────────────────────────────
 postgres_data/
 
+# ─── Dumps de banco ──────────────────────────────────────────────────────────
+*.dump
+*.sql
+*.sql.gz
+
 # ─── Dependências locais (dev sem venv) ──────────────────────────────────────
 # Instaladas via: pip install --target=.deps <pacote>
 .deps/
