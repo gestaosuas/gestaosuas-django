@@ -342,13 +342,19 @@ class CrasQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
         month = int(request.POST.get("month")); year = int(request.POST.get("year")); unit = request.POST.get("unit")
         directorate = Directorate.objects.filter(name__icontains="CRAS").first()
         if not directorate: directorate = Directorate.objects.filter(name__icontains="Proteção Social Básica").first()
+        NUMERIC_TYPES = ('IntegerField', 'PositiveIntegerField', 'PositiveSmallIntegerField', 'FloatField', 'DecimalField')
+        allowed_keys = {f.name for f in CrasReport._meta.get_fields()
+                        if hasattr(f, 'get_internal_type') and f.get_internal_type() in NUMERIC_TYPES}
+        if key not in allowed_keys:
+            return JsonResponse({"error": "Campo não permitido"}, status=400)
+
         if sub_id and sub_id != "None" and sub_id != "":
             report = get_object_or_404(CrasReport, id=sub_id)
         else:
             report, _ = CrasReport.objects.get_or_create(
-                directorate=directorate, 
-                month=month, 
-                year=year, 
+                directorate=directorate,
+                month=month,
+                year=year,
                 unit_name=unit,
                 defaults={'created_at': timezone.now(), 'updated_at': timezone.now()}
             )

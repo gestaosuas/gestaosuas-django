@@ -38,7 +38,7 @@ class SineReport(models.Model):
     class Meta:
         db_table = "sine_reports"
         managed = False
-        unique_together = ("month", "year")
+        unique_together = ("directorate", "month", "year")
         ordering = ["-year", "-month", "-updated_at"]
         verbose_name = "Relatorio SINE"
         verbose_name_plural = "Relatorios SINE"
@@ -96,7 +96,7 @@ class QualificacaoReport(models.Model):
     class Meta:
         db_table = "qualificacao_reports"
         managed = False
-        unique_together = ("month", "year")
+        unique_together = ("directorate", "month", "year")
         ordering = ["-year", "-month", "-updated_at"]
         verbose_name = "Relatorio Qualificacao"
         verbose_name_plural = "Relatorios Qualificacao"

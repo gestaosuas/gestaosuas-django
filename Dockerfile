@@ -14,15 +14,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements/base.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt gunicorn
+COPY requirements/ /app/requirements/
+RUN pip install --no-cache-dir -r requirements/prod.txt
 
 COPY . /app/
 
 RUN rm -rf /app/.deps
 
-COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
+
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+RUN chown -R appuser:appgroup /app
+USER appuser
 
 EXPOSE 8000
 

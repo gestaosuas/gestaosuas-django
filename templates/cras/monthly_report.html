@@ -39,7 +39,8 @@
                     {% if monthly_report %}
                     <article style="background: #f8fafc; padding: 40px; border-radius: 24px; border: 1px solid #f1f5f9;">
                         <div class="rich-report" style="font-size: 16px; line-height: 1.8; color: #334155;">
-                            {{ monthly_report.content|safe }}
+                            {# conteúdo sanitizado no backend antes de exibir #}
+                            {{ monthly_report.content }}
                         </div>
                         <footer style="margin-top: 40px; padding-top: 24px; border-top: 1px dashed #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
                             <div style="font-size: 12px; color: #94a3b8; font-weight: 600;">

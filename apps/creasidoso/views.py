@@ -248,11 +248,7 @@ class CreasIdosoFormView(CreasBaseMixin, FormView):
         try:
             r = CreasIdosoReport.objects.get(directorate=d, month=month_val, year=year_val)
         except CreasIdosoReport.DoesNotExist:
-            from django.db import connection
-            c = connection.cursor()
-            c.execute("SELECT id FROM auth.users LIMIT 1")
-            row = c.fetchone()
-            fb_user = row[0] if row else uuid.uuid4()
+            fb_user = self.request.user.id
             r = CreasIdosoReport(directorate=d, month=month_val, year=year_val, created_by=fb_user, created_at=datetime.now())
         for k, v in form.cleaned_data.items():
             setattr(r, k, v)
@@ -294,11 +290,7 @@ class CreasPcdFormView(CreasBaseMixin, FormView):
         try:
             r = CreasPcdReport.objects.get(directorate=d, month=month_val, year=year_val)
         except CreasPcdReport.DoesNotExist:
-            from django.db import connection
-            c = connection.cursor()
-            c.execute("SELECT id FROM auth.users LIMIT 1")
-            row = c.fetchone()
-            fb_user = row[0] if row else uuid.uuid4()
+            fb_user = self.request.user.id
             r = CreasPcdReport(directorate=d, month=month_val, year=year_val, created_by=fb_user, created_at=datetime.now())
         for k, v in form.cleaned_data.items():
             setattr(r, k, v)
@@ -412,6 +404,12 @@ class CreasSharedQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
         if not directorate:
             directorate = Directorate.objects.filter(name__icontains="Proteção Social Especial").first()
         
+        NUMERIC_TYPES = ('IntegerField', 'PositiveIntegerField', 'PositiveSmallIntegerField', 'FloatField', 'DecimalField')
+        allowed_keys = {f.name for f in self.model._meta.get_fields()
+                        if hasattr(f, 'get_internal_type') and f.get_internal_type() in NUMERIC_TYPES}
+        if key not in allowed_keys:
+            return JsonResponse({"error": "Campo não permitido"}, status=400)
+
         if sub_id and sub_id != "None" and sub_id != "":
             from django.shortcuts import get_object_or_404
             report = get_object_or_404(self.model, id=sub_id)

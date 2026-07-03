@@ -34,7 +34,8 @@
                 {% endif %}
             </h2>
             {% if monthly_report and monthly_report.content.html %}
-                <div class="rich-report">{{ monthly_report.content.html|safe }}</div>
+                {# conteúdo sanitizado no backend antes de exibir #}
+                <div class="rich-report">{{ monthly_report.content.html }}</div>
             {% else %}
                 <p>Nao ha narrativa salva para o periodo selecionado.</p>
             {% endif %}

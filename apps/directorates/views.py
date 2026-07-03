@@ -6,13 +6,16 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.views import View
 from django.views.generic import DetailView, ListView, CreateView, UpdateView, DeleteView, TemplateView
 from django.urls import reverse
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseForbidden
 from django.template.loader import render_to_string
 import json
 import uuid
 import math
 import unicodedata
+import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 def strip_accents(text):
@@ -43,7 +46,7 @@ def get_persistent_bimester(request):
 
 from .models import Directorate, Osc, Visit, WorkPlan, MonthlyReport, FormDelegation
 from apps.beneficios.models import BeneficiosReport
-from apps.accounts.models import Profile
+from apps.accounts.models import Profile, ProfileDirectorate
 
 
 def _fix_str_encoding(value):
@@ -160,14 +163,10 @@ def upload_to_supabase(file_obj, path):
         error_body = e.read().decode()
         if e.code == 409: # Arquivo ja existe
             return f"{supabase_url}/storage/v1/object/public/{bucket}/{path}"
-        print(f"--- ERRO SUPABASE STORAGE (fallback local) ---")
-        print(f"URL: {url}")
-        print(f"Status: {e.code}")
-        print(f"Corpo: {error_body}")
+        logger.error("ERRO SUPABASE STORAGE (fallback local) — URL: %s | Status: %s | Corpo: %s", url, e.code, error_body)
         return _save_file_locally(file_obj, path)
     except Exception as e:
-        print(f"--- ERRO INESPERADO NO UPLOAD (fallback local) ---")
-        print(f"Erro: {str(e)}")
+        logger.error("ERRO INESPERADO NO UPLOAD (fallback local) — %s", str(e))
         return _save_file_locally(file_obj, path)
 
 def append_visit_uploaded_documents(visit, files, request=None):
@@ -414,18 +413,13 @@ def get_monitoring_back_url(directorate):
 
 
 def get_safe_next_url(request):
+    from urllib.parse import urlparse
     next_url = request.POST.get("next") or request.GET.get("next")
-    if next_url and next_url.startswith("/"):
-        return next_url
+    if next_url:
+        parsed = urlparse(next_url)
+        if not parsed.netloc and next_url.startswith("/") and not next_url.startswith("//"):
+            return next_url
     return ""
-
-def current_bimester():
-    return math.ceil(datetime.now().month / 2)
-
-def bimester_months(bimester):
-    return (bimester - 1) * 2 + 1, bimester * 2
-from apps.beneficios.models import BeneficiosReport
-from apps.accounts.models import Profile
 
 
 class DirectorateListView(LoginRequiredMixin, ListView):
@@ -775,7 +769,7 @@ class VisitDelegateView(LoginRequiredMixin, View):
                 delegated_by=request.user.id
             )
             
-        return redirect("directorates:visit-list", kwargs={"pk": visit.directorate.pk})
+        return redirect(reverse("directorates:visit-list", kwargs={"pk": str(visit.directorate.pk)}))
 
 class WorkPlanListView(LoginRequiredMixin, ListView):
     template_name = "directorates/monitoring/plan_list.html"
@@ -857,7 +851,14 @@ class WorkPlanCreateView(LoginRequiredMixin, CreateView):
 class WorkPlanDeleteView(LoginRequiredMixin, DeleteView):
     model = WorkPlan
     template_name = "directorates/monitoring/confirm_delete.html"
-    
+
+    def dispatch(self, request, *args, **kwargs):
+        profile = getattr(request.user, 'profile', None)
+        is_admin = request.user.is_superuser or (profile and profile.role in ('admin', 'diretor'))
+        if not is_admin:
+            return HttpResponseForbidden()
+        return super().dispatch(request, *args, **kwargs)
+
     def get_success_url(self):
         next_url = get_safe_next_url(self.request)
         if next_url:
@@ -1331,20 +1332,25 @@ class VisitUploadDocumentView(LoginRequiredMixin, View):
         file = request.FILES.get("file")
         if not file:
             return JsonResponse({"success": False, "error": "No file provided"}, status=400)
-        
-        # In a real scenario, upload to Supabase or S3
-        # Here we'll simulate saving the name and a mock URL
+
+        # TODO: implementar persistência real do arquivo (usar upload_to_supabase ou FileSystemStorage)
+        ext = file.name.rsplit(".", 1)[-1].lower() if "." in file.name else ""
+        safe_name = f"{uuid.uuid4().hex}.{ext}" if ext else f"{uuid.uuid4().hex}"
+        path = f"visitas/documentos/{visit.pk}/{safe_name}"
+        url = upload_to_supabase(file, path)
+        logger.warning("VisitUploadDocumentView: arquivo %s salvo em %s", file.name, url)
+
         doc_data = {
             "name": file.name,
-            "url": f"/media/mock/{file.name}", # Mock URL
+            "url": url,
             "uploaded_at": datetime.now().isoformat()
         }
-        
+
         if not visit.documents:
             visit.documents = []
         visit.documents.append(doc_data)
         visit.save()
-        
+
         return JsonResponse({"success": True, "document": doc_data})
 
 
@@ -1446,7 +1452,14 @@ class OscUpdateView(LoginRequiredMixin, UpdateView):
 
 class OscDeleteView(LoginRequiredMixin, DeleteView):
     model = Osc
-    
+
+    def dispatch(self, request, *args, **kwargs):
+        profile = getattr(request.user, 'profile', None)
+        is_admin = request.user.is_superuser or (profile and profile.role in ('admin', 'diretor'))
+        if not is_admin:
+            return HttpResponseForbidden()
+        return super().dispatch(request, *args, **kwargs)
+
     def get_success_url(self):
         next_url = self.request.POST.get("next") or self.request.GET.get("next")
         if next_url and next_url.startswith("/"):
@@ -1713,7 +1726,7 @@ class VisitDeleteDocumentView(LoginRequiredMixin, View):
                             with urllib.request.urlopen(req, timeout=5) as resp:
                                 pass
                     except Exception as e:
-                        print(f"Erro ao deletar no Supabase: {e}")
+                        logger.warning("Erro ao deletar no Supabase: %s", e)
                 
                 documents.pop(index)
                 visit.documents = documents
@@ -1732,7 +1745,7 @@ class VisitRevertView(LoginRequiredMixin, View):
         next_url = request.POST.get("next") or request.GET.get("next")
         if next_url and next_url.startswith("/"):
             return redirect(next_url)
-        return redirect("directorates:visit-list", kwargs={"pk": visit.directorate.pk})
+        return redirect(reverse("directorates:visit-list", kwargs={"pk": str(visit.directorate.pk)}))
 
 class RevertReportView(LoginRequiredMixin, View):
     """Reverte o status de relatorio_final ou parecer_conclusivo para 'draft'."""
@@ -1753,7 +1766,14 @@ class RevertReportView(LoginRequiredMixin, View):
 
 class VisitDeleteView(LoginRequiredMixin, DeleteView):
     model = Visit
-    
+
+    def dispatch(self, request, *args, **kwargs):
+        profile = getattr(request.user, 'profile', None)
+        is_admin = request.user.is_superuser or (profile and profile.role in ('admin', 'diretor'))
+        if not is_admin:
+            return HttpResponseForbidden()
+        return super().dispatch(request, *args, **kwargs)
+
     def get_success_url(self):
         next_url = self.request.POST.get("next") or self.request.GET.get("next")
         if next_url and next_url.startswith("/"):

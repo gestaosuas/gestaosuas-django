@@ -62,6 +62,7 @@ class CasaDaMulherReport(models.Model):
     class Meta:
         db_table = "casa_da_mulher_reports"
         managed = False
+        unique_together = [("directorate", "month", "year")]
 
     def __str__(self):
         return f"Casa da Mulher Report {self.year}-{self.month}"
@@ -119,6 +120,7 @@ class DiversidadeReport(models.Model):
     class Meta:
         db_table = "diversidade_reports"
         managed = False
+        unique_together = [("directorate", "month", "year")]
 
     def __str__(self):
         return f"Diversidade Report {self.year}-{self.month}"
@@ -141,6 +143,7 @@ class NucleoDiversidadeReport(models.Model):
     class Meta:
         db_table = "nucleo_diversidade_reports"
         managed = False
+        unique_together = [("directorate", "month", "year")]
 
     def __str__(self):
         return f"Núcleo Diversidade Report {self.year}-{self.month}"

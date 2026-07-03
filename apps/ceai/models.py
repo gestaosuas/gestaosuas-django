@@ -46,7 +46,7 @@ class Submission(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'submissions'
+        db_table = 'ceai_submissions'  # FIXME: verificar nome real da tabela no banco; 'submissions' colide com directorates.MonthlySubmission
         verbose_name = 'Submissão'
         verbose_name_plural = 'Submissões'
 

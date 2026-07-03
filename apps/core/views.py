@@ -25,7 +25,12 @@ class SystemSettingsView(LoginRequiredMixin, TemplateView):
         context["logo_url"] = settings.get("logo_url", "")
         return context
     def post(self, request, *args, **kwargs):
-        from apps.core.models import SystemSetting, messages
+        from django.contrib import messages
+        from apps.core.models import SystemSetting
+        profile = getattr(request.user, 'profile', None)
+        is_admin = request.user.is_superuser or (profile and profile.role == 'admin')
+        if not is_admin:
+            return redirect('core:home')
         sn = request.POST.get("system_name")
         lu = request.POST.get("logo_url")
         SystemSetting.objects.update_or_create(key="system_name", defaults={"value": sn})
@@ -129,6 +134,10 @@ class MapManagementView(LoginRequiredMixin, TemplateView):
         from apps.core.models import MapUnit, MapCategory
         from django.shortcuts import redirect
         from django.contrib import messages
+        profile = getattr(request.user, 'profile', None)
+        is_admin = request.user.is_superuser or (profile and profile.role == 'admin')
+        if not is_admin:
+            return redirect('core:map')
         action = request.POST.get("action")
         if action == "save_category":
             cat_id = request.POST.get("category_id")

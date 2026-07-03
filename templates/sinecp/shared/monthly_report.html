@@ -57,8 +57,9 @@
                         </h2>
                     </div>
                     {% if monthly_report and monthly_report.content.html %}
+                        {# conteúdo sanitizado no backend antes de exibir #}
                         <div class="rich-report" style="line-height: 1.8; color: #334155; font-size: 16px;">
-                            {{ monthly_report.content.html|safe }}
+                            {{ monthly_report.content.html }}
                         </div>
                     {% else %}
                         <div style="text-align: center; padding: 60px; background: #f8fafc; border-radius: 20px; border: 2px dashed #e2e8f0;">

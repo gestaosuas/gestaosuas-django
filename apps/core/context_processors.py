@@ -5,9 +5,7 @@ from .models import SystemSetting
 
 def system_context(request):
     try:
-        settings_map = {
-            item.key: item.value for item in SystemSetting.objects.all()
-        } if SystemSetting.objects.exists() else {}
+        settings_map = {item.key: item.value for item in SystemSetting.objects.all()}
     except (OperationalError, ProgrammingError):
         settings_map = {}
     return {

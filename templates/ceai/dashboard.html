@@ -299,9 +299,7 @@
 {{ line_chart_desligamentos|json_script:"desl-data" }}
 {{ line_chart_atendimentos|json_script:"aten-data" }}
 {{ line_chart_total_idosos|json_script:"total-data" }}
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+{{ pie_chart_atendimentos|json_script:"pie-atend-data" }}
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
@@ -376,7 +374,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // PIE CHART
     const ctxPie = document.getElementById('atendPieChart').getContext('2d');
-    const pieData = {{ pie_chart_atendimentos|safe }};
+    const pieData = JSON.parse(document.getElementById('pie-atend-data').textContent);
     new Chart(ctxPie, {
         type: 'doughnut',
         data: {
@@ -401,6 +399,13 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 });
 
+// escapa HTML para uso seguro em innerHTML
+function escHtml(str) {
+    const d = document.createElement('div');
+    d.appendChild(document.createTextNode(str || ''));
+    return d.innerHTML;
+}
+
 // MODAL FUNCTIONS
 function openModal(id) { document.getElementById(id).classList.add('is-active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('is-active'); }
@@ -420,10 +425,10 @@ async function loadCategories(unit) {
     const list = document.getElementById('listCategories');
     list.innerHTML = data.map(c => `
         <li>
-            <span>${c.name}</span>
+            <span>${escHtml(c.name)}</span>
             <div class="item-actions">
-                <button class="btn-action edit" onclick="editCategory('${c.id}', '${c.name}')"><i data-lucide="pencil"></i></button>
-                <button class="btn-action delete" onclick="deleteCategory('${c.id}')"><i data-lucide="trash-2"></i></button>
+                <button class="btn-action edit" data-id="${escHtml(c.id)}" data-name="${escHtml(c.name)}" onclick="editCategory(this.dataset.id, this.dataset.name)"><i data-lucide="pencil"></i></button>
+                <button class="btn-action delete" data-id="${escHtml(c.id)}" onclick="deleteCategory(this.dataset.id)"><i data-lucide="trash-2"></i></button>
             </div>
         </li>
     `).join('');
@@ -475,8 +480,8 @@ async function loadOficinaCategories(unit) {
     const res = await fetch(`/ceai/api/categorias/?unit=${unit}`);
     const data = await res.json();
     const select = document.getElementById('ofiCategory');
-    select.innerHTML = '<option value="empty">Sem categoria</option>' + 
-        data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    select.innerHTML = '<option value="empty">Sem categoria</option>' +
+        data.map(c => `<option value="${escHtml(c.id)}">${escHtml(c.name)}</option>`).join('');
 }
 
 async function loadOficinas(unit) {
@@ -486,12 +491,12 @@ async function loadOficinas(unit) {
     grid.innerHTML = data.map(o => `
         <div class="item-row">
             <div class="item-info">
-                <strong>${o.activity_name}</strong>
-                <span class="tag">${o.category_name || 'Sem Categoria'}</span>
+                <strong>${escHtml(o.activity_name)}</strong>
+                <span class="tag">${escHtml(o.category_name || 'Sem Categoria')}</span>
             </div>
             <div class="item-actions">
-                <button class="btn-action edit" onclick="editOficina('${o.id}', '${o.activity_name}', '${o.category_id || 'empty'}')"><i data-lucide="pencil"></i></button>
-                <button class="btn-action delete" onclick="deleteOficina('${o.id}')"><i data-lucide="trash-2"></i></button>
+                <button class="btn-action edit" data-id="${escHtml(o.id)}" data-name="${escHtml(o.activity_name)}" data-cat="${escHtml(o.category_id || 'empty')}" onclick="editOficina(this.dataset.id, this.dataset.name, this.dataset.cat)"><i data-lucide="pencil"></i></button>
+                <button class="btn-action delete" data-id="${escHtml(o.id)}" onclick="deleteOficina(this.dataset.id)"><i data-lucide="trash-2"></i></button>
             </div>
         </div>
     `).join('');

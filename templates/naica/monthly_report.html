@@ -18,7 +18,8 @@
     <div class="panel" style="margin-top:24px;">
         <h2>Relatorio de {{ selected_month }}/{{ selected_year }}</h2>
         <div class="rich-report">
-            {{ monthly_report.content|safe }}
+            {# conteúdo sanitizado no backend antes de exibir #}
+            {{ monthly_report.content }}
         </div>
         <p style="color:var(--muted);font-size:12px;margin-top:16px;">
             Status: {{ monthly_report.get_status_display }} |

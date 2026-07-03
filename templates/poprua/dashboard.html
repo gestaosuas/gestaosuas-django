@@ -181,8 +181,14 @@
     </main>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+{{ chart_labels|json_script:"poprua-chart-labels" }}
+{{ chart_centro|json_script:"poprua-chart-centro" }}
+{{ chart_abordagem|json_script:"poprua-chart-abordagem" }}
+{{ chart_migracao|json_script:"poprua-chart-migracao" }}
+{{ drogas_labels|json_script:"poprua-drogas-labels" }}
+{{ drogas_data|json_script:"poprua-drogas-data" }}
+{{ persistentes_data|json_script:"poprua-persistentes-data" }}
+
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         const toggleBtn = document.getElementById("toggle-mgmt-menu");
@@ -200,16 +206,24 @@
 
         Chart.register(ChartDataLabels);
 
+        const chartLabels = JSON.parse(document.getElementById('poprua-chart-labels').textContent);
+        const chartCentro = JSON.parse(document.getElementById('poprua-chart-centro').textContent);
+        const chartAbordagem = JSON.parse(document.getElementById('poprua-chart-abordagem').textContent);
+        const chartMigracao = JSON.parse(document.getElementById('poprua-chart-migracao').textContent);
+        const drogasLabels = JSON.parse(document.getElementById('poprua-drogas-labels').textContent);
+        const drogasData = JSON.parse(document.getElementById('poprua-drogas-data').textContent);
+        const persistentesData = JSON.parse(document.getElementById('poprua-persistentes-data').textContent);
+
         // 1. Line Chart
         const ctxLine = document.getElementById('atendimentosChart').getContext('2d');
         new Chart(ctxLine, {
             type: 'line',
             data: {
-                labels: {{ chart_labels|safe }},
+                labels: chartLabels,
                 datasets: [
-                    { label: 'Centro de Referência', data: {{ chart_centro|safe }}, borderColor: '#3b82f6', backgroundColor: '#3b82f61a', borderWidth: 3, fill: true, tension: 0.4 },
-                    { label: 'Abordagem Social', data: {{ chart_abordagem|safe }}, borderColor: '#f59e0b', backgroundColor: '#f59e0b1a', borderWidth: 3, fill: true, tension: 0.4 },
-                    { label: 'Migração', data: {{ chart_migracao|safe }}, borderColor: '#10b981', backgroundColor: '#10b9811a', borderWidth: 3, fill: true, tension: 0.4 }
+                    { label: 'Centro de Referência', data: chartCentro, borderColor: '#3b82f6', backgroundColor: '#3b82f61a', borderWidth: 3, fill: true, tension: 0.4 },
+                    { label: 'Abordagem Social', data: chartAbordagem, borderColor: '#f59e0b', backgroundColor: '#f59e0b1a', borderWidth: 3, fill: true, tension: 0.4 },
+                    { label: 'Migração', data: chartMigracao, borderColor: '#10b981', backgroundColor: '#10b9811a', borderWidth: 3, fill: true, tension: 0.4 }
                 ]
             },
             options: {
@@ -224,9 +238,9 @@
         new Chart(ctxDrogas, {
             type: 'doughnut',
             data: {
-                labels: {{ drogas_labels|safe }},
+                labels: drogasLabels,
                 datasets: [{
-                    data: {{ drogas_data|safe }},
+                    data: drogasData,
                     backgroundColor: ['#3b82f6', '#f59e0b'],
                     borderWidth: 0,
                     hoverOffset: 10
@@ -247,10 +261,10 @@
         new Chart(ctxPers, {
             type: 'bar',
             data: {
-                labels: {{ chart_labels|safe }},
+                labels: chartLabels,
                 datasets: [{
                     label: 'Pessoas Persistentes',
-                    data: {{ persistentes_data|safe }},
+                    data: persistentesData,
                     backgroundColor: '#ef4444',
                     borderRadius: 6,
                 }]
@@ -258,7 +272,7 @@
             options: {
                 indexAxis: 'y',
                 responsive: true, maintainAspectRatio: false,
-                plugins: { 
+                plugins: {
                     legend: { display: false },
                     datalabels: { anchor: 'end', align: 'right', color: '#ef4444', font: { weight: '800', size: 10 }, formatter: (v) => v > 0 ? v : '' }
                 },
@@ -268,7 +282,7 @@
                 }
             }
         });
-        
+
         lucide.createIcons();
     });
 </script>

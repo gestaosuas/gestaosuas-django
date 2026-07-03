@@ -52,8 +52,9 @@ class SupabaseAuthBackend(BaseBackend):
             defaults={"username": email, "email": email},
         )
 
-        user.set_unusable_password()
-        user.save()
+        if user.has_usable_password():
+            user.set_unusable_password()
+            user.save(update_fields=["password"])
 
         profile, _ = Profile.objects.get_or_create(user=user)
         if not profile.full_name:

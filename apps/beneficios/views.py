@@ -319,6 +319,12 @@ class BeneficiosQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
         
         directorate = Directorate.objects.filter(name__icontains="Benef").first()
         
+        NUMERIC_TYPES = ('IntegerField', 'PositiveIntegerField', 'PositiveSmallIntegerField', 'FloatField', 'DecimalField')
+        allowed_keys = {f.name for f in BeneficiosReport._meta.get_fields()
+                        if hasattr(f, 'get_internal_type') and f.get_internal_type() in NUMERIC_TYPES}
+        if key not in allowed_keys:
+            return JsonResponse({"error": "Campo não permitido"}, status=400)
+
         if sub_id and sub_id != "None" and sub_id != "":
             report = get_object_or_404(BeneficiosReport, id=sub_id)
         else:

@@ -44,15 +44,20 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ chart_labels|json_script:"poprua-tv-labels" }}
+{{ chart_centro|json_script:"poprua-tv-centro" }}
+{{ chart_abordagem|json_script:"poprua-tv-abordagem" }}
+{{ chart_migracao|json_script:"poprua-tv-migracao" }}
+{{ drogas_data|json_script:"poprua-tv-drogas" }}
+{{ drogas_labels|json_script:"poprua-tv-drogas-labels" }}
 <script>
 (function () {
-    /* Pop Rua usa JSON pré-serializado no contexto */
-    var labels  = {{ chart_labels|safe }};
-    var centro  = {{ chart_centro|safe }};
-    var abord   = {{ chart_abordagem|safe }};
-    var migr    = {{ chart_migracao|safe }};
-    var drogas  = {{ drogas_data|safe }};
-    var dLabels = {{ drogas_labels|safe }};
+    var labels  = JSON.parse(document.getElementById('poprua-tv-labels').textContent);
+    var centro  = JSON.parse(document.getElementById('poprua-tv-centro').textContent);
+    var abord   = JSON.parse(document.getElementById('poprua-tv-abordagem').textContent);
+    var migr    = JSON.parse(document.getElementById('poprua-tv-migracao').textContent);
+    var drogas  = JSON.parse(document.getElementById('poprua-tv-drogas').textContent);
+    var dLabels = JSON.parse(document.getElementById('poprua-tv-drogas-labels').textContent);
 
     function makeBarChart(canvasId, lbl, vals, color) {
         var el = document.getElementById(canvasId);
