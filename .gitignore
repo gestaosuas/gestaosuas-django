@@ -41,6 +41,9 @@ postgres_data/
 *.sql
 *.sql.gz
 
+# Manter scripts de migração versionados
+!scripts/*.sql
+
 # ─── Dependências locais (dev sem venv) ──────────────────────────────────────
 # Instaladas via: pip install --target=.deps <pacote>
 .deps/

@@ -134,8 +134,8 @@ def upload_to_supabase(file_obj, path):
     import urllib.request
     import urllib.error
 
-    supabase_url = settings.SUPABASE_URL
-    anon_key = settings.SUPABASE_ANON_KEY
+    supabase_url = getattr(settings, "SUPABASE_URL", "")
+    anon_key = getattr(settings, "SUPABASE_ANON_KEY", "")
     bucket = "system-assets"
 
     if not supabase_url or not anon_key:
@@ -1714,8 +1714,8 @@ class VisitDeleteDocumentView(LoginRequiredMixin, View):
                         path_parts = doc_url.split("system-assets/")
                         if len(path_parts) > 1:
                             storage_path = path_parts[1]
-                            supabase_url = settings.SUPABASE_URL
-                            anon_key = settings.SUPABASE_ANON_KEY
+                            supabase_url = getattr(settings, "SUPABASE_URL", "")
+                            anon_key = getattr(settings, "SUPABASE_ANON_KEY", "")
                             
                             delete_url = f"{supabase_url}/storage/v1/object/system-assets/{storage_path}"
                             headers = {

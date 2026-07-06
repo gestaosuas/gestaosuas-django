@@ -22,7 +22,7 @@ Recriacao do Sistema de Vigilancia Socioassistencial em Django, conectado ao ban
 
 ## Banco de dados
 
-Banco unico: **PostgreSQL do Supabase Docker** (`127.0.0.1:54322`).
+Banco unico: **PostgreSQL 15 Alpine em container Docker**.
 
 Configuracao em `.env`:
 ```
@@ -30,8 +30,8 @@ DB_ENGINE=django.db.backends.postgresql
 DB_NAME=postgres
 DB_USER=postgres
 DB_PASSWORD=postgres
-DB_HOST=127.0.0.1
-DB_PORT=54322
+DB_HOST=db
+DB_PORT=5432
 ```
 
 ## Como rodar

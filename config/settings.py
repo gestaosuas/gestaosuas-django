@@ -96,7 +96,7 @@ DATABASES = {
         "USER": os.getenv("DB_USER", "postgres"),
         "PASSWORD": os.getenv("DB_PASSWORD", "postgres"),
         "HOST": os.getenv("DB_HOST", "127.0.0.1"),
-        "PORT": os.getenv("DB_PORT", "54322"),
+        "PORT": os.getenv("DB_PORT", "5432"),
         "CONN_MAX_AGE": 60,
         "OPTIONS": {"connect_timeout": 10},
     }
@@ -109,12 +109,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 AUTH_USER_MODEL = "accounts.User"
 AUTHENTICATION_BACKENDS = [
-    "apps.accounts.authentication.SupabaseAuthBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
-
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 
 LANGUAGE_CODE = "pt-br"
 TIME_ZONE = "America/Sao_Paulo"

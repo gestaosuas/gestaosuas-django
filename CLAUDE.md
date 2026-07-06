@@ -4,7 +4,7 @@
 
 Sistema de **Vigilância Socioassistencial** da Secretaria Municipal de Desenvolvimento Social de Uberlândia-MG. Coleta, consolida e visualiza dados de atendimento das unidades SUAS (CRAS, CREAS, NAICA, CEAI, SINE/CP, Pop Rua, Casa da Mulher, etc.).
 
-Origem: port de uma aplicação Next.js + Supabase para Django puro. O banco PostgreSQL foi criado pelo Supabase e continua sendo usado; o Django se conecta a ele sem gerenciar o schema.
+Origem: port de uma aplicação Next.js + Supabase para Django puro. O banco PostgreSQL foi migrado para um container Docker standalone, sem dependência do Supabase. O Django se conecta diretamente ao PostgreSQL sem gerenciar o schema.
 
 ---
 
@@ -13,8 +13,8 @@ Origem: port de uma aplicação Next.js + Supabase para Django puro. O banco Pos
 | Componente | Tecnologia |
 |---|---|
 | Backend | Django 5.2.1 / Python 3.12 |
-| Banco | PostgreSQL via Supabase (local) ou container Docker (VPS) |
-| Auth | Supabase Auth + Django ModelBackend (fallback) |
+| Banco | PostgreSQL 15 Alpine em container Docker |
+| Auth | Django ModelBackend (autenticação nativa) |
 | Static files | WhiteNoise (produção) / Django dev server (dev) |
 | WSGI | Gunicorn (produção) |
 | Container | Docker Compose |
@@ -44,7 +44,7 @@ python manage.py runserver 8001
 
 URL dev: **http://127.0.0.1:8001/**
 
-O container dev conecta ao Supabase local via `host.docker.internal:54322`.
+O container dev usa PostgreSQL 15 Alpine no serviço `db` do Docker Compose (porta 5432 interna).
 Outro projeto (`gq-app`) já ocupa a porta 8000 — nunca use 8000 para este projeto localmente.
 
 ### VPS Produção
@@ -58,8 +58,7 @@ Outro projeto (`gq-app`) já ocupa a porta 8000 — nunca use 8000 para este pro
 
 | Ambiente | Host | Porta | DB | User | Password |
 |---|---|---|---|---|---|
-| Dev local | 127.0.0.1 | 54322 | postgres | postgres | postgres |
-| Dev (Docker) | host.docker.internal | 54322 | postgres | postgres | postgres |
+| Dev (Docker) | db (serviço Docker) | 5432 | postgres | postgres | postgres |
 | VPS | db (serviço Docker) | 5432 | postgres | postgres | (via env) |
 
 **CRÍTICO — `managed = False`**: Todos os models de negócio têm `managed=False`. O Django não cria nem altera tabelas via migrations. Migrations só existem para tabelas internas do Django (sessions, admin, auth). Nunca rodar `makemigrations` em apps de negócio sem entender essa constraint.
@@ -89,9 +88,8 @@ Se o nome de uma Directorate no banco estiver corrompido (encoding errado), o co
 - `apps.core.context_processors.system_context` → injeta `system_name`, `system_reference_year`, `logo_url` em todos os templates
 - `apps.directorates.context_processors.directorates_processor` → injeta lista de diretorias para a navbar
 
-### 4. Autenticação dual
-- `SupabaseAuthBackend` (ativo apenas se `SUPABASE_URL` estiver configurado no env)
-- `ModelBackend` (fallback — único ativo no VPS e no dev sem Supabase)
+### 4. Autenticação
+- `ModelBackend` (Django nativo) — único backend ativo
 - Roles de usuário: `admin`, `diretor`, `agente`, `user` (em `Profile.role`, tabela `profiles`)
 
 ---
@@ -154,7 +152,7 @@ class MeuReport(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        managed = False           # SEMPRE — schema pertence ao Supabase
+        managed = False           # SEMPRE — schema gerenciado manualmente no PostgreSQL
         db_table = "nome_exato_da_tabela_no_banco"
         unique_together = [("directorate", "month", "year")]
 ```
@@ -251,7 +249,7 @@ docker exec -it gestaosuas_app_dev python manage.py collectstatic --noinput
 docker exec -it gestaosuas_app_dev python manage.py check
 
 # Acessar banco diretamente (dev)
-psql -h 127.0.0.1 -p 54322 -U postgres -d postgres
+docker exec -it gestaosuas_db psql -U postgres -d postgres
 
 # Build e subir dev
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
@@ -285,7 +283,5 @@ docker logs gestaosuas_app_dev -f --tail 50
 | `DB_USER` | Sim | Usuário do banco |
 | `DB_PASSWORD` | Sim | Senha do banco |
 | `DB_HOST` | Sim | Host do banco |
-| `DB_PORT` | Sim | Porta do banco (54322 dev / 5432 prod) |
-| `SUPABASE_URL` | Não | Se ausente, auth Supabase fica desativado |
-| `SUPABASE_ANON_KEY` | Não | Chave pública Supabase |
+| `DB_PORT` | Sim | Porta do banco (5432) |
 | `CSRF_TRUSTED_ORIGINS` | Sim (prod) | Domínios confiáveis para CSRF |
