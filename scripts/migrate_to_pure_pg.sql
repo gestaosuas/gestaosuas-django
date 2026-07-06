@@ -101,7 +101,7 @@ BEGIN
     END IF;
 END $$;
 
-RAISE NOTICE 'Passo 2 OK: FK de profiles/submissions para auth.users removida.';
+DO $$ BEGIN RAISE NOTICE 'Passo 2 OK: FK de profiles/submissions para auth.users removida.'; END $$;
 
 
 -- ============================================================
@@ -143,7 +143,7 @@ BEGIN
     END LOOP;
 END $$;
 
-RAISE NOTICE 'Passo 3 OK: RLS desabilitado em todas as tabelas de negócio.';
+DO $$ BEGIN RAISE NOTICE 'Passo 3 OK: RLS desabilitado em todas as tabelas de negócio.'; END $$;
 
 
 -- ============================================================
@@ -169,7 +169,7 @@ BEGIN
     END LOOP;
 END $$;
 
-RAISE NOTICE 'Passo 4 OK: todas as políticas RLS removidas.';
+DO $$ BEGIN RAISE NOTICE 'Passo 4 OK: todas as políticas RLS removidas.'; END $$;
 
 
 -- ============================================================
@@ -184,7 +184,7 @@ DROP FUNCTION IF EXISTS auth.role() CASCADE;
 DROP FUNCTION IF EXISTS auth.email() CASCADE;
 DROP FUNCTION IF EXISTS auth.jwt() CASCADE;
 
-RAISE NOTICE 'Passo 5 OK: funções Supabase removidas (se existiam).';
+DO $$ BEGIN RAISE NOTICE 'Passo 5 OK: funções Supabase removidas (se existiam).'; END $$;
 
 
 -- ============================================================
@@ -205,7 +205,7 @@ BEGIN
             WHERE table_schema = 'public' AND table_name = tbl
         ) THEN
             -- Descobrir o nome atual da constraint UNIQUE(month, year)
-            SELECT constraint_name INTO old_constraint
+            SELECT tc.constraint_name INTO old_constraint
             FROM information_schema.table_constraints tc
             JOIN information_schema.constraint_column_usage ccu
               ON tc.constraint_name = ccu.constraint_name
@@ -229,7 +229,7 @@ BEGIN
     END LOOP;
 END $$;
 
-RAISE NOTICE 'Passo 6 OK: constraints UNIQUE de SINE/Qualificação corrigidas.';
+DO $$ BEGIN RAISE NOTICE 'Passo 6 OK: constraints UNIQUE de SINE/Qualificação corrigidas.'; END $$;
 
 
 -- ============================================================
