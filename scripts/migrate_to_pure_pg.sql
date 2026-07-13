@@ -360,10 +360,46 @@ END $$;
 
 
 -- ============================================================
--- PASSO 9: Verificação final
+-- PASSO 9: Corrigir tipo de beneficios_reports.directorate_id (text → uuid)
+-- ============================================================
+-- Bug de origem no schema Supabase (presente tanto no dev quanto na VPS,
+-- não é drift introduzido por nós): ao contrário de todas as outras tabelas
+-- de relatório, directorate_id foi criada como `text`, sem FK nenhuma.
+-- Django sempre filtra por UUID, então qualquer acesso a /beneficios/painel/
+-- quebra com "operator does not exist: text = uuid".
+
+DO $$
+DECLARE
+    orphan_count INTEGER;
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'beneficios_reports' AND column_name = 'directorate_id' AND data_type = 'text'
+    ) THEN
+        SELECT count(*) INTO orphan_count
+        FROM beneficios_reports
+        WHERE directorate_id IS NOT NULL AND directorate_id !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
+
+        IF orphan_count > 0 THEN
+            RAISE WARNING 'Passo 9: % linha(s) em beneficios_reports.directorate_id não parecem UUID — coluna NÃO convertida, resolver manualmente.', orphan_count;
+        ELSE
+            ALTER TABLE beneficios_reports ALTER COLUMN directorate_id TYPE uuid USING directorate_id::uuid;
+            ALTER TABLE beneficios_reports
+                ADD CONSTRAINT beneficios_reports_directorate_id_fkey
+                FOREIGN KEY (directorate_id) REFERENCES directorates(id);
+            RAISE NOTICE 'Passo 9 OK: beneficios_reports.directorate_id convertida para uuid, com FK para directorates.';
+        END IF;
+    ELSE
+        RAISE NOTICE 'Passo 9 PULADO: beneficios_reports.directorate_id já não é text (coluna já corrigida ou não existe).';
+    END IF;
+END $$;
+
+
+-- ============================================================
+-- PASSO 10: Verificação final
 -- ============================================================
 
--- 9a. Profiles sem accounts_user correspondente (deve retornar 0 linhas)
+-- 10a. Profiles sem accounts_user correspondente (deve retornar 0 linhas)
 DO $$
 DECLARE
     orphan_count INT;
@@ -376,11 +412,11 @@ BEGIN
     IF orphan_count > 0 THEN
         RAISE WARNING 'ATENÇÃO: % profiles sem accounts_user! Verificar manualmente.', orphan_count;
     ELSE
-        RAISE NOTICE 'Passo 9a OK: todos os profiles têm accounts_user correspondente.';
+        RAISE NOTICE 'Passo 10a OK: todos os profiles têm accounts_user correspondente.';
     END IF;
 END $$;
 
--- 9b. Contagens para conferência
+-- 10b. Contagens para conferência
 SELECT
     (SELECT COUNT(*) FROM profiles) AS total_profiles,
     (SELECT COUNT(*) FROM accounts_user) AS total_accounts_users,
