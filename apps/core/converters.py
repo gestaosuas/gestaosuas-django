@@ -1,4 +1,5 @@
 import uuid
+from django.core.exceptions import ValidationError
 from apps.directorates.models import Directorate
 
 class DirectorateSlugConverter:
@@ -36,7 +37,7 @@ class DirectorateSlugConverter:
                 d = Directorate.objects.filter(pk=value).first()
                 if d:
                     return d.slug
-            except (ValueError, TypeError):
+            except (ValueError, TypeError, ValidationError):
                 pass
         
         return str(value)

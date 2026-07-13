@@ -1,6 +1,6 @@
 import math
 import uuid
-from datetime import date, datetime
+from datetime import date
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -8,6 +8,7 @@ from django.http import Http404
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.http import JsonResponse
+from django.utils import timezone
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
 from apps.core.mixins import TvTemplateMixin
 from django.views.generic import DetailView, FormView, TemplateView, View
@@ -249,10 +250,10 @@ class CreasIdosoFormView(CreasBaseMixin, FormView):
             r = CreasIdosoReport.objects.get(directorate=d, month=month_val, year=year_val)
         except CreasIdosoReport.DoesNotExist:
             fb_user = self.request.user.id
-            r = CreasIdosoReport(directorate=d, month=month_val, year=year_val, created_by=fb_user, created_at=datetime.now())
+            r = CreasIdosoReport(directorate=d, month=month_val, year=year_val, created_by=fb_user, created_at=timezone.now())
         for k, v in form.cleaned_data.items():
             setattr(r, k, v)
-        r.updated_at = datetime.now()
+        r.updated_at = timezone.now()
         r.save()
         messages.success(self.request, "Dados CREAS Idoso salvos.")
         return redirect(reverse("creasidoso:home", kwargs={"pk": d.pk}) + f"?year={year_val}")
@@ -291,10 +292,10 @@ class CreasPcdFormView(CreasBaseMixin, FormView):
             r = CreasPcdReport.objects.get(directorate=d, month=month_val, year=year_val)
         except CreasPcdReport.DoesNotExist:
             fb_user = self.request.user.id
-            r = CreasPcdReport(directorate=d, month=month_val, year=year_val, created_by=fb_user, created_at=datetime.now())
+            r = CreasPcdReport(directorate=d, month=month_val, year=year_val, created_by=fb_user, created_at=timezone.now())
         for k, v in form.cleaned_data.items():
             setattr(r, k, v)
-        r.updated_at = datetime.now()
+        r.updated_at = timezone.now()
         r.save()
         messages.success(self.request, "Dados CREAS PCD salvos.")
         return redirect(reverse("creasidoso:home", kwargs={"pk": d.pk}) + f"?year={year_val}")
@@ -417,10 +418,16 @@ class CreasSharedQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
             report, _ = self.model.objects.get_or_create(
                 directorate=directorate,
                 month=month,
-                year=year
+                year=year,
+                defaults={
+                    "created_by": request.user.id,
+                    "created_at": timezone.now(),
+                    "updated_at": timezone.now(),
+                },
             )
 
         setattr(report, key, value)
+        report.updated_at = timezone.now()
         report.save()
         return JsonResponse({"status": "success", "value": value, "sub_id": report.id})
 

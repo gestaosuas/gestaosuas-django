@@ -1,0 +1,139 @@
+import uuid
+
+from django.test import TestCase
+from django.urls import reverse
+
+from apps.accounts.models import Profile, User
+from apps.directorates.models import Directorate
+
+from .models import CreasProtetivoReport
+
+
+def make_user(email=None, password="senha12345", role=Profile.ROLE_ADMIN, full_name="Usuario Teste"):
+    email = email or f"user-{uuid.uuid4().hex[:8]}@example.com"
+    user = User.objects.create_user(username=email, email=email, password=password)
+    profile = Profile.objects.create(user=user, full_name=full_name, role=role)
+    return user, profile
+
+
+def get_existing_admin():
+    """
+    Retorna um Profile admin ja existente no banco de dev.
+
+    Nao usamos um usuario recem-criado para os testes que gravam user_id: a coluna
+    creas_protetivo_reports.user_id ainda tem uma FK legada apontando para o schema
+    Supabase residual `auth.users` (nao para accounts_user) neste banco de dev —
+    confirmado via pg_constraint. O id de um User Django recem criado nao existe
+    em auth.users e viola essa constraint com IntegrityError. Um admin ja migrado
+    do Supabase satisfaz a FK.
+    """
+    return Profile.objects.filter(role=Profile.ROLE_ADMIN).select_related("user").first()
+
+
+class CreasSharedQuickEditViewTests(TestCase):
+    """
+    Cobre o comportamento alterado em CreasSharedQuickEditView (usada tanto por
+    CreasProtetivoQuickEditView quanto por CreasSocioeducativoQuickEditView):
+    - get_or_create agora recebe defaults={"user_id", "created_by"} ao criar um
+      relatorio novo.
+    - created_by/user_id continuam sendo sempre sobrescritos com o usuario
+      autenticado apos o get_or_create, inclusive em relatorios ja existentes.
+
+    A view resolve a diretoria internamente por
+    Directorate.objects.filter(name__icontains="Proteção Especial"), sem aceitar
+    id explicito — por isso os testes usam a diretoria real ja existente no banco
+    de dev, com ano/mes exclusivos para nao colidir com dados reais.
+    """
+
+    def setUp(self):
+        self.admin_profile = get_existing_admin()
+        self.assertIsNotNone(self.admin_profile, "Nenhum profile admin encontrado no banco de dev — pré-requisito do teste.")
+        self.admin_user = self.admin_profile.user
+        self.directorate = Directorate.objects.filter(name__icontains="Proteção Especial").first()
+        self.assertIsNotNone(
+            self.directorate,
+            "Diretoria 'Proteção Especial' não encontrada no banco de dev — pré-requisito do teste.",
+        )
+        self.url = reverse("protecaoespecial:quick-edit-protetivo")
+
+    def _login_admin(self):
+        self.client.force_login(self.admin_user)
+
+    def test_anonymous_user_redirected_to_login(self):
+        response = self.client.post(self.url, {
+            "key": "fam_admitidas",
+            "value": "3",
+            "month": "1",
+            "year": "2031",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("accounts:login"), response.url)
+
+    def test_non_admin_user_forbidden(self):
+        regular_email = f"regular-{uuid.uuid4().hex[:8]}@example.com"
+        password = "senha12345"
+        make_user(email=regular_email, password=password, role=Profile.ROLE_USER)
+        self.client.login(username=regular_email, password=password)
+        response = self.client.post(self.url, {
+            "key": "fam_admitidas",
+            "value": "3",
+            "month": "1",
+            "year": "2031",
+        })
+        self.assertIn(response.status_code, (302, 403))
+
+    def test_creates_new_report_with_user_id_and_created_by_populated(self):
+        self._login_admin()
+        response = self.client.post(self.url, {
+            "key": "fam_admitidas",
+            "value": "3",
+            "month": "1",
+            "year": "2031",
+        })
+        self.assertEqual(response.status_code, 200)
+        report = CreasProtetivoReport.objects.get(directorate=self.directorate, month=1, year=2031)
+        self.assertEqual(report.fam_admitidas, 3)
+        self.assertEqual(report.user_id, self.admin_user.pk)
+        self.assertEqual(report.created_by, self.admin_user.email)
+
+    def test_updating_existing_report_via_sub_id_overwrites_created_by(self):
+        self._login_admin()
+        existing = CreasProtetivoReport.objects.create(
+            directorate=self.directorate,
+            month=2,
+            year=2031,
+            user_id=self.admin_user.pk,
+            created_by="alguem-antigo@example.com",
+            fam_admitidas=1,
+        )
+        response = self.client.post(self.url, {
+            "sub_id": str(existing.id),
+            "key": "fam_admitidas",
+            "value": "9",
+            "month": "2",
+            "year": "2031",
+        })
+        self.assertEqual(response.status_code, 200)
+        existing.refresh_from_db()
+        self.assertEqual(existing.fam_admitidas, 9)
+        self.assertEqual(existing.user_id, self.admin_user.pk)
+        self.assertEqual(existing.created_by, self.admin_user.email)
+
+
+class ProtecaoEspecialHomeViewSmokeTests(TestCase):
+    def setUp(self):
+        self.password = "senha12345"
+        self.admin_email = f"admin-{uuid.uuid4().hex[:8]}@example.com"
+        self.admin_user, self.admin_profile = make_user(email=self.admin_email, password=self.password)
+        self.directorate = Directorate.objects.filter(name__icontains="Proteção Especial").first()
+        self.url = reverse("protecaoespecial:home", kwargs={"pk": self.directorate.pk})
+
+    def test_anonymous_user_redirected_to_login(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("accounts:login"), response.url)
+
+    def test_admin_user_can_load_home(self):
+        self.client.login(username=self.admin_email, password=self.password)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)

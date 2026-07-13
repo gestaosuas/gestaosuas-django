@@ -26,7 +26,7 @@ Origem: port de uma aplicação Next.js + Supabase para Django puro. O banco Pos
 
 ### Dev local (porta 8001)
 ```sh
-# Subir com hot-reload automático
+# Subir (⚠️ NÃO tem hot-reload de código — ver nota abaixo)
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 
 # Parar
@@ -38,19 +38,34 @@ docker logs gestaosuas_app_dev -f
 # Shell Django
 docker exec -it gestaosuas_app_dev python manage.py shell
 
-# Gerenciar sem Docker (usa .env local, porta 8001 para não conflitar)
+# Gerenciar sem Docker (usa .env local + .deps/ vendorizado, porta 8001 para não conflitar)
 python manage.py runserver 8001
 ```
 
 URL dev: **http://127.0.0.1:8001/**
 
-O container dev usa PostgreSQL 15 Alpine no serviço `db` do Docker Compose (porta 5432 interna).
+O container dev usa PostgreSQL 15 Alpine no serviço `db` do Docker Compose (porta 5432 interna, exposta em **5433** no host só em dev — permite `manage.py` rodar fora do Docker apontando `DB_HOST=127.0.0.1 DB_PORT=5433`).
 Outro projeto (`gq-app`) já ocupa a porta 8000 — nunca use 8000 para este projeto localmente.
 
+**`docker-compose.dev.yml` NÃO monta o código-fonte como volume** (só `static_volume`/`media_volume`, herdados do compose base) — o comentário "hot-reload automático" que existia aqui antes era enganoso. `DEBUG=1` liga o autoreload do `runserver`, mas ele só vê os arquivos que já estão *dentro da imagem* (copiados no build). Qualquer edição no host só chega ao container depois de `up -d --build` de novo. Para iterar rápido sem rebuildar, rode `python manage.py runserver 8001` direto no host (usa `.env` + `.deps/` vendorizado, ver seção Testes).
+
+Além disso, como o compose faz merge por concatenação de listas, o serviço `app` do dev herda a porta `8080:8000` do compose base (mapeada para o serviço de produção) **e** adiciona `8001:8000` — ou seja, o container `gestaosuas_app_dev` também ocupa a porta 8080 localmente. Não é um problema em uso normal (só um container de app roda por vez localmente), mas explica confusão se algum dia tentar subir o compose de produção (`docker-compose.yml` sozinho) em paralelo ao dev na mesma máquina — vai dar conflito de porta 8080.
+
 ### VPS Produção
-- IP: `100.76.30.36` (ZimaOS NAS, acesso via Tailscale)
-- URL pública: **https://servidor-qualificacao.tailbeb7d5.ts.net:8443**
-- Banco: container `gestaosuas_db` no Docker do VPS
+
+- IP Tailscale: `100.76.30.36` (NAS CasaOS, não é uma VPS tradicional — `$HOME` do usuário SSH é `/DATA`, pertence a `root`, sem escrita direta)
+- Projeto Django em: `/DATA/AppData/Gestaosuas-django` (repo git próprio, remote `origin` = `https://github.com/rdssystems/Gestaosuas-django.git`, mas **sem credenciais de push configuradas na VPS nem localmente** com a conta atual — deploys são feitos copiando arquivos via SFTP + commit local na VPS, não via `git pull`)
+- URL pública (Tailscale Funnel): **https://servidor-qualificacao.tailbeb7d5.ts.net:8443** → proxy para `127.0.0.1:8080` (container `gestaosuas_app`)
+- Outro app roda na raiz do mesmo domínio (porta 443 → `127.0.0.1:8000`, container `gq-app`, projeto Gestao-Profissional) — **não mexer nessa rota ao alterar a do gestaosuas**
+- Banco: container `gestaosuas_db` (postgres:15-alpine), dados no volume nomeado `postgres_data` (reaproveitado entre rebuilds — não recriar/renomear o compose project ou perde o volume)
+- Credenciais (SSH, banco, Supabase): ver `.env.local` na raiz deste repo (gitignored, nunca commitado)
+
+**Gotchas operacionais da VPS:**
+- `docker` do usuário `klismanrds` dá erro `permission denied` ao ler `/DATA/.docker/config.json` (pertence a root). Rodar sempre com `DOCKER_CONFIG=/tmp/dockercfg` (criar o dir antes) para o subcomando `docker compose` funcionar — sem isso, `docker compose` nem é reconhecido.
+- `tailscale serve`/`tailscale funnel` rodando sem a flag `--bg`: a rota fica "foreground", atrelada à conexão SSH que criou — some assim que a sessão/canal fecha. **Sempre usar `--bg`** para persistir.
+- Um `tailscale serve reset` limpa TODAS as rotas configuradas (inclusive as de outros apps expostos no mesmo domínio/Tailscale). Nunca rodar reset sem re-aplicar imediatamente todas as rotas existentes (checar `tailscale serve status` antes).
+- Reiniciar o container `tailscale` (`docker restart tailscale`) derruba a própria conectividade Tailscale por alguns segundos — inclusive a sessão SSH em uso, se ela também passar pelo Tailscale.
+- Depois de reset/restart do tailscale, as rotas voltam como "tailnet only" — é preciso reabilitar o Funnel (acesso público) explicitamente com `tailscale funnel --bg --https=<porta> http://127.0.0.1:<porta-local>`.
 
 ---
 
@@ -62,6 +77,31 @@ Outro projeto (`gq-app`) já ocupa a porta 8000 — nunca use 8000 para este pro
 | VPS | db (serviço Docker) | 5432 | postgres | postgres | (via env) |
 
 **CRÍTICO — `managed = False`**: Todos os models de negócio têm `managed=False`. O Django não cria nem altera tabelas via migrations. Migrations só existem para tabelas internas do Django (sessions, admin, auth). Nunca rodar `makemigrations` em apps de negócio sem entender essa constraint.
+
+---
+
+## Testes
+
+Antes desta sessão não havia nenhum teste real no projeto (só o boilerplate padrão em `apps/ceai/tests.py`).
+
+**Por que `manage.py test` sozinho não funciona**: por padrão o test runner do Django cria um banco de testes vazio e roda as migrations nele. Como os models de negócio são `managed=False`, as migrations desses apps não emitem `CREATE TABLE` (são só "state") — então o banco de testes vazio nunca teria as tabelas de negócio, e qualquer teste que toque nesses models falha com `relation "..." does not exist`.
+
+**Solução aplicada** em `config/settings.py`: `DATABASES["default"]["TEST"] = {"NAME": os.getenv("DB_NAME", "postgres")}`, ou seja, aponta o "banco de testes" para o próprio banco (com schema real). Combinado com a flag `--keepdb`, o Django não tenta criar/destruir um banco novo — reusa o banco existente como está. Isso é seguro porque `TestCase` (não `TransactionTestCase`) envolve cada teste numa transação com rollback automático: nada é persistido de fato, mesmo rodando contra o banco com dados reais.
+
+```sh
+# Rodar testes de um app específico
+DB_HOST=127.0.0.1 DB_PORT=5433 python manage.py test apps.<app> --keepdb -v 2
+
+# Rodar toda a suíte
+DB_HOST=127.0.0.1 DB_PORT=5433 python manage.py test --keepdb
+```
+
+Rodar local (fora do Docker, ver nota de hot-reload acima) é mais rápido para iterar — dentro do container `gestaosuas_app_dev` funcionaria igual, mas exige rebuild a cada mudança de código.
+
+Regras para escrever testes neste projeto:
+- Use `django.test.TestCase`, nunca `TransactionTestCase`, para manter o isolamento via rollback contra o banco real.
+- Não crie/edite/apague linhas de tabelas "singleton" compartilhadas (`directorates`, `settings`) — prefira ler registros existentes (`Directorate.objects.first()` etc.) ou criar registros novos com identificadores únicos por teste.
+- Nunca rodar com `--keepdb` omitido, e nunca sem confirmar que `DB_HOST`/`DB_PORT` apontam para o banco de **dev** (nunca para produção).
 
 ---
 
@@ -260,6 +300,37 @@ docker logs gestaosuas_app_dev -f --tail 50
 
 ---
 
+## Migração Supabase → PostgreSQL puro (status)
+
+Script: `scripts/migrate_to_pure_pg.sql` (idempotente, projetado para rodar "no banco do VPS e no banco de dev local" — reaproveitável). Pré-requisito: `python manage.py migrate` já ter rodado (cria `accounts_user`). Fazer backup (`pg_dump -Fc`) antes de rodar.
+
+- **Concluído e aplicado na VPS** (banco `gestaosuas_prod`): dump fresco puxado direto do Supabase de produção (projeto `xvyaaavcbxskmunmhwcg`) e restaurado, depois script de migração rodado em cima dele. Resultado: usuários copiados de `auth.users` → `accounts_user` (50/50, sem órfãos), FKs para `auth.users` removidas, RLS desabilitado, políticas RLS removidas, funções `auth.*`/`is_admin()` dropadas, constraint UNIQUE de `sine_reports`/`qualificacao_reports` corrigida para incluir `directorate_id`. App verificado funcionando (HTTP 200, login, 50 usuários Django).
+- **Como puxar um dump novo do Supabase de produção** (se precisar repetir):
+  - Conexão direta (`db.<ref>.supabase.co:5432`) só resolve em **IPv6** — não roteável a partir da VPS ("Network unreachable"). Usar o **connection pooler** (modal "Connect" no painel Supabase → aba "Session pooler", porta **5432**, não a Transaction/6543). Host confirmado para este projeto: `aws-0-us-west-2.pooler.supabase.com`, user `postgres.xvyaaavcbxskmunmhwcg` (ver `.env.local`).
+  - Servidor Supabase é **PostgreSQL 17.6** — `pg_dump`/`pg_restore` do container `gestaosuas_db` (postgres:15-alpine) são incompatíveis (erro "server version mismatch" / "unsupported version in file header"). Usar um container temporário `postgres:17-alpine` (`docker run --rm --network gestaosuas-django_default -v /DATA/AppData/Gestaosuas-django:/out ...`) para dump E restore.
+  - Restaurar com `pg_restore --clean --if-exists --no-owner --no-privileges` — dá ~70 erros esperados de `CREATE POLICY ... TO authenticated` (role Supabase que não existe aqui); ignorar, o script de migração dropa as políticas de qualquer forma depois.
+  - Depois de restaurar, **sempre re-rodar `migrate_to_pure_pg.sql`** — o restore recria o schema original do Supabase (RLS habilitado, FKs, policies), desfazendo a limpeza anterior.
+- **Banco ainda NÃO está fisicamente limpo**: os schemas de origem Supabase seguem no banco da VPS como resíduo inerte (não usados pela app): `auth`, `storage`, `realtime`, `extensions`, `supabase_functions`, `graphql`, `graphql_public`, `vault`, `pgbouncer`, `supabase_migrations`, `_realtime`. Dropar com `DROP SCHEMA <nome> CASCADE` quando quiser fazer a limpeza definitiva (nenhuma urgência — são inertes).
+- `restaurar-banco.sh` existente tem `DB_NAME`/`DB_USER` hardcoded como `postgres`/`postgres` — o banco real é `gestaosuas_prod`/`gestaosuas_user` (`.env`). Ajustar antes de usar esse script.
+- Correções feitas no script original (bugs de sintaxe, não eram assim antes desta sessão): `RAISE NOTICE` solto fora de bloco `DO $$...$$` não é válido em SQL puro (só em PL/pgSQL) — precisou envolver em `DO $$ BEGIN ... END $$;`; `constraint_name` ambíguo no JOIN do Passo 6 — precisou qualificar como `tc.constraint_name`.
+- Também sincronizadas migrations Django que já existiam aplicadas na VPS mas não commitadas no repo: `apps/directorates/migrations/0002_alter_formdelegation_options.py`, `apps/naica/migrations/0001_initial.py`, `apps/sinecp/migrations/0001_initial.py`.
+- Backups de segurança ficam em `/DATA/AppData/Gestaosuas-django/*.dump` na VPS (não versionados).
+
+### Dump fresco puxado e restaurado no dev local (2026-07-13) — drift de schema encontrado
+
+Repetiu-se o processo acima, mas contra o banco de **dev local** (`gestaosuas_db`), como teste antes de decidir o cutover real da VPS (que ainda não aconteceu — combinado com o usuário fazer isso "outro momento", começando com banco limpo). Backup de segurança do estado anterior salvo em `pre_supabase_restore_backup.dump` (gitignored, na raiz do repo).
+
+Descoberta importante: **o Postgres local vinha recebendo alterações manuais de schema que nunca foram propagadas de volta pro Supabase.** Ao restaurar um dump 100% fresco do Supabase (depois de derrubar TODOS os schemas residuais — `auth`, `storage`, `realtime`, `vault`, `graphql`, `graphql_public`, `extensions`, `supabase_migrations`, `pgbouncer` — com `DROP SCHEMA ... CASCADE`, o que elimina os ~300+ erros de "already exists" que aparecem se restaurar em cima de resíduo antigo), várias divergências apareceram:
+
+- **6 tabelas inteiras que existem no Postgres local mas não no Supabase**: `casa_da_mulher_reports`, `diversidade_reports`, `nucleo_diversidade_reports` (app `casamulher`), `creas_protetivo_reports` (app `protecaoespecial`), `monitorings_genericmonitoringreport` (app `monitoramento`) — essas 5 quebram os apps correspondentes até serem recriadas manualmente (managed=False, `migrate` não cria). A sexta, `protecao_especial_reports`, não é referenciada por nenhum model/view atual — resíduo morto, sem impacto. Ficou pendente recriar as 5 tabelas ativas (usuário optou por "deixar ausente por enquanto").
+- **`visits` sem a coluna `visit_time`** (Django exige via `models.TimeField()`, sem `null=True`, e usa no `ordering`) — quebrava toda leitura/escrita de Visita técnica. Corrigido no dev com `ALTER TABLE visits ADD COLUMN visit_time time without time zone` (nullable, igual à definição original).
+- **`cras_reports` sem a coluna `rma_url`** (usada em `apps/cras/views.py` para upload/leitura do anexo RMA) — corrigido com `ALTER TABLE cras_reports ADD COLUMN rma_url text`.
+- **`visits` ganhou uma coluna nova no Supabase que o Django não conhece**: `work_plan_id` (FK pra `work_plans`) — dado existe no banco, sem campo correspondente no model. Não quebra nada, mas é uma feature (vincular visita a plano de trabalho) presente no banco e não exposta na aplicação. Não mexido.
+
+**Lição para o cutover real da VPS**: repetir esse mesmo processo de comparação de schema (dump antigo vs. dump novo do Supabase) antes de ir para produção, para não descobrir esses gaps só quando um usuário real bater neles. Comando usado para comparar: restaurar os dois dumps em bancos separados e comparar `information_schema.columns` via `comm` (Postgres não suporta cross-database query direto).
+
+---
+
 ## Débito Técnico Conhecido
 
 | # | Problema | Impacto | Prioridade |
@@ -268,6 +339,9 @@ docker logs gestaosuas_app_dev -f --tail 50
 | 2 | `ProfileDirectorate.profile` usa `ForeignKey(unique=True)` em vez de `OneToOneField` | Warning Django não-crítico | Baixa |
 | 3 | Colunas JSON de `visits` (identificacao, assinaturas, etc.) podem ter dupla codificação UTF-8 | Texto com acentos corrompido em detalhes de visita | Média |
 | 4 | `strip_accents` e funções utilitárias duplicadas em `core/utils.py` e `monitoramento/views.py` | Inconsistência | Baixa |
+| 5 | **[Parcialmente corrigido]** Colunas `user_id`/`created_by` de quase todas as tabelas de relatório tinham FK física para o schema Supabase residual `auth.users` em vez de `accounts_user` — achado por testes escritos em 2026-07. `scripts/migrate_to_pure_pg.sql` (Passo 7) repontou todas as 18 tabelas para `accounts_user`; **aplicado no banco de dev**, ainda **pendente aplicar na VPS de produção** | Até rodar o script na VPS, qualquer usuário criado lá depois da migração original recebe `IntegrityError` ao salvar relatórios/work plans/OSCs/visitas | **Alta — aplicar na VPS** |
+
+Achados e corrigidos na mesma sessão (2026-07-13): rota `quick-edit` do NAICA/CRAS inacessível (ordem de URL), `IntegrityError` ao criar relatório novo via quick-edit do CREAS Idoso/PCD (`updated_at` faltando no `get_or_create`), 500 para admin em diretoria inexistente (query desprotegida em 6 List/CreateViews), drift de nullability em `naica_reports.user_id`, `ValidationError` não capturada em `DirectorateSlugConverter.to_url()`, tipo de coluna incompatível em `creas_pop_rua_reports.created_by` (agora `uuid` com FK), e toast de sucesso+erro simultâneo em `UserPermissionsView`. Ver `git log` para detalhes — não repetidos aqui pois já não são débito técnico atual.
 
 ---
 

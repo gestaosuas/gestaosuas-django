@@ -99,6 +99,12 @@ DATABASES = {
         "PORT": os.getenv("DB_PORT", "5432"),
         "CONN_MAX_AGE": 60,
         "OPTIONS": {"connect_timeout": 10},
+        # Models de negócio são managed=False (schema não vem de migrations),
+        # então um banco de testes vazio nunca teria essas tabelas. Apontar o
+        # TEST NAME para o próprio banco e rodar `test --keepdb` faz os testes
+        # usarem o schema real; TestCase (transação com rollback) garante que
+        # nada é persistido de fato.
+        "TEST": {"NAME": os.getenv("DB_NAME", "postgres")},
     }
 }
 
@@ -110,6 +116,19 @@ AUTH_PASSWORD_VALIDATORS = [
 AUTH_USER_MODEL = "accounts.User"
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
+]
+
+# BCryptPasswordHasher habilitado para verificar as senhas herdadas do
+# Supabase Auth (bcrypt puro, ex.: "$2a$10$..."), migradas como
+# "bcrypt$<hash>". Não é o hasher padrão para senhas novas (PBKDF2 continua
+# sendo o primeiro da lista), só permite validar o hash legado no login.
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+    "django.contrib.auth.hashers.ScryptPasswordHasher",
+    "django.contrib.auth.hashers.BCryptPasswordHasher",
 ]
 
 LANGUAGE_CODE = "pt-br"
@@ -138,6 +157,11 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 _csrf_origins = os.getenv("CSRF_TRUSTED_ORIGINS", "")
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(",") if o.strip()]
+
+# Tailscale Funnel/Serve termina o TLS e encaminha para o Gunicorn em HTTP puro.
+# Sem isso, request.is_secure() sempre retorna False atrás do proxy, quebrando
+# a verificação de Origin do CSRF e os cookies com Secure=True.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 CACHES = {
     "default": {

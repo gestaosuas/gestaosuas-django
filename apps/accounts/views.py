@@ -1,9 +1,10 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.views.generic import ListView, UpdateView
-from django.shortcuts import redirect, get_object_or_404
+from django.views.generic import ListView, UpdateView, View
+from django.shortcuts import redirect, get_object_or_404, render
 from django.urls import reverse_lazy
 from django.contrib import messages
-from .models import Profile, ProfileDirectorate
+from django.utils import timezone
+from .models import Profile, ProfileDirectorate, User
 from apps.directorates.models import Directorate
 
 
@@ -29,13 +30,61 @@ class UserListView(AdminRequiredMixin, ListView):
         return queryset
 
 
+class UserCreateView(AdminRequiredMixin, View):
+    template_name = "accounts/user_create.html"
+
+    def get_context(self, form_data=None):
+        return {
+            "all_directorates": Directorate.objects.all().order_by("name"),
+            "role_choices": Profile.ROLE_CHOICES,
+            "form_data": form_data or {},
+        }
+
+    def get(self, request, *args, **kwargs):
+        return render(request, self.template_name, self.get_context())
+
+    def post(self, request, *args, **kwargs):
+        full_name = request.POST.get("full_name", "").strip()
+        email = request.POST.get("email", "").strip().lower()
+        password = request.POST.get("password", "")
+        role = request.POST.get("role") or Profile.ROLE_USER
+        primary_directorate_id = request.POST.get("primary_directorate") or None
+
+        errors = []
+        if not full_name:
+            errors.append("Nome completo é obrigatório.")
+        if not email:
+            errors.append("E-mail é obrigatório.")
+        elif User.objects.filter(username=email).exists():
+            errors.append("Já existe um usuário cadastrado com este e-mail.")
+        if len(password) < 8:
+            errors.append("A senha deve ter pelo menos 8 caracteres.")
+        if role not in dict(Profile.ROLE_CHOICES):
+            errors.append("Nível de acesso inválido.")
+
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+            return render(request, self.template_name, self.get_context(form_data=request.POST))
+
+        user = User.objects.create_user(username=email, email=email, password=password)
+        profile = Profile.objects.create(
+            user=user,
+            full_name=full_name,
+            role=role,
+            primary_directorate_id=primary_directorate_id,
+            created_at=timezone.now(),
+        )
+        messages.success(request, f"Usuário {full_name} criado com sucesso!")
+        return redirect("accounts:user_permissions", pk=profile.pk)
+
+
 class UserPermissionsView(AdminRequiredMixin, UpdateView):
     model = Profile
     template_name = "accounts/user_permissions.html"
     fields = ['full_name', 'role', 'primary_directorate']
     
     def get_success_url(self):
-        messages.success(self.request, f"Permissões de {self.object.full_name} atualizadas!")
         return reverse_lazy('accounts:user_list')
 
     def get_context_data(self, **kwargs):
@@ -69,7 +118,29 @@ class UserPermissionsView(AdminRequiredMixin, UpdateView):
         
         if form.is_valid():
             profile = form.save()
-            
+            has_error = False
+
+            # Handle email change (username is kept in sync with e-mail for login)
+            new_email = request.POST.get("email", "").strip().lower()
+            if new_email and new_email != profile.user.email:
+                if User.objects.exclude(pk=profile.user.pk).filter(username=new_email).exists():
+                    messages.error(request, "Já existe outro usuário com este e-mail. O e-mail não foi alterado.")
+                    has_error = True
+                else:
+                    profile.user.email = new_email
+                    profile.user.username = new_email
+                    profile.user.save(update_fields=["email", "username"])
+
+            # Handle password change (optional — blank keeps current password)
+            new_password = request.POST.get("new_password", "").strip()
+            if new_password:
+                if len(new_password) < 8:
+                    messages.error(request, "A senha deve ter pelo menos 8 caracteres. As demais alterações foram salvas.")
+                    has_error = True
+                else:
+                    profile.user.set_password(new_password)
+                    profile.user.save(update_fields=["password"])
+
             # Handle profile_directorates (additional access)
             selected_directorates = request.POST.getlist('directorates')
             
@@ -99,7 +170,9 @@ class UserPermissionsView(AdminRequiredMixin, UpdateView):
                     directorate_id=dir_id,
                     allowed_units=allowed_units
                 )
-            
+
+            if not has_error:
+                messages.success(request, f"Permissões de {profile.full_name} atualizadas!")
             return self.form_valid(form)
         else:
             return self.form_invalid(form)

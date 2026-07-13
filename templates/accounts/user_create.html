@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Novo Usuário | {{ system_name }}{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+
+    <main class="dashboard-main">
+        <header class="dashboard-header">
+            <div class="header-content">
+                <a href="{% url 'accounts:user_list' %}" class="back-link">
+                    <i data-lucide="arrow-left"></i>
+                    Voltar para lista
+                </a>
+                <h1>Novo Usuário</h1>
+                <p class="header-description">Cadastre um novo membro e defina seu acesso inicial.</p>
+            </div>
+        </header>
+
+        <section class="permissions-section animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <form method="post" class="permissions-form">
+                {% csrf_token %}
+
+                <div class="form-card main-settings" style="max-width: 520px;">
+                    <h3>Dados de Acesso</h3>
+
+                    <div class="form-group">
+                        <label for="id_full_name">Nome Completo</label>
+                        <input type="text" name="full_name" id="id_full_name" value="{{ form_data.full_name|default:'' }}" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="id_email">E-mail</label>
+                        <input type="email" name="email" id="id_email" value="{{ form_data.email|default:'' }}" class="form-control" required>
+                        <small class="field-help">O e-mail é usado para fazer login no sistema.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="id_password">Senha Provisória</label>
+                        <input type="password" name="password" id="id_password" class="form-control" minlength="8" required autocomplete="new-password">
+                        <small class="field-help">Mínimo de 8 caracteres. O usuário pode trocar depois.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="id_role">Nível de Acesso (Papel)</label>
+                        <select name="role" id="id_role" class="form-select">
+                            {% for val, label in role_choices %}
+                                <option value="{{ val }}" {% if form_data.role == val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="id_primary_directorate">Diretoria Primária (Lotação)</label>
+                        <select name="primary_directorate" id="id_primary_directorate" class="form-select">
+                            <option value="">Nenhuma</option>
+                            {% for dir in all_directorates %}
+                                <option value="{{ dir.pk }}" {% if form_data.primary_directorate == dir.pk|stringformat:"s" %}selected{% endif %}>{{ dir.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="field-help">Acessos adicionais a outras diretorias podem ser configurados depois, na tela de Permissões.</small>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-save">
+                        <i data-lucide="user-plus"></i>
+                        Criar Usuário
+                    </button>
+                </div>
+            </form>
+        </section>
+    </main>
+</div>
+
+<style>
+    @media (min-width: 1025px) {
+        .dashboard-main { padding-top: 80px !important; }
+    }
+    .back-link { display: inline-flex; align-items: center; gap: 6px; color: #64748b; text-decoration: none; font-size: 14px; font-weight: 600; margin-bottom: 12px; transition: color 0.2s; }
+    .back-link:hover { color: #2563eb; }
+    .back-link i { width: 16px; height: 16px; }
+    .header-description { color: #64748b; font-size: 14px; margin-top: 4px; }
+    .form-card { background: #fff; border-radius: 20px; border: 1px solid #e2e8f0; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .form-card h3 { font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 24px; }
+    .form-group { margin-bottom: 24px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px; }
+    .form-control, .form-select { width: 100%; height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 14px; transition: all 0.2s; }
+    .form-control:focus, .form-select:focus { outline: none; border-color: #2563eb; background: #fff; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); }
+    .field-help { display: block; font-size: 11px; color: #94a3b8; margin-top: 6px; }
+    .form-actions { margin-top: 32px; padding-top: 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; }
+    .btn-save { height: 52px; padding: 0 40px; background: #2563eb; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); }
+    .btn-save:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3); }
+</style>
+{% endblock %}

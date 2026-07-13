@@ -400,6 +400,8 @@ class NaicaQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
         if key not in allowed_keys:
             return JsonResponse({"error": "Campo não permitido"}, status=400)
 
+        created_by = request.user.email or request.user.username
+
         if sub_id and sub_id != "None" and sub_id != "":
             report = get_object_or_404(NaicaReport, id=sub_id)
         else:
@@ -407,12 +409,14 @@ class NaicaQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
                 directorate=directorate,
                 month=month,
                 year=year,
-                unit_name=unit
+                unit_name=unit,
+                defaults={"user_id": request.user.pk, "created_by": created_by},
             )
 
         setattr(report, key, value)
         if not report.user_id:
-            import uuid
-            report.user_id = uuid.uuid4()
+            report.user_id = request.user.pk
+        if not report.created_by:
+            report.created_by = created_by
         report.save()
         return JsonResponse({"status": "success", "value": value, "sub_id": report.id})

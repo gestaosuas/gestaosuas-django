@@ -39,8 +39,15 @@ BEGIN
             -- username = email (único e já conhecido pelos usuários)
             au.email,
             au.email,
-            -- '!' = senha inutilizável, padrão Django para contas externas
-            '!',
+            -- Reaproveita o hash bcrypt do Supabase Auth (GoTrue), prefixado
+            -- para o formato que o Django BCryptPasswordHasher reconhece
+            -- ("bcrypt$" + hash). Se não houver hash (conta OAuth/sem senha),
+            -- usa '!' (senha inutilizável, padrão Django).
+            CASE
+                WHEN au.encrypted_password IS NOT NULL AND au.encrypted_password <> ''
+                    THEN 'bcrypt$' || au.encrypted_password
+                ELSE '!'
+            END,
             '',
             '',
             false,
@@ -51,6 +58,16 @@ BEGIN
         FROM auth.users au
         WHERE au.id NOT IN (SELECT id FROM accounts_user)
         ON CONFLICT (id) DO NOTHING;
+
+        -- Backfill: corrige contas já migradas anteriormente com senha '!'
+        -- (versão antiga deste script não copiava o hash bcrypt).
+        UPDATE accounts_user u
+        SET password = 'bcrypt$' || au.encrypted_password
+        FROM auth.users au
+        WHERE u.id = au.id
+          AND u.password = '!'
+          AND au.encrypted_password IS NOT NULL
+          AND au.encrypted_password <> '';
 
         RAISE NOTICE 'Passo 1 OK: usuários copiados de auth.users para accounts_user.';
     ELSE
@@ -233,10 +250,120 @@ DO $$ BEGIN RAISE NOTICE 'Passo 6 OK: constraints UNIQUE de SINE/Qualificação 
 
 
 -- ============================================================
--- PASSO 7: Verificação final
+-- PASSO 7: Repontar FKs de tabelas de negócio de auth.users → accounts_user
+-- ============================================================
+-- Achado por testes automatizados (2026-07): apesar do Passo 2 já cuidar de
+-- profiles/submissions, quase 20 outras tabelas de relatório (naica_reports,
+-- work_plans, oscs, visits, creas_idoso_reports, monthly_reports etc.) ainda
+-- têm a FK de user_id/created_by apontando para o schema Supabase residual
+-- auth.users em vez de accounts_user. Isso NÃO é resíduo inerte: é uma FK
+-- ativa. Qualquer usuário Django criado depois da migração inicial (não
+-- existe em auth.users) recebe IntegrityError ao gravar nessas colunas.
+-- Idempotente: uma vez repontada, a FK não aparece mais na busca por
+-- confrelid = auth.users, então rodar de novo não faz nada.
+
+DO $$
+DECLARE
+    r RECORD;
+    orphan_count INTEGER;
+    on_delete_clause TEXT;
+    new_constraint_name TEXT;
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'auth' AND table_name = 'users'
+    ) THEN
+        FOR r IN
+            SELECT DISTINCT
+                con.conname,
+                con.conrelid::regclass::text AS tbl,
+                att.attname AS col,
+                con.confdeltype
+            FROM pg_constraint con
+            JOIN unnest(con.conkey) WITH ORDINALITY AS ck(attnum, ord) ON true
+            JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = ck.attnum
+            WHERE con.contype = 'f'
+              AND con.confrelid = 'auth.users'::regclass
+              AND con.connamespace = 'public'::regnamespace
+        LOOP
+            EXECUTE format(
+                'SELECT count(*) FROM %s t WHERE t.%I IS NOT NULL AND NOT EXISTS (SELECT 1 FROM accounts_user u WHERE u.id = t.%I)',
+                r.tbl, r.col, r.col
+            ) INTO orphan_count;
+
+            IF orphan_count > 0 THEN
+                RAISE WARNING 'Passo 7: % linha(s) em %.% não existem em accounts_user — FK NÃO repontada, resolver manualmente.', orphan_count, r.tbl, r.col;
+                CONTINUE;
+            END IF;
+
+            on_delete_clause := CASE r.confdeltype
+                WHEN 'c' THEN 'ON DELETE CASCADE'
+                WHEN 'n' THEN 'ON DELETE SET NULL'
+                WHEN 'd' THEN 'ON DELETE SET DEFAULT'
+                WHEN 'r' THEN 'ON DELETE RESTRICT'
+                ELSE ''
+            END;
+            new_constraint_name := r.conname || '_accounts_user';
+
+            EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.tbl, r.conname);
+            EXECUTE format(
+                'ALTER TABLE %s ADD CONSTRAINT %I FOREIGN KEY (%I) REFERENCES accounts_user(id) %s',
+                r.tbl, new_constraint_name, r.col, on_delete_clause
+            );
+            RAISE NOTICE 'Passo 7: FK %.% repontada de auth.users para accounts_user (constraint %).', r.tbl, r.col, new_constraint_name;
+        END LOOP;
+        RAISE NOTICE 'Passo 7 OK: FKs legadas de tabelas de negócio repontadas para accounts_user.';
+    ELSE
+        RAISE NOTICE 'Passo 7 PULADO: schema auth.users não existe neste banco (já puro).';
+    END IF;
+END $$;
+
+
+-- ============================================================
+-- PASSO 8: Corrigir tipo de creas_pop_rua_reports.created_by (text → uuid)
+-- ============================================================
+-- Achado por testes automatizados (2026-07): ao contrário de todas as outras
+-- tabelas de relatório, esta coluna foi criada como `text` (sem FK), embora
+-- o model Django (`ForeignKey(User, on_delete=SET_NULL, null=True)`) e os
+-- dados nela armazenados sejam sempre UUIDs de usuário. Resultado: qualquer
+-- operação que compare essa coluna com um UUID (inclusive o cascade do
+-- Django ao rodar User.delete()) quebra com
+-- "operator does not exist: text = uuid". Também estava NOT NULL, incompatível
+-- com o on_delete=SET_NULL do model.
+
+DO $$
+DECLARE
+    orphan_count INTEGER;
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'creas_pop_rua_reports' AND column_name = 'created_by' AND data_type = 'text'
+    ) THEN
+        SELECT count(*) INTO orphan_count
+        FROM creas_pop_rua_reports
+        WHERE created_by IS NOT NULL AND created_by !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
+
+        IF orphan_count > 0 THEN
+            RAISE WARNING 'Passo 8: % linha(s) em creas_pop_rua_reports.created_by não parecem UUID — coluna NÃO convertida, resolver manualmente.', orphan_count;
+        ELSE
+            ALTER TABLE creas_pop_rua_reports ALTER COLUMN created_by DROP NOT NULL;
+            ALTER TABLE creas_pop_rua_reports ALTER COLUMN created_by TYPE uuid USING created_by::uuid;
+            ALTER TABLE creas_pop_rua_reports
+                ADD CONSTRAINT creas_pop_rua_reports_created_by_fkey
+                FOREIGN KEY (created_by) REFERENCES accounts_user(id) ON DELETE SET NULL;
+            RAISE NOTICE 'Passo 8 OK: creas_pop_rua_reports.created_by convertida para uuid, nullable, com FK para accounts_user.';
+        END IF;
+    ELSE
+        RAISE NOTICE 'Passo 8 PULADO: creas_pop_rua_reports.created_by já não é text (coluna já corrigida ou não existe).';
+    END IF;
+END $$;
+
+
+-- ============================================================
+-- PASSO 9: Verificação final
 -- ============================================================
 
--- 7a. Profiles sem accounts_user correspondente (deve retornar 0 linhas)
+-- 9a. Profiles sem accounts_user correspondente (deve retornar 0 linhas)
 DO $$
 DECLARE
     orphan_count INT;
@@ -249,11 +376,11 @@ BEGIN
     IF orphan_count > 0 THEN
         RAISE WARNING 'ATENÇÃO: % profiles sem accounts_user! Verificar manualmente.', orphan_count;
     ELSE
-        RAISE NOTICE 'Passo 7a OK: todos os profiles têm accounts_user correspondente.';
+        RAISE NOTICE 'Passo 9a OK: todos os profiles têm accounts_user correspondente.';
     END IF;
 END $$;
 
--- 7b. Contagens para conferência
+-- 9b. Contagens para conferência
 SELECT
     (SELECT COUNT(*) FROM profiles) AS total_profiles,
     (SELECT COUNT(*) FROM accounts_user) AS total_accounts_users,

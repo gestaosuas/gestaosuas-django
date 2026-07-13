@@ -6,8 +6,10 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.views import View
 from django.views.generic import DetailView, ListView, CreateView, UpdateView, DeleteView, TemplateView
 from django.urls import reverse
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponseForbidden, Http404
 from django.template.loader import render_to_string
+
+from apps.accounts.mixins import DirectorateAccessMixin
 import json
 import uuid
 import math
@@ -422,6 +424,44 @@ def get_safe_next_url(request):
     return ""
 
 
+class DirectorateScopedMixin(DirectorateAccessMixin):
+    """Para views cujo <dir_slug:pk> na URL é diretamente o pk da diretoria."""
+
+    def get_directorate(self):
+        directorate = Directorate.objects.filter(pk=self.kwargs.get("pk")).first()
+        if not directorate:
+            raise Http404("Diretoria não encontrada.")
+        return directorate
+
+
+class _ObjectDirectorateScopedMixin(DirectorateAccessMixin):
+    """Para views cujo <uuid:pk> na URL identifica um objeto (Osc/Visit/
+    WorkPlan) — não a diretoria diretamente. O acesso é resolvido a partir
+    da diretoria a que esse objeto pertence."""
+
+    scope_model = None
+
+    def get_scoped_object(self):
+        if not hasattr(self, "_scoped_object"):
+            self._scoped_object = get_object_or_404(self.scope_model, pk=self.kwargs["pk"])
+        return self._scoped_object
+
+    def get_directorate(self):
+        return self.get_scoped_object().directorate
+
+
+class OscScopedMixin(_ObjectDirectorateScopedMixin):
+    scope_model = Osc
+
+
+class VisitScopedMixin(_ObjectDirectorateScopedMixin):
+    scope_model = Visit
+
+
+class WorkPlanScopedMixin(_ObjectDirectorateScopedMixin):
+    scope_model = WorkPlan
+
+
 class DirectorateListView(LoginRequiredMixin, ListView):
     template_name = "directorates/list.html"
     model = Directorate
@@ -444,7 +484,7 @@ class DirectorateListView(LoginRequiredMixin, ListView):
             return Directorate.objects.none()
 
 
-class DirectorateDetailView(LoginRequiredMixin, DetailView):
+class DirectorateDetailView(DirectorateScopedMixin, DetailView):
     template_name = "directorates/detail.html"
     model = Directorate
     context_object_name = "directorate"
@@ -633,34 +673,21 @@ class DirectorateDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
-class OscListView(LoginRequiredMixin, ListView):
+class OscListView(DirectorateScopedMixin, ListView):
     template_name = "directorates/monitoring/osc_list.html"
     model = Osc
     context_object_name = "oscs"
 
     def get_queryset(self):
-        qs = Osc.objects.filter(directorate_id=self.kwargs["pk"])
-        profile = getattr(self.request.user, 'profile', None)
-        
-        if not profile or profile.role == 'admin' or self.request.user.is_superuser:
-            return qs
-            
-        if profile.role == 'diretor':
-            # Diretor can see everything in their primary directorate
-            if str(profile.primary_directorate_id) == str(self.kwargs["pk"]):
-                return qs
-            # Or if they are linked to it in profile_directorates
-            if ProfileDirectorate.objects.filter(profile=profile, directorate_id=self.kwargs["pk"]).exists():
-                return qs
-                
-        # For Agente or others, they can only see OSCs if they have at least one visit delegated or owned
-        # However, usually OSCs are public within the directorate for agents to create visits.
-        # But if we want to be strict:
-        return qs # Keep OSCs visible for now so they can create visits.
+        # Acesso à diretoria em si já é checado em dispatch() (DirectorateAccessMixin) —
+        # quem chega até aqui tem vínculo com esta diretoria. Dentro dela, as OSCs
+        # permanecem visíveis para todos os papéis (inclusive agente), pois precisam
+        # navegar por todas as OSCs da diretoria para criar visitas/planos.
+        return Osc.objects.filter(directorate_id=self.kwargs["pk"])
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        directorate = Directorate.objects.get(pk=self.kwargs["pk"])
+        directorate = self.get_directorate()
         context["directorate"] = directorate
         types = (
             Osc.objects.filter(directorate_id=self.kwargs["pk"])
@@ -674,7 +701,7 @@ class OscListView(LoginRequiredMixin, ListView):
         context["can_delete"] = self.request.user.is_superuser or (profile and profile.role == 'admin')
         return context
 
-class VisitListView(LoginRequiredMixin, ListView):
+class VisitListView(DirectorateScopedMixin, ListView):
     template_name = "directorates/monitoring/visit_list.html"
     model = Visit
     context_object_name = "visits"
@@ -718,7 +745,7 @@ class VisitListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["directorate"] = Directorate.objects.get(pk=self.kwargs["pk"])
+        context["directorate"] = self.get_directorate()
         for visit in context["visits"]:
             identificacao = visit.identificacao or {}
             visit.registered_by_name = (
@@ -742,9 +769,9 @@ class VisitListView(LoginRequiredMixin, ListView):
         context["can_delete"] = self.request.user.is_superuser or (profile and profile.role == 'admin')
         return context
 
-class VisitDelegateView(LoginRequiredMixin, View):
+class VisitDelegateView(VisitScopedMixin, View):
     def post(self, request, pk):
-        visit = get_object_or_404(Visit, pk=pk)
+        visit = self.get_scoped_object()
         user_ids = request.POST.getlist("user_ids")
         directorate_ids = request.POST.getlist("directorate_ids")
         
@@ -771,7 +798,7 @@ class VisitDelegateView(LoginRequiredMixin, View):
             
         return redirect(reverse("directorates:visit-list", kwargs={"pk": str(visit.directorate.pk)}))
 
-class WorkPlanListView(LoginRequiredMixin, ListView):
+class WorkPlanListView(DirectorateScopedMixin, ListView):
     template_name = "directorates/monitoring/plan_list.html"
     model = WorkPlan
     context_object_name = "oscs"
@@ -802,16 +829,19 @@ class WorkPlanListView(LoginRequiredMixin, ListView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["directorate"] = Directorate.objects.get(pk=self.kwargs["pk"])
+        context["directorate"] = self.get_directorate()
         context["selected_osc_id"] = self.request.GET.get("osc", "")
         profile = getattr(self.request.user, 'profile', None)
         context["can_delete"] = self.request.user.is_superuser or (profile and profile.role == 'admin')
         return context
 
-class WorkPlanUpdateView(LoginRequiredMixin, UpdateView):
+class WorkPlanUpdateView(WorkPlanScopedMixin, UpdateView):
     model = WorkPlan
     template_name = "directorates/monitoring/plan_form.html"
     fields = ["title", "content", "status"]
+
+    def get_object(self, queryset=None):
+        return self.get_scoped_object()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -826,20 +856,21 @@ class WorkPlanUpdateView(LoginRequiredMixin, UpdateView):
             return next_url
         return reverse("directorates:plan-list", kwargs={"pk": self.object.directorate.pk})
 
-class WorkPlanCreateView(LoginRequiredMixin, CreateView):
+class WorkPlanCreateView(DirectorateScopedMixin, CreateView):
     model = WorkPlan
     template_name = "directorates/monitoring/plan_form.html"
     fields = ["title", "content", "status", "osc"]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["directorate"] = Directorate.objects.get(pk=self.kwargs["pk"])
+        context["directorate"] = self.get_directorate()
         context["selected_osc_id"] = self.request.GET.get("osc", "")
         context["return_url"] = get_safe_next_url(self.request) or reverse("directorates:plan-list", kwargs={"pk": self.kwargs["pk"]})
         return context
 
     def form_valid(self, form):
         form.instance.directorate_id = self.kwargs["pk"]
+        form.instance.user_id = self.request.user.pk
         return super().form_valid(form)
 
     def get_success_url(self):
@@ -848,7 +879,7 @@ class WorkPlanCreateView(LoginRequiredMixin, CreateView):
             return next_url
         return reverse("directorates:plan-list", kwargs={"pk": self.kwargs["pk"]})
 
-class WorkPlanDeleteView(LoginRequiredMixin, DeleteView):
+class WorkPlanDeleteView(WorkPlanScopedMixin, DeleteView):
     model = WorkPlan
     template_name = "directorates/monitoring/confirm_delete.html"
 
@@ -859,6 +890,9 @@ class WorkPlanDeleteView(LoginRequiredMixin, DeleteView):
             return HttpResponseForbidden()
         return super().dispatch(request, *args, **kwargs)
 
+    def get_object(self, queryset=None):
+        return self.get_scoped_object()
+
     def get_success_url(self):
         next_url = get_safe_next_url(self.request)
         if next_url:
@@ -866,7 +900,7 @@ class WorkPlanDeleteView(LoginRequiredMixin, DeleteView):
         return reverse("directorates:plan-list", kwargs={"pk": self.object.directorate.pk})
 
 
-class WorkPlanPreviewView(LoginRequiredMixin, View):
+class WorkPlanPreviewView(DirectorateScopedMixin, View):
     def get(self, request, pk):
         osc_id = request.GET.get("osc")
         if not osc_id:
@@ -889,7 +923,7 @@ class WorkPlanPreviewView(LoginRequiredMixin, View):
         )
 
 
-class WorkPlanDocumentView(LoginRequiredMixin, TemplateView):
+class WorkPlanDocumentView(DirectorateScopedMixin, TemplateView):
     template_name = "directorates/monitoring/work_plan_document.html"
 
     def get(self, request, *args, **kwargs):
@@ -907,7 +941,7 @@ class WorkPlanDocumentView(LoginRequiredMixin, TemplateView):
         context.update(build_work_plan_document_context(plan))
         return render(request, self.template_name, context)
 
-class MonitoringReportListView(LoginRequiredMixin, ListView):
+class MonitoringReportListView(DirectorateScopedMixin, ListView):
     template_name = "directorates/monitoring/report_list.html"
     model = Visit
     context_object_name = "visits"
@@ -940,15 +974,18 @@ class MonitoringReportListView(LoginRequiredMixin, ListView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["directorate"] = Directorate.objects.get(pk=self.kwargs["pk"])
+        context["directorate"] = self.get_directorate()
         context["selected_bimester"] = get_persistent_bimester(self.request)
         return context
 
-class VisitReportView(LoginRequiredMixin, DetailView):
+class VisitReportView(VisitScopedMixin, DetailView):
     """Generic view to handle the 3 types of specialized reports."""
     model = Visit
     template_name = "directorates/monitoring/report_form.html"
     context_object_name = "visit"
+
+    def get_object(self, queryset=None):
+        return self.get_scoped_object()
 
     REPORT_LABELS = {
         "parecer_tecnico": "Relatório do Monitoramento",
@@ -1326,9 +1363,9 @@ class VisitReportView(LoginRequiredMixin, DetailView):
         except Exception as e:
             return JsonResponse({"success": False, "error": str(e)}, status=400)
 
-class VisitUploadDocumentView(LoginRequiredMixin, View):
+class VisitUploadDocumentView(VisitScopedMixin, View):
     def post(self, request, pk):
-        visit = get_object_or_404(Visit, pk=pk)
+        visit = self.get_scoped_object()
         file = request.FILES.get("file")
         if not file:
             return JsonResponse({"success": False, "error": "No file provided"}, status=400)
@@ -1357,9 +1394,9 @@ class VisitUploadDocumentView(LoginRequiredMixin, View):
 from django.core.files.storage import FileSystemStorage
 from django.conf import settings
 
-class VisitUploadNotificationView(LoginRequiredMixin, View):
+class VisitUploadNotificationView(VisitScopedMixin, View):
     def post(self, request, pk):
-        visit = get_object_or_404(Visit, pk=pk)
+        visit = self.get_scoped_object()
         file = request.FILES.get("file")
         if not file:
             return JsonResponse({"success": False, "error": "Arquivo não fornecido"}, status=400)
@@ -1388,9 +1425,9 @@ class VisitUploadNotificationView(LoginRequiredMixin, View):
             return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
-class VisitRemoveNotificationView(LoginRequiredMixin, View):
+class VisitRemoveNotificationView(VisitScopedMixin, View):
     def post(self, request, pk):
-        visit = get_object_or_404(Visit, pk=pk)
+        visit = self.get_scoped_object()
         try:
             import json
             data = json.loads(request.body.decode('utf-8'))
@@ -1416,14 +1453,14 @@ class VisitRemoveNotificationView(LoginRequiredMixin, View):
 
 from .forms import OscForm, VisitForm
 
-class OscCreateView(LoginRequiredMixin, CreateView):
+class OscCreateView(DirectorateScopedMixin, CreateView):
     model = Osc
     form_class = OscForm
     template_name = "directorates/monitoring/osc_form.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["directorate"] = Directorate.objects.get(pk=self.kwargs["pk"])
+        context["directorate"] = self.get_directorate()
         return context
 
     def form_valid(self, form):
@@ -1437,10 +1474,13 @@ class OscCreateView(LoginRequiredMixin, CreateView):
             return next_url
         return reverse("directorates:osc-list", kwargs={"pk": self.kwargs["pk"]})
 
-class OscUpdateView(LoginRequiredMixin, UpdateView):
+class OscUpdateView(OscScopedMixin, UpdateView):
     model = Osc
     form_class = OscForm
     template_name = "directorates/monitoring/osc_form.html"
+
+    def get_object(self, queryset=None):
+        return self.get_scoped_object()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1450,7 +1490,7 @@ class OscUpdateView(LoginRequiredMixin, UpdateView):
     def get_success_url(self):
         return reverse("directorates:osc-list", kwargs={"pk": self.object.directorate.pk})
 
-class OscDeleteView(LoginRequiredMixin, DeleteView):
+class OscDeleteView(OscScopedMixin, DeleteView):
     model = Osc
 
     def dispatch(self, request, *args, **kwargs):
@@ -1460,13 +1500,16 @@ class OscDeleteView(LoginRequiredMixin, DeleteView):
             return HttpResponseForbidden()
         return super().dispatch(request, *args, **kwargs)
 
+    def get_object(self, queryset=None):
+        return self.get_scoped_object()
+
     def get_success_url(self):
         next_url = self.request.POST.get("next") or self.request.GET.get("next")
         if next_url and next_url.startswith("/"):
             return next_url
         return reverse("directorates:osc-list", kwargs={"pk": self.object.directorate.pk})
 
-class VisitCreateView(LoginRequiredMixin, TemplateView):
+class VisitCreateView(DirectorateScopedMixin, TemplateView):
     template_name = "directorates/monitoring/visit_instrumental.html"
 
     def get_context_data(self, **kwargs):
@@ -1560,13 +1603,13 @@ class VisitCreateView(LoginRequiredMixin, TemplateView):
             return redirect(next_url)
         return redirect(get_monitoring_back_url(directorate))
 
-class VisitInstrumentalView(LoginRequiredMixin, UpdateView):
+class VisitInstrumentalView(VisitScopedMixin, UpdateView):
     model = Visit
     template_name = "directorates/monitoring/visit_instrumental.html"
     fields = ["status", "observacoes", "recomendacoes"]
 
     def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
+        obj = self.get_scoped_object()
         if obj and obj.atendimento:
             obj.atendimento = sync_atendimento_pse_fields(obj.atendimento)
         return obj
@@ -1691,13 +1734,13 @@ class VisitInstrumentalView(LoginRequiredMixin, UpdateView):
             return next_url
         return reverse("directorates:visit-list", kwargs={"pk": self.object.directorate.pk})
 
-class VisitDeleteDocumentView(LoginRequiredMixin, View):
+class VisitDeleteDocumentView(VisitScopedMixin, View):
     def post(self, request, pk):
         import json
         import urllib.request
         from django.conf import settings
-        visit = get_object_or_404(Visit, pk=pk)
-        
+        visit = self.get_scoped_object()
+
         try:
             data = json.loads(request.body)
             index = int(data.get("index"))
@@ -1737,9 +1780,9 @@ class VisitDeleteDocumentView(LoginRequiredMixin, View):
             
         return JsonResponse({"success": False, "error": "Index invalido"}, status=400)
 
-class VisitRevertView(LoginRequiredMixin, View):
+class VisitRevertView(VisitScopedMixin, View):
     def post(self, request, pk):
-        visit = get_object_or_404(Visit, pk=pk)
+        visit = self.get_scoped_object()
         visit.status = "draft"
         visit.save()
         next_url = request.POST.get("next") or request.GET.get("next")
@@ -1747,14 +1790,14 @@ class VisitRevertView(LoginRequiredMixin, View):
             return redirect(next_url)
         return redirect(reverse("directorates:visit-list", kwargs={"pk": str(visit.directorate.pk)}))
 
-class RevertReportView(LoginRequiredMixin, View):
+class RevertReportView(VisitScopedMixin, View):
     """Reverte o status de relatorio_final ou parecer_conclusivo para 'draft'."""
     ALLOWED = ("relatorio_final", "parecer_conclusivo")
 
     def post(self, request, pk, report_type):
         if report_type not in self.ALLOWED:
             return JsonResponse({"success": False, "error": "Tipo inválido"}, status=400)
-        visit = get_object_or_404(Visit, pk=pk)
+        visit = self.get_scoped_object()
         report_data = getattr(visit, report_type) or {}
         if not isinstance(report_data, dict):
             return JsonResponse({"success": False, "error": "Dados inválidos"}, status=400)
@@ -1764,7 +1807,7 @@ class RevertReportView(LoginRequiredMixin, View):
         return JsonResponse({"success": True})
 
 
-class VisitDeleteView(LoginRequiredMixin, DeleteView):
+class VisitDeleteView(VisitScopedMixin, DeleteView):
     model = Visit
 
     def dispatch(self, request, *args, **kwargs):
@@ -1773,6 +1816,9 @@ class VisitDeleteView(LoginRequiredMixin, DeleteView):
         if not is_admin:
             return HttpResponseForbidden()
         return super().dispatch(request, *args, **kwargs)
+
+    def get_object(self, queryset=None):
+        return self.get_scoped_object()
 
     def get_success_url(self):
         next_url = self.request.POST.get("next") or self.request.GET.get("next")

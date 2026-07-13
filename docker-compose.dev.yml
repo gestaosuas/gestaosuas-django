@@ -4,6 +4,12 @@
 # Logs:    docker logs gestaosuas_app_dev -f
 
 services:
+  db:
+    # Porta exposta ao host apenas em dev, para permitir rodar
+    # `manage.py runserver` fora do Docker (ver CLAUDE.md).
+    ports:
+      - "5433:5432"
+
   app:
     container_name: gestaosuas_app_dev
     ports:

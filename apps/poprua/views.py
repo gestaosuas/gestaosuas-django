@@ -219,7 +219,8 @@ class PopRuaQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
             report, _ = PopRuaReport.objects.get_or_create(
                 directorate=directorate,
                 month=month,
-                year=year
+                year=year,
+                defaults={"created_by": request.user},
             )
 
         setattr(report, key, value)

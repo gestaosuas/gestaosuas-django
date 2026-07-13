@@ -4,13 +4,13 @@ import unicodedata
 from datetime import date, datetime
 
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.views.generic import DetailView, FormView, TemplateView
 
+from apps.accounts.mixins import DirectorateAccessMixin
 from apps.accounts.models import Profile, ProfileDirectorate
 from apps.directorates.models import Directorate, FormDelegation, MonthlyReport, Osc, Visit, WorkPlan
 from apps.directorates.forms import OscForm
@@ -52,7 +52,7 @@ def title_name(value):
     return " ".join(part.capitalize() for part in str(value or "").split())
 
 
-class MonitoramentoBaseMixin(LoginRequiredMixin):
+class MonitoramentoBaseMixin(DirectorateAccessMixin):
     def get_directorate(self):
         directorate = Directorate.objects.filter(pk=self.kwargs["pk"]).first()
         if not directorate:

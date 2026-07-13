@@ -2,16 +2,24 @@
 import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.generic import TemplateView, View
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.utils import timezone
 from apps.directorates.models import Directorate, MonthlyReport
 from apps.ceai.models import CeaiCategory, CeaiOficina, Submission
 from apps.ceai.constants import CEAI_UNITS, CEAI_FORM_DEFINITION, CONDOMINIO_IDOSO_FORM_DEFINITION
-from apps.accounts.mixins import RoleRequiredMixin
+from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
 from apps.core.mixins import TvTemplateMixin
 
-class CeaiDashboardView(TvTemplateMixin, LoginRequiredMixin, RoleRequiredMixin, TemplateView):
+
+class CeaiBaseMixin(DirectorateAccessMixin):
+    def get_directorate(self):
+        directorate = Directorate.objects.filter(name__icontains="CEAI").first()
+        if not directorate:
+            raise Http404("A diretoria de CEAI nao foi encontrada.")
+        return directorate
+
+
+class CeaiDashboardView(TvTemplateMixin, CeaiBaseMixin, RoleRequiredMixin, TemplateView):
     template_name = "ceai/dashboard.html"
     tv_template_name = "ceai/tv.html"
     allowed_roles = ["admin", "diretor", "agente"]
@@ -144,7 +152,7 @@ class CeaiDashboardView(TvTemplateMixin, LoginRequiredMixin, RoleRequiredMixin, 
         context["summary"] = summary
         return context
 
-class CeaiUpdateDataView(LoginRequiredMixin, RoleRequiredMixin, View):
+class CeaiUpdateDataView(CeaiBaseMixin, RoleRequiredMixin, View):
     allowed_roles = ["admin", "diretor", "agente"]
 
     def get(self, request, unit):
@@ -236,7 +244,7 @@ class CeaiUpdateDataView(LoginRequiredMixin, RoleRequiredMixin, View):
             
         return redirect("ceai:dashboard")
 
-class CeaiCategoryApiView(LoginRequiredMixin, RoleRequiredMixin, View):
+class CeaiCategoryApiView(CeaiBaseMixin, RoleRequiredMixin, View):
     allowed_roles = ["admin", "diretor", "agente"]
 
     def get(self, request):
@@ -271,7 +279,7 @@ class CeaiCategoryApiView(LoginRequiredMixin, RoleRequiredMixin, View):
         category.delete()
         return JsonResponse({"success": True})
 
-class CeaiOficinaApiView(LoginRequiredMixin, RoleRequiredMixin, View):
+class CeaiOficinaApiView(CeaiBaseMixin, RoleRequiredMixin, View):
     allowed_roles = ["admin", "diretor", "agente"]
 
     def get(self, request):
@@ -320,7 +328,7 @@ class CeaiOficinaApiView(LoginRequiredMixin, RoleRequiredMixin, View):
         oficina.delete()
         return JsonResponse({"success": True})
 
-class CeaiOficinasView(LoginRequiredMixin, RoleRequiredMixin, TemplateView):
+class CeaiOficinasView(CeaiBaseMixin, RoleRequiredMixin, TemplateView):
     template_name = "ceai/oficinas.html"
     allowed_roles = ["admin", "diretor", "agente"]
 
@@ -332,7 +340,7 @@ class CeaiOficinasView(LoginRequiredMixin, RoleRequiredMixin, TemplateView):
         context["oficinas"] = CeaiOficina.objects.filter(unit=unit).select_related("category").order_by("activity_name")
         return context
 
-class CeaiCategoriesView(LoginRequiredMixin, RoleRequiredMixin, TemplateView):
+class CeaiCategoriesView(CeaiBaseMixin, RoleRequiredMixin, TemplateView):
     template_name = "ceai/categories.html"
     allowed_roles = ["admin", "diretor", "agente"]
 
@@ -343,12 +351,15 @@ class CeaiCategoriesView(LoginRequiredMixin, RoleRequiredMixin, TemplateView):
         context["categories"] = CeaiCategory.objects.filter(unit=unit).order_by("name")
         return context
 
-class CeaiMonthlyNarrativeView(LoginRequiredMixin, RoleRequiredMixin, View):
+class CeaiMonthlyNarrativeView(CeaiBaseMixin, RoleRequiredMixin, View):
     template_name = "ceai/monthly_report.html"
     allowed_roles = ["admin", "diretor", "agente"]
 
     def get(self, request, pk):
-        directorate = get_object_or_404(Directorate, pk=pk)
+        # O pk da URL é ignorado de propósito: este relatório narrativo é
+        # sempre da diretoria fixa do CEAI (mesmo padrão das demais views
+        # deste módulo), nunca de uma diretoria arbitrária vinda da URL.
+        directorate = self.get_directorate()
         month = int(request.GET.get("month", timezone.now().month))
         year = int(request.GET.get("year", timezone.now().year))
         
@@ -379,7 +390,7 @@ class CeaiMonthlyNarrativeView(LoginRequiredMixin, RoleRequiredMixin, View):
         })
 
     def post(self, request, pk):
-        directorate = get_object_or_404(Directorate, pk=pk)
+        directorate = self.get_directorate()
         month = int(request.POST.get("month"))
         year = int(request.POST.get("year"))
         content = request.POST.get("content")
@@ -391,14 +402,14 @@ class CeaiMonthlyNarrativeView(LoginRequiredMixin, RoleRequiredMixin, View):
             month=month,
             defaults={
                 "content": content,
-                "user_id": request.user.id,
+                "user_external_id": request.user.id,
                 "status": "finalized"
             }
         )
-        
+
         return redirect("ceai:dashboard")
 
-class CeaiDataListView(LoginRequiredMixin, RoleRequiredMixin, TemplateView):
+class CeaiDataListView(CeaiBaseMixin, RoleRequiredMixin, TemplateView):
     template_name = "ceai/data_list.html"
     allowed_roles = ["admin", "diretor", "agente"]
 
@@ -492,7 +503,7 @@ class CeaiDataListView(LoginRequiredMixin, RoleRequiredMixin, TemplateView):
         context["all_categories"] = CeaiCategory.objects.values_list("name", flat=True).distinct().order_by("name")
         return context
 
-class CeaiQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
+class CeaiQuickEditView(CeaiBaseMixin, RoleRequiredMixin, View):
     allowed_roles = ["admin"]
 
     def post(self, request):
@@ -549,7 +560,7 @@ def safe_int(value):
             return int(float(value))
         except:
             return 0
-class CeaiReportsListView(LoginRequiredMixin, RoleRequiredMixin, TemplateView):
+class CeaiReportsListView(CeaiBaseMixin, RoleRequiredMixin, TemplateView):
     template_name = "ceai/reports.html"
     allowed_roles = ["admin", "diretor", "agente"]
 

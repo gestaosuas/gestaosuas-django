@@ -425,6 +425,8 @@ class CreasSharedQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
         if key not in allowed_keys:
             return JsonResponse({"error": "Campo não permitido"}, status=400)
 
+        created_by = request.user.email or request.user.username
+
         if sub_id and sub_id != "None" and sub_id != "":
             from django.shortcuts import get_object_or_404
             report = get_object_or_404(self.model, id=sub_id)
@@ -432,16 +434,17 @@ class CreasSharedQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
             report, _ = self.model.objects.get_or_create(
                 directorate=directorate,
                 month=month,
-                year=year
+                year=year,
+                defaults={"user_id": request.user.pk, "created_by": created_by},
             )
 
         setattr(report, key, value)
-        
+
         try:
             report.user_id = request.user.pk
         except Exception:
             pass
-        report.created_by = request.user.email or request.user.username
+        report.created_by = created_by
         
         # Save triggers model customsave calculations
         report.save()

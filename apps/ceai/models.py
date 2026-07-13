@@ -37,8 +37,8 @@ class CeaiOficina(models.Model):
 
 class Submission(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, db_column='user_id')
-    directorate_id = models.UUIDField()
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, db_column='user_id', null=True, blank=True)
+    directorate_id = models.UUIDField(null=True, blank=True)
     month = models.IntegerField()
     year = models.IntegerField()
     data = models.JSONField()
@@ -46,7 +46,9 @@ class Submission(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'ceai_submissions'  # FIXME: verificar nome real da tabela no banco; 'submissions' colide com directorates.MonthlySubmission
+        # Mesma tabela física de apps.directorates.models.MonthlySubmission
+        # (compartilhada entre módulos, chaveada por directorate_id/month/year).
+        db_table = 'submissions'
         verbose_name = 'Submissão'
         verbose_name_plural = 'Submissões'
 

@@ -1,0 +1,639 @@
+"""
+Testes do app `directorates`.
+
+Foco principal: o `DirectorateAccessMixin` (apps/accounts/mixins.py) foi ligado a
+praticamente todas as views deste app nesta sessão (antes elas só tinham
+`LoginRequiredMixin`). Isso introduziu controle de acesso por diretoria via dois
+novos mixins locais:
+
+- `DirectorateScopedMixin` — para views cujo `<dir_slug:pk>` na URL é a própria
+  diretoria (ex: OscListView, VisitListView, WorkPlanCreateView...).
+- `OscScopedMixin` / `VisitScopedMixin` / `WorkPlanScopedMixin` — para views cujo
+  `<uuid:pk>` identifica um objeto (Osc/Visit/WorkPlan); o acesso é resolvido a
+  partir da diretoria a que esse objeto pertence.
+
+Também cobrimos o fluxo básico de CRUD de OSC/Visita/Plano de trabalho e o
+`dir_slug` converter, e uma correção de bug real encontrada no diff
+(`WorkPlanCreateView.form_valid` passou a setar `user_id`, campo NOT NULL no
+banco que antes ficava sem valor).
+
+Banco: TestCase roda em transação com rollback automático contra o banco de
+dev real (settings.DATABASES["default"]["TEST"]["NAME"] aponta pro mesmo banco).
+Nenhuma `Directorate` existente é criada/alterada/apagada — só lida via
+`Directorate.objects.annotate(...).first()`. Osc/Visit/WorkPlan/FormDelegation
+usados nos testes são sempre criados do zero dentro do teste.
+"""
+import uuid
+from datetime import date, time
+
+from django.db.models import Count
+from django.test import TestCase, override_settings
+from django.urls import reverse
+
+from apps.accounts.models import Profile, ProfileDirectorate, User
+from apps.directorates.models import Directorate, FormDelegation, Osc, Visit, WorkPlan
+
+# WhiteNoise's CompressedManifestStaticFilesStorage (config/settings.py STORAGES)
+# exige que `collectstatic` já tenha rodado (manifesto staticfiles.json). Como os
+# testes rodam direto no host sem collectstatic, qualquer template que renderize
+# de verdade (não apenas redirects) e referencie `{% static %}` quebraria com
+# "Missing staticfiles manifest entry". Isso é puramente do ambiente de teste —
+# trocamos para o storage simples só durante os testes deste módulo.
+STATIC_TEST_STORAGES = {"staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"}}
+
+
+def _unique_username(prefix="testuser"):
+    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
+def make_user(role="user", primary_directorate=None, linked_directorate=None, is_superuser=False):
+    """Cria um User + Profile de teste. Nunca reaproveita usuários reais do banco."""
+    user = User.objects.create_user(
+        username=_unique_username(),
+        email=f"{_unique_username()}@example.com",
+        password="testpass123",
+        is_superuser=is_superuser,
+    )
+    Profile.objects.create(
+        user=user,
+        full_name="Usuario de Teste",
+        role=role,
+        primary_directorate=primary_directorate,
+    )
+    if linked_directorate is not None:
+        ProfileDirectorate.objects.create(profile=user.profile, directorate=linked_directorate)
+    return user
+
+
+@override_settings(STORAGES=STATIC_TEST_STORAGES)
+class DirectoratesTestBase(TestCase):
+    """Diretoria compartilhada: a que tem mais OSCs cadastradas (dado real, nunca
+    modificado — só lido)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.directorate = (
+            Directorate.objects.annotate(n_oscs=Count("oscs")).order_by("-n_oscs", "name").first()
+        )
+        cls.other_directorate = (
+            Directorate.objects.exclude(pk=cls.directorate.pk)
+            .annotate(n_oscs=Count("oscs"))
+            .order_by("-n_oscs", "name")
+            .first()
+        )
+
+    def make_osc(self, name="OSC de Teste", directorate=None):
+        return Osc.objects.create(
+            id=uuid.uuid4(),
+            name=name,
+            directorate=directorate or self.directorate,
+        )
+
+    def make_visit(self, osc=None, directorate=None):
+        return Visit.objects.create(
+            id=uuid.uuid4(),
+            osc=osc or self.make_osc(),
+            directorate=directorate or self.directorate,
+            visit_date=date.today(),
+            visit_time=time(9, 0),
+        )
+
+    def make_work_plan(self, osc=None, directorate=None, user=None):
+        owner = user or make_user()
+        return WorkPlan.objects.create(
+            osc=osc or self.make_osc(),
+            directorate=directorate or self.directorate,
+            title="Plano de Teste",
+            user_id=owner.pk,
+        )
+
+
+class DirectorateSlugConverterTests(DirectoratesTestBase):
+    """Testa o `dir_slug` converter (apps/core/converters.py) via as URLs reais do app."""
+
+    def test_reverse_with_uuid_pk_produces_friendly_slug_url(self):
+        url = reverse("directorates:osc-list", kwargs={"pk": self.directorate.pk})
+        self.assertIn(self.directorate.slug, url)
+        self.assertNotIn(str(self.directorate.pk), url)
+
+    def test_request_with_friendly_slug_path_resolves_to_directorate(self):
+        """to_python() deve casar o slug amigável com a Directorate certa
+        percorrendo e normalizando os nomes (NFD + lowercase + hifens)."""
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        url = f"/directorias/{self.directorate.slug}/oscs/"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["directorate"].pk, self.directorate.pk)
+
+    def test_request_with_raw_uuid_path_still_works(self):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        url = f"/directorias/{self.directorate.pk}/oscs/"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_reverse_with_non_uuid_string_pk_does_not_crash(self):
+        """Regressão do bug corrigido em 2026-07: DirectorateSlugConverter.to_url()
+        só capturava (ValueError, TypeError) ao tentar `Directorate.objects.filter(pk=value)`
+        com uma string não-UUID, mas o Django atual levanta ValidationError
+        nesse caso — reverse() quebrava sem tratamento sempre que algum código
+        passasse uma string arbitrária (não UUID, não instância de Directorate)
+        como kwarg pk. Corrigido adicionando ValidationError ao except."""
+        url = reverse("directorates:osc-list", kwargs={"pk": "string-que-nao-e-uuid"})
+        self.assertEqual(url, "/directorias/string-que-nao-e-uuid/oscs/")
+
+    def test_unknown_slug_redirects_regular_user_to_landing_instead_of_404(self):
+        """Slug que não bate com nenhuma Directorate: to_python() retorna a
+        string crua (comentário do próprio converter: 'Fallback to string if
+        not found, though views might fail later'). Isso NÃO vira um 404
+        limpo: DirectorateScopedMixin.get_directorate() faz
+        `Directorate.objects.filter(pk=<string-invalida>)`, que levanta
+        ValidationError (pk é UUIDField) — capturado pelo `except Exception`
+        genérico de DirectorateAccessMixin.dispatch() e tratado como se fosse
+        "diretoria não encontrada", redirecionando para core:landing.
+        (Para admin/superuser, que pulam esse except, um slug totalmente
+        desconhecido ainda pode virar 500 — ver debito técnico #10 no
+        CLAUDE.md sobre ValidationError não capturada em get_directorate()
+        para pk malformado; o caso de UUID válido mas inexistente já foi
+        corrigido, ver DirectorateAccessMixinTests.test_nonexistent_directorate_gives_clean_404_for_admin.)"""
+        user = make_user(role="user")
+        self.client.force_login(user)
+        response = self.client.get(
+            "/directorias/esta-diretoria-nao-existe/oscs/", follow=False
+        )
+        self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
+
+
+class DirectorateAccessMixinTests(DirectoratesTestBase):
+    """Cobre o comportamento novo introduzido pelo diff: DirectorateAccessMixin
+    aplicado via DirectorateScopedMixin em views antes protegidas só por
+    LoginRequiredMixin."""
+
+    def _osc_list_url(self, directorate=None):
+        return reverse("directorates:osc-list", kwargs={"pk": (directorate or self.directorate).pk})
+
+    def test_anonymous_user_redirected_to_login(self):
+        response = self.client.get(self._osc_list_url())
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url.startswith(reverse("accounts:login")))
+
+    def test_user_with_no_directorate_link_is_denied(self):
+        user = make_user(role="user")
+        self.client.force_login(user)
+        response = self.client.get(self._osc_list_url(), follow=False)
+        self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
+
+    def test_user_with_primary_directorate_is_allowed(self):
+        user = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(user)
+        response = self.client.get(self._osc_list_url())
+        self.assertEqual(response.status_code, 200)
+
+    def test_user_with_secondary_linked_directorate_is_allowed(self):
+        user = make_user(role="agente", linked_directorate=self.directorate)
+        self.client.force_login(user)
+        response = self.client.get(self._osc_list_url())
+        self.assertEqual(response.status_code, 200)
+
+    def test_diretor_linked_only_to_a_different_directorate_is_denied(self):
+        user = make_user(role="diretor", primary_directorate=self.other_directorate)
+        self.client.force_login(user)
+        response = self.client.get(self._osc_list_url(), follow=False)
+        self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
+
+    def test_admin_role_bypasses_directorate_link_requirement(self):
+        user = make_user(role="admin")  # sem primary_directorate nem link algum
+        self.client.force_login(user)
+        response = self.client.get(self._osc_list_url())
+        self.assertEqual(response.status_code, 200)
+
+    def test_superuser_bypasses_directorate_link_requirement(self):
+        user = make_user(role="user", is_superuser=True)
+        self.client.force_login(user)
+        response = self.client.get(self._osc_list_url())
+        self.assertEqual(response.status_code, 200)
+
+    def test_nonexistent_directorate_redirects_regular_user_to_landing(self):
+        user = make_user(role="user")
+        self.client.force_login(user)
+        fake_pk = uuid.uuid4()
+        response = self.client.get(
+            reverse("directorates:osc-list", kwargs={"pk": fake_pk}), follow=False
+        )
+        self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
+
+    def test_nonexistent_directorate_gives_clean_404_for_admin(self):
+        """Regressão do bug corrigido em 2026-07: DirectorateAccessMixin.dispatch()
+        só chamava get_directorate() (que faz o 404 amigável) para usuários
+        não-admin — admin/superuser pulavam direto pro super().dispatch(). Só
+        que OscListView.get_context_data() fazia um SEGUNDO lookup redundante
+        com `Directorate.objects.get(pk=self.kwargs["pk"])` (sem
+        get_object_or_404), sem proteção nenhuma. Resultado: um admin acessando
+        uma diretoria inexistente recebia uma Directorate.DoesNotExist não
+        tratada (500). Corrigido trocando esse lookup redundante por
+        `self.get_directorate()` (mesmo método já usado por dispatch(), que
+        levanta Http404 de forma limpa) em OscListView/VisitListView/
+        WorkPlanListView/MonitoringReportListView/WorkPlanCreateView/
+        OscCreateView — as 6 ocorrências desse padrão no app."""
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        fake_pk = uuid.uuid4()
+        response = self.client.get(reverse("directorates:osc-list", kwargs={"pk": fake_pk}))
+        self.assertEqual(response.status_code, 404)
+
+
+class ObjectScopedAccessMixinTests(DirectoratesTestBase):
+    """Cobre OscScopedMixin/VisitScopedMixin/WorkPlanScopedMixin: views cujo
+    <uuid:pk> identifica o objeto, não a diretoria — o acesso deve ser resolvido
+    a partir de `objeto.directorate`."""
+
+    def test_osc_update_allowed_for_user_with_directorate_access(self):
+        osc = self.make_osc()
+        user = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(user)
+        response = self.client.get(reverse("directorates:osc-update", kwargs={"pk": osc.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_osc_update_denied_for_user_without_directorate_access(self):
+        osc = self.make_osc()
+        user = make_user(role="agente", primary_directorate=self.other_directorate)
+        self.client.force_login(user)
+        response = self.client.get(
+            reverse("directorates:osc-update", kwargs={"pk": osc.pk}), follow=False
+        )
+        self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
+
+    def test_osc_update_nonexistent_object_is_a_clean_404_even_for_regular_user(self):
+        """Diferente do caso de diretoria inexistente: get_scoped_object() usa
+        get_object_or_404 corretamente, então o Http404 é levantado dentro do
+        get_directorate() chamado por dispatch() e cai no except genérico — 404
+        vira redirect amigável para quem não é admin."""
+        user = make_user(role="user")
+        self.client.force_login(user)
+        response = self.client.get(
+            reverse("directorates:osc-update", kwargs={"pk": uuid.uuid4()}), follow=False
+        )
+        self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
+
+    def test_osc_update_nonexistent_object_is_clean_404_for_admin(self):
+        """Ao contrário do bug em OscListView, aqui o admin recebe um 404 de
+        verdade (sem crash) porque get_object() usa get_scoped_object(), que
+        chama get_object_or_404 corretamente."""
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        response = self.client.get(
+            reverse("directorates:osc-update", kwargs={"pk": uuid.uuid4()})
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_visit_scoped_view_denied_for_user_without_access(self):
+        visit = self.make_visit()
+        user = make_user(role="agente", primary_directorate=self.other_directorate)
+        self.client.force_login(user)
+        response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}), follow=False
+        )
+        self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
+
+    def test_visit_scoped_view_allowed_for_user_with_access(self):
+        visit = self.make_visit()
+        user = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(user)
+        response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_work_plan_scoped_view_denied_for_user_without_access(self):
+        plan = self.make_work_plan()
+        user = make_user(role="agente", primary_directorate=self.other_directorate)
+        self.client.force_login(user)
+        response = self.client.get(
+            reverse("directorates:plan-update", kwargs={"pk": plan.pk}), follow=False
+        )
+        self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
+
+
+class OscCrudTests(DirectoratesTestBase):
+    def test_osc_create_view_creates_osc_scoped_to_directorate(self):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        url = reverse("directorates:osc-create", kwargs={"pk": self.directorate.pk})
+        unique_name = f"OSC Criada {uuid.uuid4().hex[:8]}"
+        response = self.client.post(
+            url,
+            {
+                "name": unique_name,
+                "activity_type": "",
+                "cep": "",
+                "address": "",
+                "number": "",
+                "neighborhood": "",
+                "phone": "",
+                "subsidized_count": "0",
+                "subsidized_type": "number",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        osc = Osc.objects.get(name=unique_name)
+        self.assertEqual(osc.directorate_id, self.directorate.pk)
+        self.assertIsNotNone(osc.id)
+
+    def test_osc_create_view_conforme_demanda_sets_subsidized_count_minus_one(self):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        url = reverse("directorates:osc-create", kwargs={"pk": self.directorate.pk})
+        unique_name = f"OSC Demanda {uuid.uuid4().hex[:8]}"
+        self.client.post(
+            url,
+            {
+                "name": unique_name,
+                "activity_type": "",
+                "cep": "",
+                "address": "",
+                "number": "",
+                "neighborhood": "",
+                "phone": "",
+                "subsidized_count": "0",
+                "subsidized_type": "demand",
+            },
+        )
+        osc = Osc.objects.get(name=unique_name)
+        self.assertEqual(osc.subsidized_count, -1)
+
+    def test_osc_update_view_updates_existing_osc(self):
+        osc = self.make_osc(name="Nome Original")
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        url = reverse("directorates:osc-update", kwargs={"pk": osc.pk})
+        response = self.client.post(
+            url,
+            {
+                "name": "Nome Atualizado",
+                "activity_type": "",
+                "cep": "",
+                "address": "",
+                "number": "",
+                "neighborhood": "",
+                "phone": "",
+                "subsidized_count": "5",
+                "subsidized_type": "number",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        osc.refresh_from_db()
+        self.assertEqual(osc.name, "Nome Atualizado")
+        self.assertEqual(osc.subsidized_count, 5)
+
+    def test_osc_delete_view_forbidden_for_regular_user(self):
+        osc = self.make_osc()
+        user = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(user)
+        response = self.client.post(reverse("directorates:osc-delete", kwargs={"pk": osc.pk}))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Osc.objects.filter(pk=osc.pk).exists())
+
+    def test_osc_delete_view_allowed_for_admin(self):
+        osc = self.make_osc()
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        response = self.client.post(reverse("directorates:osc-delete", kwargs={"pk": osc.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Osc.objects.filter(pk=osc.pk).exists())
+
+    def test_osc_delete_view_allowed_for_diretor(self):
+        osc = self.make_osc()
+        diretor = make_user(role="diretor", primary_directorate=self.directorate)
+        self.client.force_login(diretor)
+        response = self.client.post(reverse("directorates:osc-delete", kwargs={"pk": osc.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Osc.objects.filter(pk=osc.pk).exists())
+
+
+class WorkPlanCrudTests(DirectoratesTestBase):
+    """WorkPlanCreateView.form_valid() ganhou `form.instance.user_id =
+    self.request.user.pk` neste diff. A coluna work_plans.user_id é NOT NULL no
+    banco real (confirmado via information_schema) mas o campo do model é
+    `null=True, blank=True` — ou seja, sem essa linha o INSERT quebra com
+    IntegrityError. Este teste teria falhado antes da correção."""
+
+    def test_work_plan_create_view_sets_user_id_from_request_user(self):
+        osc = self.make_osc()
+        user = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(user)
+        url = reverse("directorates:plan-create", kwargs={"pk": self.directorate.pk})
+        response = self.client.post(
+            url,
+            {
+                "title": "Plano Novo",
+                "content": "[]",
+                "status": "draft",
+                "osc": str(osc.pk),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        plan = WorkPlan.objects.get(title="Plano Novo", osc=osc)
+        self.assertEqual(plan.user_id, user.pk)
+        self.assertEqual(plan.directorate_id, self.directorate.pk)
+
+    def test_work_plan_create_view_works_for_user_never_in_legacy_auth_users(self):
+        """Regressão do bug corrigido em 2026-07: `work_plans.user_id` tinha uma
+        FK viva para o schema legado `auth.users` (Supabase), então qualquer
+        usuário Django criado depois da migração original (nunca presente em
+        `auth.users`) quebrava com IntegrityError ao salvar um Plano de
+        Trabalho. `scripts/migrate_to_pure_pg.sql` (Passo 7) repontou a FK para
+        `accounts_user`; este teste usa um usuário "puro" (nunca inserido em
+        auth.users) para garantir que o fluxo funciona sem o workaround que
+        existia aqui antes."""
+        osc = self.make_osc()
+        user = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(user)
+        url = reverse("directorates:plan-create", kwargs={"pk": self.directorate.pk})
+        response = self.client.post(
+            url,
+            {
+                "title": "Plano De Usuario Novo",
+                "content": "[]",
+                "status": "draft",
+                "osc": str(osc.pk),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        plan = WorkPlan.objects.get(title="Plano De Usuario Novo", osc=osc)
+        self.assertEqual(plan.user_id, user.pk)
+
+    def test_work_plan_update_view_updates_title(self):
+        plan = self.make_work_plan()
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        url = reverse("directorates:plan-update", kwargs={"pk": plan.pk})
+        response = self.client.post(
+            url,
+            {"title": "Titulo Editado", "content": "[]", "status": "finalized"},
+        )
+        self.assertEqual(response.status_code, 302)
+        plan.refresh_from_db()
+        self.assertEqual(plan.title, "Titulo Editado")
+        self.assertEqual(plan.status, "finalized")
+
+    def test_work_plan_delete_view_forbidden_for_regular_user(self):
+        plan = self.make_work_plan()
+        user = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(user)
+        response = self.client.post(reverse("directorates:plan-delete", kwargs={"pk": plan.pk}))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(WorkPlan.objects.filter(pk=plan.pk).exists())
+
+    def test_work_plan_delete_view_allowed_for_admin(self):
+        plan = self.make_work_plan()
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        response = self.client.post(reverse("directorates:plan-delete", kwargs={"pk": plan.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(WorkPlan.objects.filter(pk=plan.pk).exists())
+
+
+class VisitFlowTests(DirectoratesTestBase):
+    def test_visit_create_view_draft_flow(self):
+        osc = self.make_osc()
+        user = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(user)
+        url = reverse("directorates:visit-create", kwargs={"pk": self.directorate.pk})
+        response = self.client.post(
+            url,
+            {
+                "osc": str(osc.pk),
+                "status": "draft",
+                "identificacao[visit_date_1]": date.today().isoformat(),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        visit = Visit.objects.filter(osc=osc, directorate=self.directorate).latest("created_at")
+        self.assertEqual(visit.status, "draft")
+        self.assertEqual(visit.identificacao.get("registered_by_username"), user.get_username())
+
+    def test_visit_create_view_without_osc_shows_error_and_redirects_back(self):
+        user = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(user)
+        url = reverse("directorates:visit-create", kwargs={"pk": self.directorate.pk})
+        response = self.client.post(url, {"status": "draft"})
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(
+            reverse("directorates:visit-create", kwargs={"pk": self.directorate.pk}),
+            response.url,
+        )
+
+    def test_visit_delete_view_forbidden_for_regular_user(self):
+        visit = self.make_visit()
+        user = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(user)
+        response = self.client.post(reverse("directorates:visit-delete", kwargs={"pk": visit.pk}))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Visit.objects.filter(pk=visit.pk).exists())
+
+    def test_visit_delete_view_allowed_for_admin(self):
+        visit = self.make_visit()
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        response = self.client.post(reverse("directorates:visit-delete", kwargs={"pk": visit.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Visit.objects.filter(pk=visit.pk).exists())
+
+
+class VisitDelegateViewTests(DirectoratesTestBase):
+    def test_delegate_to_users_creates_form_delegations(self):
+        visit = self.make_visit()
+        owner = make_user(role="diretor", primary_directorate=self.directorate)
+        target_user = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(owner)
+        url = reverse("directorates:visit-delegate", kwargs={"pk": visit.pk})
+        response = self.client.post(url, {"user_ids": [str(target_user.pk)]})
+        self.assertEqual(response.status_code, 302)
+        delegation = FormDelegation.objects.get(visit=visit, user_id=target_user.pk)
+        self.assertEqual(delegation.delegated_by, owner.pk)
+
+    def test_delegate_replaces_previous_delegations(self):
+        visit = self.make_visit()
+        owner = make_user(role="diretor", primary_directorate=self.directorate)
+        first_target = make_user(role="agente", primary_directorate=self.directorate)
+        second_target = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(owner)
+        url = reverse("directorates:visit-delegate", kwargs={"pk": visit.pk})
+
+        self.client.post(url, {"user_ids": [str(first_target.pk)]})
+        self.assertEqual(FormDelegation.objects.filter(visit=visit).count(), 1)
+
+        self.client.post(url, {"user_ids": [str(second_target.pk)]})
+        delegations = FormDelegation.objects.filter(visit=visit)
+        self.assertEqual(delegations.count(), 1)
+        self.assertEqual(delegations.first().user_id, second_target.pk)
+
+    def test_delegate_denied_for_user_without_directorate_access(self):
+        visit = self.make_visit()
+        outsider = make_user(role="agente", primary_directorate=self.other_directorate)
+        self.client.force_login(outsider)
+        url = reverse("directorates:visit-delegate", kwargs={"pk": visit.pk})
+        response = self.client.post(url, {"user_ids": []}, follow=False)
+        self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
+
+
+@override_settings(STORAGES=STATIC_TEST_STORAGES)
+class DirectorateDetailViewRedirectTests(TestCase):
+    """DirectorateDetailView.get() nunca renderiza a própria página: sempre
+    redireciona para o módulo específico com base no nome (sem acento) da
+    diretoria. Esse roteamento não foi alterado neste diff, mas é o fluxo
+    "home via dir_slug" mais importante do app."""
+
+    def _get_as_admin(self, directorate):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        return self.client.get(reverse("directorates:detail", kwargs={"pk": directorate.pk}))
+
+    def test_cras_directorate_redirects_to_cras_home(self):
+        directorate = Directorate.objects.filter(name__iexact="CRAS").first()
+        if not directorate:
+            self.skipTest("Diretoria 'CRAS' não encontrada no banco de teste.")
+        response = self._get_as_admin(directorate)
+        self.assertRedirects(
+            response,
+            reverse("cras:home", kwargs={"pk": directorate.pk}),
+            fetch_redirect_response=False,
+        )
+
+    def test_monitoring_directorate_redirects_to_monitoramento_home(self):
+        directorate = Directorate.objects.filter(name__iexact="Outros").first()
+        if not directorate:
+            self.skipTest("Diretoria 'Outros' não encontrada no banco de teste.")
+        response = self._get_as_admin(directorate)
+        self.assertRedirects(
+            response,
+            reverse("monitoramento:home", kwargs={"pk": directorate.pk}),
+            fetch_redirect_response=False,
+        )
+
+
+@override_settings(STORAGES=STATIC_TEST_STORAGES)
+class DirectorateListViewTests(TestCase):
+    def test_anonymous_user_redirected_to_login(self):
+        response = self.client.get(reverse("directorates:list"))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url.startswith(reverse("accounts:login")))
+
+    def test_admin_sees_all_directorates(self):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        response = self.client.get(reverse("directorates:list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            list(response.context["directorates"]), list(Directorate.objects.order_by("name"))
+        )
+
+    def test_regular_user_sees_only_linked_directorates(self):
+        directorate = Directorate.objects.first()
+        user = make_user(role="user", primary_directorate=directorate)
+        self.client.force_login(user)
+        response = self.client.get(reverse("directorates:list"))
+        self.assertEqual(response.status_code, 200)
+        seen = list(response.context["directorates"])
+        self.assertEqual(seen, [directorate])
