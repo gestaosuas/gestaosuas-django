@@ -54,7 +54,8 @@ Além disso, como o compose faz merge por concatenação de listas, o serviço `
 ### VPS Produção
 
 - IP Tailscale: `100.76.30.36` (NAS CasaOS, não é uma VPS tradicional — `$HOME` do usuário SSH é `/DATA`, pertence a `root`, sem escrita direta)
-- Projeto Django em: `/DATA/AppData/Gestaosuas-django` (repo git próprio, remote `origin` = `https://github.com/rdssystems/Gestaosuas-django.git`, mas **sem credenciais de push configuradas na VPS nem localmente** com a conta atual — deploys são feitos copiando arquivos via SFTP + commit local na VPS, não via `git pull`)
+- Projeto Django em: `/DATA/AppData/Gestaosuas-django` (repo git próprio na VPS — remote de lá ainda não confirmado/atualizado nesta sessão) — deploys são feitos copiando arquivos via SFTP + commit local na VPS, não via `git pull`.
+- **Repositório GitHub (checkout local deste projeto)**: remote `origin` = `https://github.com/gestaosuas/gestaosuas-django.git` (trocado nesta sessão, 2026-07-13 — as credenciais git configuradas localmente não têm permissão de push em `rdssystems/Gestaosuas-django`, só nesse repo `gestaosuas/gestaosuas-django`, que estava vazio e agora tem o histórico completo). Se o remote da VPS ainda apontar para `rdssystems`, provavelmente tem o mesmo problema de permissão — verificar antes de tentar `git push`/`git pull` de lá.
 - URL pública (Tailscale Funnel): **https://servidor-qualificacao.tailbeb7d5.ts.net:8443** → proxy para `127.0.0.1:8080` (container `gestaosuas_app`)
 - Outro app roda na raiz do mesmo domínio (porta 443 → `127.0.0.1:8000`, container `gq-app`, projeto Gestao-Profissional) — **não mexer nessa rota ao alterar a do gestaosuas**
 - Banco: container `gestaosuas_db` (postgres:15-alpine), dados no volume nomeado `postgres_data` (reaproveitado entre rebuilds — não recriar/renomear o compose project ou perde o volume)
