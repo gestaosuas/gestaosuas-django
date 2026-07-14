@@ -81,6 +81,11 @@
                         <a href="{% url 'directorates:visit-create' directorate.pk %}" class="btn-primary-premium" style="text-decoration: none;">
                             <i data-lucide="plus"></i> Nova Visita
                         </a>
+                        {% if cards %}
+                        <a href="{% url 'monitoramento:data' directorate.pk %}?year={{ selected_year }}" class="btn-primary-premium" style="background: white; color: #0f172a; text-decoration: none;">
+                            <i data-lucide="table"></i> Dados
+                        </a>
+                        {% endif %}
                     </div>
                     {% endif %}
                 </div>

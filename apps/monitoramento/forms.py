@@ -1,11 +1,16 @@
 from django import forms
 from apps.core.forms import StyledMonitoringForm
+from .models import GenericMonitoringReport
 
 
 class GenericMonitoringForm(StyledMonitoringForm):
     # Este formulário será preenchido dinamicamente na view
     # Mas herdamos do StyledMonitoringForm para manter o visual premium
-    
+
+    class Meta:
+        model = GenericMonitoringReport
+        fields = ["month", "year"]
+
     month = forms.ChoiceField(
         choices=[(i, str(i)) for i in range(1, 13)],
         widget=forms.Select(attrs={"class": "form-select"})

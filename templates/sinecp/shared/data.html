@@ -58,7 +58,14 @@
                                 <tr style="background: #ffffff;">
                                     <th style="padding: 15px 25px; text-align: left; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #f1f5f9; position: sticky; left: 0; background: white; z-index: 10;">Indicador</th>
                                     {% for month in month_labels %}
-                                        <th style="padding: 15px 12px; text-align: center; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #f1f5f9;">{{ month }}</th>
+                                        <th style="padding: 15px 12px; text-align: center; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #f1f5f9;">
+                                            {{ month }}
+                                            {% if can_delete %}
+                                            <button type="button" class="delete-month-btn" title="Excluir dados de {{ month }}" data-month="{{ forloop.counter }}" data-month-label="{{ month }}" data-year="{{ selected_year }}">
+                                                <i data-lucide="trash-2"></i>
+                                            </button>
+                                            {% endif %}
+                                        </th>
                                     {% endfor %}
                                 </tr>
                             </thead>
@@ -98,6 +105,9 @@
 .val-cell.editable-cell:focus { outline: none; }
 .val-cell.editable-cell:focus .val-inner { background: white !important; outline: 2px solid #3b82f6 !important; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
 .val-cell.saving .val-inner { opacity: 0.6; }
+.delete-month-btn { background: none; border: none; cursor: pointer; color: #ef4444; padding: 2px; margin-left: 4px; vertical-align: middle; opacity: 0.6; }
+.delete-month-btn:hover { opacity: 1; }
+.delete-month-btn i { width: 14px; height: 14px; }
 </style>
 
 <script>
@@ -121,6 +131,46 @@
                     e.preventDefault();
                     this.blur();
                 }
+            });
+        });
+
+        document.querySelectorAll('.delete-month-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const month = this.dataset.month;
+                const year = this.dataset.year;
+                const monthLabel = this.dataset.monthLabel;
+                if (!confirm(`Excluir todos os dados de ${monthLabel}/${year}? Essa ação não pode ser desfeita.`)) return;
+
+                const formData = new FormData();
+                formData.append('month', month);
+                formData.append('year', year);
+                formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+                let deleteUrl = '';
+                if ('{{ module_title }}' === 'SINE') {
+                    deleteUrl = '{% url "sinecp:sine-delete-month" %}';
+                } else {
+                    deleteUrl = '{% url "sinecp:qualificacao-delete-month" %}';
+                }
+
+                fetch(deleteUrl, {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        window.showToast('Excluído', 'Dados do mês removidos com sucesso.', 'success');
+                        setTimeout(() => location.reload(), 600);
+                    } else {
+                        alert('Erro ao excluir dados do mês.');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Erro ao excluir dados do mês.');
+                });
             });
         });
 

@@ -46,6 +46,7 @@
             </div>
         </div>
 
+        {% if request.user.is_superuser or request.user.profile.role == 'admin' %}
         <a href="{% url 'accounts:user_list' %}" class="nav-link {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}">
             <i data-lucide="users"></i>
             <span>Usuários</span>
@@ -55,6 +56,7 @@
             <i data-lucide="settings"></i>
             <span>Configurações</span>
         </a>
+        {% endif %}
 
         <div class="nav-group">
             <button class="nav-btn">

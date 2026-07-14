@@ -1,6 +1,8 @@
 # Views for the CEAI module - Centro de Apoio ao Idoso
 import json
+from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.views.generic import TemplateView, View
 from django.http import Http404, JsonResponse
 from django.utils import timezone
@@ -9,6 +11,7 @@ from apps.ceai.models import CeaiCategory, CeaiOficina, Submission
 from apps.ceai.constants import CEAI_UNITS, CEAI_FORM_DEFINITION, CONDOMINIO_IDOSO_FORM_DEFINITION
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
 from apps.core.mixins import TvTemplateMixin
+from apps.core.utils import MONTH_OPTIONS
 
 
 class CeaiBaseMixin(DirectorateAccessMixin):
@@ -155,22 +158,45 @@ class CeaiDashboardView(TvTemplateMixin, CeaiBaseMixin, RoleRequiredMixin, Templ
 class CeaiUpdateDataView(CeaiBaseMixin, RoleRequiredMixin, View):
     allowed_roles = ["admin", "diretor", "agente"]
 
+    def _unit_already_launched(self, directorate, month, year, unit):
+        """
+        A tabela "submissions" guarda, numa única linha por (diretoria, mês,
+        ano), os dados de TODAS as unidades do CEAI dentro do JSON em
+        data["units"][unidade] (mesma estrutura usada por CeaiDeleteMonthView).
+        "Já foi lançado" para uma unidade específica significa que essa chave
+        já existe dentro do JSON daquele mês/ano -- não que a linha inteira
+        precise existir (ela pode já existir com OUTRAS unidades preenchidas
+        e a unidade atual ainda vazia).
+        """
+        submission = Submission.objects.filter(
+            directorate_id=directorate.id, month=month, year=year
+        ).first()
+        if not submission:
+            return False
+        data = submission.data or {}
+        if data.get("_is_multi_unit") and isinstance(data.get("units"), dict):
+            return unit in data["units"]
+        # Formato legado: a linha inteira pertencia só a esta unidade.
+        return not data.get("_is_multi_unit") and data.get("_unit") == unit
+
     def get(self, request, unit):
         directorate = get_object_or_404(Directorate, name__icontains="CEAI")
         now = timezone.now()
         month = int(request.GET.get("month", now.month))
         year = int(request.GET.get("year", now.year))
-        
+
         submission = Submission.objects.filter(
             directorate_id=directorate.id,
             month=month,
             year=year
         ).first()
-        
+
         initial_data = {}
         if submission and "units" in submission.data and unit in submission.data["units"]:
             initial_data = submission.data["units"][unit]
-            
+
+        is_locked = self._unit_already_launched(directorate, month, year, unit)
+
         form_def = CEAI_FORM_DEFINITION
         if unit == "Condomínio do Idoso":
             form_def = CONDOMINIO_IDOSO_FORM_DEFINITION
@@ -195,14 +221,26 @@ class CeaiUpdateDataView(CeaiBaseMixin, RoleRequiredMixin, View):
             "oficinas": context_oficinas,
             "initial_data": initial_data,
             "month": month,
-            "year": year
+            "year": year,
+            "is_locked": is_locked,
+            "is_admin_user": self.is_admin(),
+            "month_options": MONTH_OPTIONS,
         })
 
     def post(self, request, unit):
         directorate = get_object_or_404(Directorate, name__icontains="CEAI")
         month = int(request.POST.get("month"))
         year = int(request.POST.get("year"))
-        
+
+        if self._unit_already_launched(directorate, month, year, unit):
+            messages.error(
+                request,
+                "Este mês já foi lançado. Peça a um administrador para reabrir antes de preencher novamente.",
+            )
+            return redirect(
+                reverse("ceai:update_data", kwargs={"unit": unit}) + f"?month={month}&year={year}"
+            )
+
         # Collect form data
         form_data = {}
         for key, value in request.POST.items():
@@ -501,7 +539,49 @@ class CeaiDataListView(CeaiBaseMixin, RoleRequiredMixin, TemplateView):
         context["month_headers"] = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
         context["years_range"] = range(2023, timezone.now().year + 1)
         context["all_categories"] = CeaiCategory.objects.values_list("name", flat=True).distinct().order_by("name")
+        context["can_delete"] = self.is_admin()
         return context
+
+class CeaiDeleteMonthView(CeaiBaseMixin, RoleRequiredMixin, View):
+    allowed_roles = ["admin"]
+
+    def post(self, request, *args, **kwargs):
+        directorate = self.get_directorate()
+        unit = request.POST.get("unit")
+
+        try:
+            month = int(request.POST.get("month"))
+            year = int(request.POST.get("year"))
+        except (TypeError, ValueError):
+            return JsonResponse({"status": "error", "message": "Mês/ano inválidos."}, status=400)
+
+        submission = Submission.objects.filter(
+            directorate_id=directorate.id, month=month, year=year
+        ).first()
+
+        if not submission:
+            return JsonResponse({"status": "success", "deleted": 0})
+
+        # A tabela "submissions" guarda, numa única linha por (diretoria, mês,
+        # ano), os dados de TODAS as unidades do CEAI dentro do JSON em
+        # data["units"][unidade]. "Excluir o mês" aqui significa remover só a
+        # chave da unidade selecionada, preservando os dados das demais
+        # unidades armazenados na mesma linha/JSON.
+        data = submission.data or {}
+        deleted = 0
+
+        if data.get("_is_multi_unit") and isinstance(data.get("units"), dict) and unit in data["units"]:
+            del data["units"][unit]
+            submission.data = data
+            submission.save(update_fields=["data"])
+            deleted = 1
+        elif not data.get("_is_multi_unit") and data.get("_unit") == unit:
+            # Formato legado: a linha inteira pertencia só a esta unidade.
+            submission.delete()
+            deleted = 1
+
+        return JsonResponse({"status": "success", "deleted": deleted})
+
 
 class CeaiQuickEditView(CeaiBaseMixin, RoleRequiredMixin, View):
     allowed_roles = ["admin"]

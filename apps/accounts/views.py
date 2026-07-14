@@ -23,7 +23,7 @@ class UserListView(AdminRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        queryset = Profile.objects.select_related('primary_directorate').all()
+        queryset = Profile.objects.select_related('primary_directorate', 'user').all()
         search = self.request.GET.get('q')
         if search:
             queryset = queryset.filter(full_name__icontains=search)

@@ -47,7 +47,14 @@
                                 <tr style="background: #fff;">
                                     <th style="padding: 16px 24px; text-align: left; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; border-bottom: 2px solid #f1f5f9;">INDICADOR</th>
                                     {% for month in month_headers %}
-                                    <th style="padding: 16px; text-align: center; font-size: 11px; font-weight: 800; color: #94a3b8; border-bottom: 2px solid #f1f5f9;">{{ month }}</th>
+                                    <th style="padding: 16px; text-align: center; font-size: 11px; font-weight: 800; color: #94a3b8; border-bottom: 2px solid #f1f5f9;">
+                                        {{ month }}
+                                        {% if can_delete %}
+                                        <button type="button" class="delete-month-btn" title="Excluir dados de {{ month }}" data-month="{{ forloop.counter }}" data-month-label="{{ month }}" data-year="{{ selected_year }}">
+                                            <i data-lucide="trash-2"></i>
+                                        </button>
+                                        {% endif %}
+                                    </th>
                                     {% endfor %}
                                     <th style="padding: 16px 24px; text-align: center; font-size: 11px; font-weight: 800; color: #1e3a8a; background: #f8fafc; border-bottom: 2px solid #f1f5f9;">TOTAL</th>
                                 </tr>
@@ -104,6 +111,9 @@
 .val-cell.editable-cell:hover { background: #eff6ff; color: #3b82f6; outline: 2px solid #bfdbfe; }
 .val-cell.editable-cell:focus { background: white; outline: 2px solid #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
 .val-cell.saving { position: relative; opacity: 0.6; }
+.delete-month-btn { background: none; border: none; cursor: pointer; color: #ef4444; padding: 2px; margin-left: 4px; vertical-align: middle; opacity: 0.6; }
+.delete-month-btn:hover { opacity: 1; }
+.delete-month-btn i { width: 14px; height: 14px; }
 
 @media (max-width: 1000px) { .monitoring-header { flex-direction: column; gap: 20px; align-items: flex-start; } }
 </style>
@@ -111,7 +121,40 @@
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         lucide.createIcons();
-        
+
+        document.querySelectorAll('.delete-month-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const month = this.dataset.month;
+                const year = this.dataset.year;
+                const monthLabel = this.dataset.monthLabel;
+                if (!confirm(`Excluir todos os dados de ${monthLabel}/${year}? Essa ação não pode ser desfeita.`)) return;
+
+                const formData = new FormData();
+                formData.append('month', month);
+                formData.append('year', year);
+                formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+                fetch('{% url "poprua:delete_month" %}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        window.showToast('Excluído', 'Dados do mês removidos com sucesso.', 'success');
+                        setTimeout(() => location.reload(), 600);
+                    } else {
+                        alert('Erro ao excluir dados do mês.');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Erro ao excluir dados do mês.');
+                });
+            });
+        });
+
         document.querySelectorAll('.editable-cell').forEach(cell => {
             cell.addEventListener('focus', function() {
                 this.setAttribute('data-original', this.innerText.trim());

@@ -22,6 +22,75 @@
         </div>
     </header>
 
+    {% if is_locked %}
+    <div class="locked-month-warning">
+        <i data-lucide="alert-triangle"></i>
+        <div>
+            <strong>Este mês já foi lançado.</strong>
+            <p>Os dados de {{ month }}/{{ year }} ({{ unit }}) já foram enviados. Procure um administrador para liberar o preenchimento novamente.</p>
+        </div>
+        <form method="get" class="period-switch-form">
+            <select name="month" class="period-switch-select" onchange="this.form.submit()">
+                {% for m_num, m_label in month_options %}
+                    <option value="{{ m_num }}" {% if m_num == month %}selected{% endif %}>{{ m_label }}</option>
+                {% endfor %}
+            </select>
+            <input type="number" name="year" value="{{ year }}" class="period-switch-input" onchange="this.form.submit()">
+        </form>
+        {% if is_admin_user %}
+        <button type="button" id="reopen-month-btn" class="btn-premium-action" data-month="{{ month }}" data-year="{{ year }}" data-unit="{{ unit }}">
+            <i data-lucide="unlock"></i> Reabrir mês
+        </button>
+        {% endif %}
+    </div>
+    <style>
+        .locked-month-warning { margin-top: 24px; display: flex; align-items: center; gap: 16px; background: #fff7ed; border: 1px solid #fdba74; color: #9a3412; border-radius: 12px; padding: 20px 24px; flex-wrap: wrap; }
+        .locked-month-warning i:first-child { width: 28px; height: 28px; color: #ea580c; flex-shrink: 0; }
+        .locked-month-warning strong { display: block; margin-bottom: 4px; }
+        .locked-month-warning p { margin: 0; }
+        .period-switch-form { display: flex; gap: 8px; align-items: center; }
+        .period-switch-select, .period-switch-input {
+            border: 1px solid #fdba74; border-radius: 8px; padding: 8px 10px;
+            background: white; color: #9a3412; font-weight: 700; font-size: 13px;
+        }
+        .period-switch-input { width: 80px; }
+        @media (min-width: 1025px) {
+            .locked-month-warning { margin-top: 96px; }
+        }
+    </style>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            var btn = document.getElementById("reopen-month-btn");
+            if (!btn) return;
+            btn.addEventListener("click", function () {
+                if (!confirm("Reabrir este mês? Isso apaga o registro atual de " + btn.dataset.unit + " para permitir um novo preenchimento.")) return;
+                var formData = new FormData();
+                formData.append("month", btn.dataset.month);
+                formData.append("year", btn.dataset.year);
+                formData.append("unit", btn.dataset.unit);
+                formData.append("csrfmiddlewaretoken", "{{ csrf_token }}");
+                fetch('{% url "ceai:delete_month" %}', {
+                    method: "POST",
+                    body: formData,
+                    headers: { "X-Requested-With": "XMLHttpRequest" }
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.status === "success") {
+                        window.showToast("Reaberto", "Mês liberado para novo preenchimento.", "success");
+                        setTimeout(function () { location.reload(); }, 500);
+                    } else {
+                        alert("Erro ao reabrir o mês.");
+                    }
+                })
+                .catch(function (err) {
+                    console.error(err);
+                    alert("Erro ao reabrir o mês.");
+                });
+            });
+        });
+    </script>
+    {% else %}
     <form method="post" class="report-form-container">
         {% csrf_token %}
         <input type="hidden" name="month" value="{{ month }}">
@@ -38,7 +107,7 @@
                 <div class="field-group">
                     <label for="id_{{ field.id }}">{{ field.label }}</label>
                     <input type="{{ field.type }}" name="{{ field.id }}" id="id_{{ field.id }}"
-                           class="form-control" 
+                           class="form-control"
                            {% if field.disabled %}readonly{% endif %}
                            value="{% for k, v in initial_data.items %}{% if k == field.id %}{{ v }}{% endif %}{% endfor %}">
                 </div>
@@ -84,6 +153,7 @@
             </button>
         </div>
     </form>
+    {% endif %}
 </div>
 
 <style>

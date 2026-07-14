@@ -1,10 +1,17 @@
 from apps.directorates.models import Directorate
+from apps.accounts.mixins import user_has_directorate_access
 from django.db import OperationalError, ProgrammingError
 
 def directorates_processor(request):
     try:
         all_dirs = list(Directorate.objects.order_by("name"))
-        
+
+        user = getattr(request, "user", None)
+        if user and user.is_authenticated:
+            all_dirs = [d for d in all_dirs if user_has_directorate_access(user, d)]
+        else:
+            all_dirs = []
+
         main_names = [
             'Benefícios Socioassistenciais', 
             'Qualificação Profissional e SINE', 

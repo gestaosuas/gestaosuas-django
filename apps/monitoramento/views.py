@@ -4,13 +4,14 @@ import unicodedata
 from datetime import date, datetime
 
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
-from django.views.generic import DetailView, FormView, TemplateView
+from django.views.generic import DetailView, FormView, TemplateView, View
 
-from apps.accounts.mixins import DirectorateAccessMixin
+from apps.accounts.mixins import DirectorateAccessMixin, RoleRequiredMixin
 from apps.accounts.models import Profile, ProfileDirectorate
 from apps.directorates.models import Directorate, FormDelegation, MonthlyReport, Osc, Visit, WorkPlan
 from apps.directorates.forms import OscForm
@@ -253,27 +254,33 @@ class MonitoramentoFormView(MonitoramentoBaseMixin, FormView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        raw_def = self.get_directorate().form_definition
-        kwargs["form_definition"] = json.loads(raw_def) if isinstance(raw_def, str) else raw_def
+        raw_def = self.get_directorate().form_definition or []
+        form_def = json.loads(raw_def) if isinstance(raw_def, str) else raw_def
+        kwargs["form_definition"] = form_def if isinstance(form_def, list) else (form_def.get("sections", []) if isinstance(form_def, dict) else [])
         return kwargs
 
     def get_initial(self):
         initial = super().get_initial()
-        directorate = self.get_directorate()
-        reference = self.get_reference()
         month = int(self.request.GET.get("month") or date.today().month)
         year = self.get_year()
 
         initial["month"] = month
         initial["year"] = year
 
-        report = GenericMonitoringReport.objects.filter(
-            directorate=directorate, reference=reference, month=month, year=year
-        ).first()
+        report = self._get_existing_report()
 
         if report:
             initial.update(report.payload)
         return initial
+
+    def _get_existing_report(self):
+        directorate = self.get_directorate()
+        reference = self.get_reference()
+        month = int(self.request.GET.get("month") or date.today().month)
+        year = self.get_year()
+        return GenericMonitoringReport.objects.filter(
+            directorate=directorate, reference=reference, month=month, year=year
+        ).first()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -282,18 +289,41 @@ class MonitoramentoFormView(MonitoramentoBaseMixin, FormView):
         section_items = []
         raw_def = directorate.form_definition or []
         form_def = json.loads(raw_def) if isinstance(raw_def, str) else raw_def
-        for section in form_def:
+        sections = form_def if isinstance(form_def, list) else (form_def.get("sections", []) if isinstance(form_def, dict) else [])
+        for section in sections:
             title = section.get("title", "Dados")
             fields = [form[f.get("name")] for f in section.get("fields", []) if f.get("name") in form.fields]
             if fields:
                 section_items.append({"title": title, "fields": fields})
+        existing_report = self._get_existing_report()
         context.update({
             "directorate": directorate,
             "module_title": directorate.name,
             "section_items": section_items,
             "back_url": reverse("monitoramento:home", kwargs={"pk": directorate.pk}),
+            "selected_year": self.get_year(),
+            "selected_month": int(self.request.GET.get("month") or date.today().month),
+            "reference": self.get_reference(),
+            "existing_report": existing_report,
+            "is_locked": bool(existing_report),
+            "is_admin_user": self.is_admin(),
+            "month_options": MONTH_OPTIONS,
         })
         return context
+
+    def post(self, request, *args, **kwargs):
+        if self._get_existing_report():
+            messages.error(
+                request,
+                "Este mês já foi lançado. Peça a um administrador para reabrir antes de preencher novamente.",
+            )
+            directorate = self.get_directorate()
+            month = int(request.GET.get("month") or date.today().month)
+            return redirect(
+                reverse("monitoramento:form", kwargs={"pk": directorate.pk})
+                + f"?year={self.get_year()}&month={month}&ref={self.get_reference()}"
+            )
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         directorate = self.get_directorate()
@@ -307,3 +337,70 @@ class MonitoramentoFormView(MonitoramentoBaseMixin, FormView):
         report.save()
         messages.success(self.request, "Dados salvos com sucesso.")
         return redirect(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + f"?year={year}")
+
+
+class MonitoramentoDataView(MonitoramentoBaseMixin, TemplateView):
+    template_name = "monitoramento/shared/data.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        directorate = self.get_directorate()
+        selected_year = self.get_year()
+        reference = self.get_reference()
+
+        raw_def = directorate.form_definition or []
+        form_def = json.loads(raw_def) if isinstance(raw_def, str) else raw_def
+        sections = form_def if isinstance(form_def, list) else (form_def.get("sections", []) if isinstance(form_def, dict) else [])
+
+        reports = GenericMonitoringReport.objects.filter(
+            directorate=directorate, reference=reference, year=selected_year
+        )
+        reports_by_month = {r.month: r for r in reports}
+
+        table_groups = []
+        for section in sections:
+            fields = [f for f in section.get("fields", []) if f.get("type") == "number"]
+            if not fields:
+                continue
+            rows = []
+            for field in fields:
+                name = field.get("name")
+                label = field.get("label", name)
+                values = []
+                for month_num, _label in MONTH_LABELS:
+                    report = reports_by_month.get(month_num)
+                    value = report.payload.get(name, "") if report else ""
+                    values.append({
+                        "val": value,
+                        "sub_id": report.id if report else None,
+                        "month": month_num,
+                        "year": selected_year,
+                    })
+                rows.append({"label": label, "key": name, "values": values})
+            table_groups.append({"title": section.get("title", "Dados"), "rows": rows})
+
+        context.update({
+            "directorate": directorate,
+            "selected_year": selected_year,
+            "reference": reference,
+            "month_labels": [label for _month, label in MONTH_LABELS],
+            "table_groups": table_groups,
+            "module_title": directorate.name,
+            "can_delete": self.is_admin(),
+            "back_url": reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + f"?year={selected_year}",
+            "form_url": reverse("monitoramento:form", kwargs={"pk": directorate.pk}) + f"?year={selected_year}",
+        })
+        return context
+
+
+class MonitoramentoDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):
+    allowed_roles = ["admin"]
+
+    def post(self, request, *args, **kwargs):
+        month = request.POST.get("month")
+        year = request.POST.get("year")
+        reference = request.POST.get("reference")
+        deleted, _ = GenericMonitoringReport.objects.filter(
+            directorate_id=kwargs["pk"], reference=reference, month=month, year=year
+        ).delete()
+        return JsonResponse({"status": "success", "deleted": deleted})

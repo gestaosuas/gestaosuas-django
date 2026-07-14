@@ -29,7 +29,14 @@
                     <tr>
                         <th>Indicador</th>
                         {% for l in month_labels %}
-                        <th>{{ l }}</th>
+                        <th>
+                            {{ l }}
+                            {% if can_delete %}
+                            <button type="button" class="delete-month-btn" title="Excluir dados de {{ l }} ({{ selected_year }})" data-month="{{ forloop.counter }}" data-month-label="{{ l }}" data-year="{{ selected_year }}">
+                                <i data-lucide="trash-2"></i>
+                            </button>
+                            {% endif %}
+                        </th>
                         {% endfor %}
                     </tr>
                 </thead>
@@ -71,6 +78,9 @@
 .val-cell.editable-cell:focus .val-inner { background: white !important; outline: 2px solid #3b82f6 !important; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
 .val-cell.saving .val-inner { opacity: 0.6; }
 .val-cell.readonly-cell .val-inner { background: transparent !important; }
+.delete-month-btn { background: none; border: none; cursor: pointer; color: #ef4444; padding: 2px; margin-left: 4px; vertical-align: middle; opacity: 0.6; }
+.delete-month-btn:hover { opacity: 1; }
+.delete-month-btn i { width: 14px; height: 14px; }
 </style>
 
 <script>
@@ -97,10 +107,48 @@
             });
         });
 
+        document.querySelectorAll('.delete-month-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const month = this.dataset.month;
+                const year = this.dataset.year;
+                const monthLabel = this.dataset.monthLabel;
+                if (!confirm(`Excluir todos os dados de ${monthLabel}/${year}? Essa ação não pode ser desfeita.`)) return;
+
+                const formData = new FormData();
+                formData.append('month', month);
+                formData.append('year', year);
+                formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+                let deleteUrl = '{% url "protecaoespecial:delete-month-protetivo" directorate.pk %}';
+                {% if subcategory == 'socioeducativo' %}
+                    deleteUrl = '{% url "protecaoespecial:delete-month-socioeducativo" directorate.pk %}';
+                {% endif %}
+
+                fetch(deleteUrl, {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        window.showToast('Excluído', 'Dados do mês removidos com sucesso.', 'success');
+                        setTimeout(() => location.reload(), 600);
+                    } else {
+                        alert('Erro ao excluir dados do mês.');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Erro ao excluir dados do mês.');
+                });
+            });
+        });
+
         function saveCell(cell) {
             const inner = cell.querySelector('.val-inner');
             if(!inner) return;
-            
+
             const subId = cell.dataset.subId;
             const month = cell.dataset.month;
             const year = cell.dataset.year;

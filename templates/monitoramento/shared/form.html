@@ -3,6 +3,9 @@
 {% block title %}Atualizar {{ module_title }} | {{ directorate.name }}{% endblock %}
 
 {% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+    <main class="dashboard-main" style="padding-top: 0;">
 <section class="simple-shell benefits-shell">
     <a class="back-link" href="{{ back_url }}">&larr; Voltar para o painel</a>
 
@@ -20,6 +23,81 @@
         </div>
     </div>
 
+    {% if is_locked %}
+        <div class="locked-month-warning">
+            <i data-lucide="alert-triangle"></i>
+            <div>
+                <strong>Este mês já foi lançado.</strong>
+                <p>Os dados de {{ selected_month }}/{{ selected_year }} já foram enviados. Procure um administrador para liberar o preenchimento novamente.</p>
+            </div>
+            <form method="get" class="period-switch-form">
+                <input type="hidden" name="ref" value="{{ reference }}">
+                <select name="month" class="period-switch-select" onchange="this.form.submit()">
+                    {% for m_num, m_label in month_options %}
+                        <option value="{{ m_num }}" {% if m_num == selected_month %}selected{% endif %}>{{ m_label }}</option>
+                    {% endfor %}
+                </select>
+                <input type="number" name="year" value="{{ selected_year }}" class="period-switch-input" onchange="this.form.submit()">
+            </form>
+            {% if is_admin_user %}
+            <button type="button" id="reopen-month-btn" class="btn-premium-action"
+                data-month="{{ selected_month }}" data-year="{{ selected_year }}" data-reference="{{ reference }}">
+                <i data-lucide="unlock"></i> Reabrir mês
+            </button>
+            {% endif %}
+        </div>
+        <style>
+            .locked-month-warning {
+                margin-top: 24px; display: flex; align-items: center; gap: 16px;
+                background: #fff7ed; border: 1px solid #fdba74; color: #9a3412;
+                border-radius: 12px; padding: 20px 24px; flex-wrap: wrap;
+            }
+            .locked-month-warning i:first-child { width: 28px; height: 28px; color: #ea580c; flex-shrink: 0; }
+            .locked-month-warning strong { display: block; margin-bottom: 4px; }
+            .locked-month-warning p { margin: 0; }
+            .period-switch-form { display: flex; gap: 8px; align-items: center; }
+            .period-switch-select, .period-switch-input {
+                border: 1px solid #fdba74; border-radius: 8px; padding: 8px 10px;
+                background: white; color: #9a3412; font-weight: 700; font-size: 13px;
+            }
+            .period-switch-input { width: 80px; }
+            @media (min-width: 1025px) {
+                .locked-month-warning { margin-top: 96px; }
+            }
+        </style>
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                var btn = document.getElementById("reopen-month-btn");
+                if (!btn) return;
+                btn.addEventListener("click", function () {
+                    if (!confirm("Reabrir este mês? Isso apaga o registro atual para permitir um novo preenchimento.")) return;
+                    var formData = new FormData();
+                    formData.append("month", btn.dataset.month);
+                    formData.append("year", btn.dataset.year);
+                    formData.append("reference", btn.dataset.reference);
+                    formData.append("csrfmiddlewaretoken", "{{ csrf_token }}");
+                    fetch('{% url "monitoramento:delete-month" directorate.pk %}', {
+                        method: "POST",
+                        body: formData,
+                        headers: { "X-Requested-With": "XMLHttpRequest" }
+                    })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.status === "success") {
+                            window.showToast("Reaberto", "Mês liberado para novo preenchimento.", "success");
+                            setTimeout(function () { location.reload(); }, 500);
+                        } else {
+                            alert("Erro ao reabrir o mês.");
+                        }
+                    })
+                    .catch(function (err) {
+                        console.error(err);
+                        alert("Erro ao reabrir o mês.");
+                    });
+                });
+            });
+        </script>
+    {% else %}
     <form method="post" class="report-form-shell">
         {% csrf_token %}
         {% if form.non_field_errors %}
@@ -65,5 +143,23 @@
             <button type="submit" class="primary-button">Salvar Preenchimento</button>
         </div>
     </form>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        var monthEl = document.getElementById("id_month");
+        var yearEl = document.getElementById("id_year");
+        function reloadWithPeriod() {
+            var url = new URL(window.location.href);
+            if (monthEl) url.searchParams.set("month", monthEl.value);
+            if (yearEl) url.searchParams.set("year", yearEl.value);
+            window.location.href = url.toString();
+        }
+        if (monthEl) monthEl.addEventListener("change", reloadWithPeriod);
+        if (yearEl) yearEl.addEventListener("change", reloadWithPeriod);
+    });
+    </script>
+    {% endif %}
 </section>
+    </main>
+</div>
 {% endblock %}

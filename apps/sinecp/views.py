@@ -1,5 +1,6 @@
 from datetime import date
 from django.contrib import messages
+from django.utils import timezone
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, get_object_or_404
@@ -163,6 +164,7 @@ class SharedCreateUpdateView(SineCpBaseMixin, FormView):
     form_class = None
     success_view_name = ""
     report_title = ""
+    delete_month_view_name = ""
 
     def get_initial(self):
         initial = super().get_initial()
@@ -195,22 +197,42 @@ class SharedCreateUpdateView(SineCpBaseMixin, FormView):
         context["selected_month"] = int(self.request.GET.get("month") or date.today().month)
         context["section_items"] = section_items
         context["module_title"] = self.report_title
-        context["existing_report"] = self.get_existing_report()
+        existing_report = self.get_existing_report()
+        context["existing_report"] = existing_report
+        context["is_locked"] = bool(existing_report)
+        context["is_admin_user"] = self.is_admin()
+        context["delete_month_url"] = reverse(self.delete_month_view_name)
+        context["month_options"] = MONTH_OPTIONS
         return context
+
+    def post(self, request, *args, **kwargs):
+        if self.get_existing_report():
+            messages.error(
+                request,
+                "Este mês já foi lançado. Peça a um administrador para reabrir antes de preencher novamente.",
+            )
+            month = int(request.GET.get("month") or date.today().month)
+            return redirect(f"{request.path}?year={self.get_year()}&month={month}")
+        return super().post(request, *args, **kwargs)
 
 class SineCreateUpdateView(SharedCreateUpdateView):
     form_class = SineReportForm
     success_view_name = "sinecp:sine-data"
     report_title = "SINE"
+    delete_month_view_name = "sinecp:sine-delete-month"
 
     def form_valid(self, form):
         directorate = self.get_directorate()
         month = form.cleaned_data["month"]
         year = form.cleaned_data["year"]
-        report, _created = SineReport.objects.get_or_create(directorate=directorate, month=month, year=year)
+        report, _created = SineReport.objects.get_or_create(
+            directorate=directorate, month=month, year=year,
+            defaults={"created_at": timezone.now(), "updated_at": timezone.now()},
+        )
         for field_name, value in form.cleaned_data.items():
             setattr(report, field_name, value)
         report.user_external_id = None
+        report.updated_at = timezone.now()
         report.save()
         messages.success(self.request, "Dados salvos.")
         return redirect(reverse(self.success_view_name) + f"?year={year}")
@@ -219,14 +241,19 @@ class QualificacaoCreateUpdateView(SharedCreateUpdateView):
     form_class = QualificacaoReportForm
     success_view_name = "sinecp:qualificacao-data"
     report_title = "Qualificacao"
+    delete_month_view_name = "sinecp:qualificacao-delete-month"
 
     def form_valid(self, form):
         directorate = self.get_directorate()
         month = form.cleaned_data["month"]
         year = form.cleaned_data["year"]
-        report, _created = QualificacaoReport.objects.get_or_create(directorate=directorate, month=month, year=year)
+        report, _created = QualificacaoReport.objects.get_or_create(
+            directorate=directorate, month=month, year=year,
+            defaults={"created_at": timezone.now(), "updated_at": timezone.now()},
+        )
         for field_name, value in form.cleaned_data.items():
             setattr(report, field_name, value)
+        report.updated_at = timezone.now()
         report.save()
         messages.success(self.request, "Dados salvos.")
         return redirect(reverse(self.success_view_name) + f"?year={year}")
@@ -368,10 +395,32 @@ class SharedQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
         if sub_id and sub_id != "None" and sub_id != "":
             report = get_object_or_404(self.model, id=sub_id)
         else:
-            report, _ = self.model.objects.get_or_create(directorate=directorate, month=month, year=year)
+            report, _ = self.model.objects.get_or_create(
+                directorate=directorate, month=month, year=year,
+                defaults={"created_at": timezone.now(), "updated_at": timezone.now()},
+            )
         setattr(report, key, value)
+        report.updated_at = timezone.now()
         report.save()
         return JsonResponse({"status": "success", "value": value, "sub_id": report.id})
 
 class SineQuickEditView(SharedQuickEditView): model = SineReport
 class QualificacaoQuickEditView(SharedQuickEditView): model = QualificacaoReport
+
+class SharedDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):
+    allowed_roles = ["admin"]
+    model = None
+
+    def post(self, request, *args, **kwargs):
+        month = request.POST.get("month")
+        year = request.POST.get("year")
+        directorate = Directorate.objects.filter(name__icontains="sine").first()
+        if not directorate:
+            directorate = Directorate.objects.filter(name__icontains="qualific").first()
+        deleted, _ = self.model.objects.filter(
+            directorate=directorate, month=month, year=year
+        ).delete()
+        return JsonResponse({"status": "success", "deleted": deleted})
+
+class SineDeleteMonthView(SharedDeleteMonthView): model = SineReport
+class QualificacaoDeleteMonthView(SharedDeleteMonthView): model = QualificacaoReport

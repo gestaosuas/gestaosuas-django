@@ -222,16 +222,34 @@ class NaicaCreateUpdateView(NaicaBaseMixin, FormView):
                 "title": section_title,
                 "fields": [form[field_name] for field_name in field_names],
             })
+        existing_report = self._get_existing_report()
         context.update({
             "directorate": directorate,
             "selected_year": self.get_year(),
             "selected_month": self.get_month_number(),
             "section_items": section_items,
-            "existing_report": self._get_existing_report(),
+            "existing_report": existing_report,
+            "is_locked": bool(existing_report),
+            "is_admin_user": self.is_admin(),
+            "month_options": MONTH_OPTIONS,
             "naica_units": self.filter_units(NAICA_UNITS),
             "selected_unit": self.request.GET.get("unit") or "",
         })
         return context
+
+    def post(self, request, *args, **kwargs):
+        if self._get_existing_report():
+            messages.error(
+                request,
+                "Este mês já foi lançado. Peça a um administrador para reabrir antes de preencher novamente.",
+            )
+            directorate = self.get_directorate()
+            unit = request.GET.get("unit") or request.POST.get("unit_name", "")
+            return redirect(
+                reverse("naica:form", kwargs={"pk": directorate.pk})
+                + f"?year={self.get_year()}&month={self.get_month_number()}&unit={unit}"
+            )
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         directorate = self.get_directorate()
@@ -376,6 +394,19 @@ class NaicaNarrativeListView(NaicaBaseMixin, TemplateView):
             "monthly_report_base_url": reverse("naica:monthly-report", kwargs={"pk": directorate.pk}),
         })
         return context
+
+class NaicaDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):
+    allowed_roles = ["admin"]
+
+    def post(self, request, *args, **kwargs):
+        month = request.POST.get("month")
+        year = request.POST.get("year")
+        unit = request.POST.get("unit")
+        deleted, _ = NaicaReport.objects.filter(
+            directorate_id=kwargs["pk"], unit_name=unit, month=month, year=year
+        ).delete()
+        return JsonResponse({"status": "success", "deleted": deleted})
+
 
 class NaicaQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
     allowed_roles = ["admin"]

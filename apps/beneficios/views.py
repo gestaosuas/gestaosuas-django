@@ -152,8 +152,24 @@ class BeneficiosCreateUpdateView(BeneficiosBaseMixin, FormView):
         context["selected_year"] = self.get_year()
         context["selected_month"] = int(self.request.GET.get("month") or date.today().month)
         context["section_items"] = section_items
-        context["existing_report"] = self.get_existing_report()
+        existing_report = self.get_existing_report()
+        context["existing_report"] = existing_report
+        context["is_locked"] = bool(existing_report)
+        context["is_admin_user"] = self.is_admin()
+        context["month_options"] = MONTH_OPTIONS
         return context
+
+    def post(self, request, *args, **kwargs):
+        if self.get_existing_report():
+            messages.error(
+                request,
+                "Este mês já foi lançado. Peça a um administrador para reabrir antes de preencher novamente.",
+            )
+            month = self.request.GET.get("month") or date.today().month
+            return redirect(
+                reverse("beneficios:update") + f"?year={self.get_year()}&month={month}"
+            )
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         directorate = self.get_directorate()
@@ -304,6 +320,21 @@ class BeneficiosNarrativeListView(BeneficiosBaseMixin, TemplateView):
             }
         )
         return context
+
+class BeneficiosDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):
+    allowed_roles = ["admin"]
+
+    def post(self, request, *args, **kwargs):
+        month = request.POST.get("month")
+        year = request.POST.get("year")
+        # Beneficios nao tem conceito de "unidade" dentro da diretoria (uma unica
+        # diretoria fixa, sem <dir_slug:pk> na URL) — filtro so por directorate/mes/ano.
+        directorate = Directorate.objects.filter(name__icontains="benef").first()
+        deleted, _ = BeneficiosReport.objects.filter(
+            directorate=directorate, month=month, year=year
+        ).delete()
+        return JsonResponse({"status": "success", "deleted": deleted})
+
 
 class BeneficiosQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
     allowed_roles = ["admin"]

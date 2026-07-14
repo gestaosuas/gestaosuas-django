@@ -62,7 +62,14 @@
                             <tr>
                                 <th class="indicator-col">ATRIBUTO / INDICADOR</th>
                                 {% for month in month_headers %}
-                                <th class="month-col">{{ month }}</th>
+                                <th class="month-col">
+                                    {{ month }}
+                                    {% if can_delete %}
+                                    <button type="button" class="delete-month-btn" title="Excluir dados de {{ month }} ({{ unit.name }})" data-month="{{ forloop.counter }}" data-month-label="{{ month }}" data-year="{{ selected_year }}" data-unit="{{ unit.name }}">
+                                        <i data-lucide="trash-2"></i>
+                                    </button>
+                                    {% endif %}
+                                </th>
                                 {% endfor %}
                                 <th class="total-col">ACUMULADO</th>
                             </tr>
@@ -222,12 +229,52 @@
     cursor: cell;
 }
 .saving { opacity: 0.5; pointer-events: none; }
+.delete-month-btn { background: none; border: none; cursor: pointer; color: #ef4444; padding: 2px; margin-left: 4px; vertical-align: middle; opacity: 0.6; }
+.delete-month-btn:hover { opacity: 1; }
+.delete-month-btn i { width: 14px; height: 14px; }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    if (window.lucide) { lucide.createIcons(); }
+
+    document.querySelectorAll('.delete-month-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const month = this.dataset.month;
+            const year = this.dataset.year;
+            const unit = this.dataset.unit;
+            const monthLabel = this.dataset.monthLabel;
+            if (!confirm(`Excluir todos os dados de ${monthLabel}/${year} da unidade ${unit}? Essa ação não pode ser desfeita.`)) return;
+
+            const formData = new FormData();
+            formData.append('month', month);
+            formData.append('year', year);
+            formData.append('unit', unit);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('{% url "ceai:delete_month" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.showToast('Excluído', 'Dados do mês removidos com sucesso.', 'success');
+                    setTimeout(() => location.reload(), 600);
+                } else {
+                    alert('Erro ao excluir dados do mês.');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Erro ao excluir dados do mês.');
+            });
+        });
+    });
+
     const editableCells = document.querySelectorAll('.editable-cell');
-    
+
     editableCells.forEach(cell => {
         cell.addEventListener('focus', function() {
             this.setAttribute('data-original', this.innerText.trim());

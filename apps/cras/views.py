@@ -207,8 +207,25 @@ class CrasCreateUpdateView(CrasBaseMixin, FormView):
             "section_items": section_items, "existing_report": existing,
             "cras_units": self.filter_units(CRAS_UNITS), "selected_unit": self.request.GET.get("unit") or "",
             "existing_rma": existing.rma_url if existing else None,
+            "is_locked": bool(existing),
+            "is_admin_user": self.is_admin(),
+            "month_options": MONTH_OPTIONS,
         })
         return context
+
+    def post(self, request, *args, **kwargs):
+        if self._get_existing_report():
+            messages.error(
+                request,
+                "Este mês já foi lançado. Peça a um administrador para reabrir antes de preencher novamente.",
+            )
+            directorate = self.get_directorate()
+            unit = request.GET.get("unit") or request.POST.get("unit_name", "")
+            return redirect(
+                reverse("cras:form", kwargs={"pk": directorate.pk})
+                + f"?year={self.get_year()}&month={self.get_month_number()}&unit={unit}"
+            )
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         directorate = self.get_directorate()
@@ -333,6 +350,28 @@ class CrasNarrativeListView(CrasBaseMixin, TemplateView):
             "can_delete": self.is_admin(),
         })
         return context
+
+class CrasDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):
+    allowed_roles = ["admin"]
+
+    def post(self, request, *args, **kwargs):
+        month = request.POST.get("month")
+        year = request.POST.get("year")
+        unit = request.POST.get("unit")
+        # unit_name pode estar salvo com variacoes de acentuacao/caixa em relacao
+        # a lista canonica CRAS_UNITS (mesmo criterio usado em CrasDataView/CrasHomeView
+        # para casar unidade -> registros), entao comparamos normalizado em vez de
+        # usar filter(unit_name=unit) direto.
+        unit_key = strip_accents(unit).upper() if unit else ""
+        candidates = CrasReport.objects.filter(
+            directorate_id=kwargs["pk"], month=month, year=year
+        )
+        ids_to_delete = [
+            r.id for r in candidates if strip_accents(r.unit_name).upper() == unit_key
+        ]
+        deleted, _ = CrasReport.objects.filter(id__in=ids_to_delete).delete()
+        return JsonResponse({"status": "success", "deleted": deleted})
+
 
 class CrasQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
     allowed_roles = ["admin"]

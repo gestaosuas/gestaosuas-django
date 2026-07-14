@@ -7,9 +7,86 @@
     {% include "partials/navbar.html" %}
 
     <main class="dashboard-main sinecp-main" style="padding-top: 0;">
+        {% if is_locked %}
+        <div class="locked-month-warning">
+            <i data-lucide="alert-triangle"></i>
+            <div>
+                <strong>Este mês já foi lançado.</strong>
+                <p>Os dados de {{ selected_month }}/{{ selected_year }} ({{ module_title }}) já foram enviados. Procure um administrador para liberar o preenchimento novamente.</p>
+            </div>
+            <form method="get" class="period-switch-form">
+                <select name="month" class="period-switch-select" onchange="this.form.submit()">
+                    {% for m_num, m_label in month_options %}
+                        <option value="{{ m_num }}" {% if m_num == selected_month %}selected{% endif %}>{{ m_label }}</option>
+                    {% endfor %}
+                </select>
+                <input type="number" name="year" value="{{ selected_year }}" class="period-switch-input" onchange="this.form.submit()">
+            </form>
+            {% if is_admin_user %}
+            <button type="button" id="reopen-month-btn" class="btn-premium-action"
+                data-month="{{ selected_month }}" data-year="{{ selected_year }}">
+                <i data-lucide="unlock"></i> Reabrir mês
+            </button>
+            {% endif %}
+        </div>
+        <style>
+            .locked-month-warning {
+                margin: 24px 40px; display: flex; align-items: center; gap: 16px;
+                background: #fff7ed; border: 1px solid #fdba74; color: #9a3412;
+                border-radius: 12px; padding: 20px 24px; flex-wrap: wrap;
+            }
+            /* Sem o banner colorido antes (só aparece no estado desbloqueado),
+               o aviso vira o primeiro elemento e fica atrás da navbar (que no
+               desktop é position:absolute, sem reservar espaço no fluxo). */
+            @media (min-width: 1025px) {
+                .locked-month-warning { margin-top: 96px; }
+            }
+            .locked-month-warning i:first-child { width: 28px; height: 28px; color: #ea580c; flex-shrink: 0; }
+            .locked-month-warning strong { display: block; margin-bottom: 4px; }
+            .locked-month-warning p { margin: 0; }
+            .period-switch-form { display: flex; gap: 8px; align-items: center; }
+            .period-switch-select, .period-switch-input {
+                border: 1px solid #fdba74; border-radius: 8px; padding: 8px 10px;
+                background: white; color: #9a3412; font-weight: 700; font-size: 13px;
+            }
+            .period-switch-input { width: 80px; }
+        </style>
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                lucide.createIcons();
+                var btn = document.getElementById("reopen-month-btn");
+                if (!btn) return;
+                btn.addEventListener("click", function () {
+                    if (!confirm("Reabrir este mês? Isso apaga o registro atual para permitir um novo preenchimento.")) return;
+                    var formData = new FormData();
+                    formData.append("month", btn.dataset.month);
+                    formData.append("year", btn.dataset.year);
+                    formData.append("csrfmiddlewaretoken", "{{ csrf_token }}");
+                    fetch('{{ delete_month_url }}', {
+                        method: "POST",
+                        body: formData,
+                        headers: { "X-Requested-With": "XMLHttpRequest" }
+                    })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.status === "success") {
+                            window.showToast("Reaberto", "Mês liberado para novo preenchimento.", "success");
+                            setTimeout(function () { location.reload(); }, 500);
+                        } else {
+                            alert("Erro ao reabrir o mês.");
+                        }
+                    })
+                    .catch(function (err) {
+                        console.error(err);
+                        alert("Erro ao reabrir o mês.");
+                    });
+                });
+            });
+        </script>
+        {% else %}
         <form method="post" id="main-report-form" class="report-form-shell" style="width: 100%; margin: 0;">
             {% csrf_token %}
-            
+
             <div class="monitoring-header-container header-indigo">
                 <div class="monitoring-header-content">
                     <div class="monitoring-title-area">
@@ -76,9 +153,11 @@
                 </div>
             </div>
         </form>
+        {% endif %}
     </main>
 </div>
 
+{% if not is_locked %}
 <!-- MODAL 1: SELEÇÃO DE PERÍODO -->
 <div id="modal-select-period" class="modal-premium-overlay" style="display: flex;">
     <div class="modal-premium-content">
@@ -165,6 +244,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <style>
     /* Estilos Header Minimizados */
@@ -296,17 +376,31 @@
     function finalConfirm() {
         const monthVal = document.getElementById('modal-month-select').value;
         const yearVal = document.getElementById('modal-year-select').value;
-        
+
         const realMonthSelect = document.querySelector('select[name="month"]');
         const realYearSelect = document.querySelector('select[name="year"]');
-        
+
         if (realMonthSelect) realMonthSelect.value = monthVal;
         if (realYearSelect) realYearSelect.value = yearVal;
-        
+
         document.getElementById('modal-confirm-period').style.display = 'none';
-        
+
         // Marca que o período já foi confirmado para não reabrir o modal por engano nesta sessão
         sessionStorage.setItem('period_confirmed', 'true');
+
+        // Recarrega a página via GET com o período escolhido para que o backend
+        // recalcule "is_locked" imediatamente para o novo mês/ano (mesmo padrão
+        // usado no formulário do NAICA).
+        reloadWithPeriod();
+    }
+
+    function reloadWithPeriod() {
+        var url = new URL(window.location.href);
+        var monthEl = document.querySelector('select[name="month"]');
+        var yearEl = document.querySelector('select[name="year"]');
+        if (monthEl) url.searchParams.set("month", monthEl.value);
+        if (yearEl) url.searchParams.set("year", yearEl.value);
+        window.location.href = url.toString();
     }
 
     function showSubmitModal() {
@@ -324,11 +418,20 @@
     // Inicia os ícones do Lucide e verifica se deve mostrar o modal inicial
     document.addEventListener('DOMContentLoaded', () => {
         lucide.createIcons();
-        
+
         // Se já confirmou o período, não mostra o modal de novo (ajuda em casos de erro de validação)
-        if (sessionStorage.getItem('period_confirmed') === 'true') {
-            document.getElementById('modal-select-period').style.display = 'none';
+        var modalSelectPeriod = document.getElementById('modal-select-period');
+        if (modalSelectPeriod && sessionStorage.getItem('period_confirmed') === 'true') {
+            modalSelectPeriod.style.display = 'none';
         }
+
+        // Os selects reais de mês/ano também ficam visíveis e editáveis direto
+        // no cabeçalho (fora do modal) — trocar o valor por ali também deve
+        // recarregar a página para recalcular "is_locked" para o novo período.
+        var realMonthSelect = document.querySelector('select[name="month"]');
+        var realYearSelect = document.querySelector('select[name="year"]');
+        if (realMonthSelect) realMonthSelect.addEventListener("change", reloadWithPeriod);
+        if (realYearSelect) realYearSelect.addEventListener("change", reloadWithPeriod);
     });
 </script>
 {% endblock %}

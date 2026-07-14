@@ -16,7 +16,12 @@ urlpatterns = [
     path("<dir_slug:pk>/dados/casa-da-mulher/", views.CasaDaMulherDataView.as_view(), name="data-casa-da-mulher"),
     path("<dir_slug:pk>/dados/diversidade/", views.DiversidadeDataView.as_view(), name="data-diversidade"),
     path("<dir_slug:pk>/dados/nucleo-diversidade/", views.NucleoDiversidadeDataView.as_view(), name="data-nucleo-diversidade"),
-    
+
+    # Delete month AJAX APIs
+    path("<dir_slug:pk>/dados/casa-da-mulher/excluir-mes/", views.CasaDaMulherDeleteMonthView.as_view(), name="delete-month-casa-da-mulher"),
+    path("<dir_slug:pk>/dados/diversidade/excluir-mes/", views.DiversidadeDeleteMonthView.as_view(), name="delete-month-diversidade"),
+    path("<dir_slug:pk>/dados/nucleo-diversidade/excluir-mes/", views.NucleoDiversidadeDeleteMonthView.as_view(), name="delete-month-nucleo-diversidade"),
+
     # Quick Edit AJAX APIs
     path("quick-edit/casa-da-mulher/", views.CasaDaMulherQuickEditView.as_view(), name="quick-edit-casa-da-mulher"),
     path("quick-edit/diversidade/", views.DiversidadeQuickEditView.as_view(), name="quick-edit-diversidade"),

@@ -263,34 +263,59 @@ class CasaMulherGenericFormView(CasaMulherBaseMixin, FormView):
     template_name = "casamulher/form.html"
     subcategory = ""
     success_msg = ""
+    delete_month_url_name = ""
 
     def get_initial(self):
         initial = super().get_initial()
         initial["month"] = self.get_month_number()
         initial["year"] = self.get_year()
-        r = self.form_class.Meta.model.objects.filter(
-            directorate=self.get_directorate(), month=self.get_month_number(), year=self.get_year()
-        ).first()
+        r = self._get_existing_report()
         if r:
             for f in self.form_class.Meta.model._meta.fields:
                 if f.name in self.form_class.base_fields:
                     initial[f.name] = getattr(r, f.name)
         return initial
 
+    def _get_existing_report(self):
+        return self.form_class.Meta.model.objects.filter(
+            directorate=self.get_directorate(), month=self.get_month_number(), year=self.get_year()
+        ).first()
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         form = ctx["form"]
+        directorate = self.get_directorate()
         items = [{"title": t, "fields": [form[f] for f in fs]} for t, fs in self.form_class.section_map]
+        existing_report = self._get_existing_report()
         ctx.update({
-            "directorate": self.get_directorate(), "section_items": items,
-            "subcategory": self.subcategory, "selected_year": self.get_year(), "selected_month": self.get_month_number()
+            "directorate": directorate, "section_items": items,
+            "subcategory": self.subcategory, "selected_year": self.get_year(), "selected_month": self.get_month_number(),
+            "existing_report": existing_report,
+            "is_locked": bool(existing_report),
+            "is_admin_user": self.is_admin(),
+            "delete_month_url": reverse(f"casamulher:{self.delete_month_url_name}", kwargs={"pk": directorate.pk}),
+            "month_options": MONTH_OPTIONS,
         })
         return ctx
+
+    def post(self, request, *args, **kwargs):
+        if self._get_existing_report():
+            messages.error(
+                request,
+                "Este mês já foi lançado. Peça a um administrador para reabrir antes de preencher novamente.",
+            )
+            directorate = self.get_directorate()
+            return redirect(
+                reverse(f"casamulher:{self.request.resolver_match.url_name}", kwargs={"pk": directorate.pk})
+                + f"?year={self.get_year()}&month={self.get_month_number()}"
+            )
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         d = self.get_directorate()
         r, created = self.form_class.Meta.model.objects.get_or_create(
             directorate=d, month=form.cleaned_data["month"], year=form.cleaned_data["year"],
+            defaults={"user_id": self.request.user.pk},
         )
         if created:
             r.created_at = datetime.now()
@@ -314,18 +339,21 @@ class CasaDaMulherFormView(CasaMulherGenericFormView):
     form_class = CasaDaMulherForm
     subcategory = "casa-da-mulher"
     success_msg = "Dados Casa da Mulher salvos com sucesso."
+    delete_month_url_name = "delete-month-casa-da-mulher"
 
 
 class DiversidadeFormView(CasaMulherGenericFormView):
     form_class = DiversidadeForm
     subcategory = "diversidade"
     success_msg = "Dados Atendimentos Diversos salvos com sucesso."
+    delete_month_url_name = "delete-month-diversidade"
 
 
 class NucleoDiversidadeFormView(CasaMulherGenericFormView):
     form_class = NucleoDiversidadeForm
     subcategory = "nucleo-diversidade"
     success_msg = "Dados Núcleo de Diversidade salvos com sucesso."
+    delete_month_url_name = "delete-month-nucleo-diversidade"
 
 
 class CasaMulherGenericDataView(CasaMulherBaseMixin, TemplateView):
@@ -376,6 +404,31 @@ class NucleoDiversidadeDataView(CasaMulherGenericDataView):
     form_class = NucleoDiversidadeForm
     model = NucleoDiversidadeReport
     subcategory = "nucleo-diversidade"
+
+
+class CasaMulherSharedDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):
+    allowed_roles = ["admin"]
+    model = None
+
+    def post(self, request, *args, **kwargs):
+        month = request.POST.get("month")
+        year = request.POST.get("year")
+        deleted, _ = self.model.objects.filter(
+            directorate_id=kwargs["pk"], month=month, year=year
+        ).delete()
+        return JsonResponse({"status": "success", "deleted": deleted})
+
+
+class CasaDaMulherDeleteMonthView(CasaMulherSharedDeleteMonthView):
+    model = CasaDaMulherReport
+
+
+class DiversidadeDeleteMonthView(CasaMulherSharedDeleteMonthView):
+    model = DiversidadeReport
+
+
+class NucleoDiversidadeDeleteMonthView(CasaMulherSharedDeleteMonthView):
+    model = NucleoDiversidadeReport
 
 
 class CasaMulherSharedQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):

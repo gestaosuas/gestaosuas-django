@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.views.generic import TemplateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils import timezone
@@ -6,6 +7,7 @@ from django.http import JsonResponse, Http404
 from django.contrib import messages
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
 from apps.core.mixins import TvTemplateMixin
+from apps.core.utils import MONTH_OPTIONS
 from apps.directorates.models import Directorate
 from .models import PopRuaReport
 from .forms import PopRuaForm
@@ -137,45 +139,89 @@ class PopRuaDataListView(PopRuaBaseMixin, TemplateView):
         context["can_delete"] = self.is_admin()
         return context
 
+class PopRuaDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):
+    allowed_roles = ["admin"]
+
+    def post(self, request, *args, **kwargs):
+        directorate = Directorate.objects.filter(name__icontains="População de Rua").first()
+
+        try:
+            month = int(request.POST.get("month"))
+            year = int(request.POST.get("year"))
+        except (TypeError, ValueError):
+            return JsonResponse({"status": "error", "message": "Mês/ano inválidos."}, status=400)
+
+        deleted, _ = PopRuaReport.objects.filter(
+            directorate=directorate, month=month, year=year
+        ).delete()
+        return JsonResponse({"status": "success", "deleted": deleted})
+
+
 class PopRuaUpdateView(PopRuaBaseMixin, View):
+    def _get_existing_report(self, directorate, month, year):
+        return PopRuaReport.objects.filter(directorate=directorate, month=month, year=year).first()
+
     def get(self, request, pk=None):
         directorate = self.get_directorate()
         report = None
         if pk:
             report = get_object_or_404(PopRuaReport, pk=pk)
-        
+
+        if report:
+            month, year = report.month, report.year
+        else:
+            month = int(request.GET.get("month") or timezone.now().month)
+            year = int(request.GET.get("year") or timezone.now().year)
+
+        # Uma linha de PopRuaReport por (diretoria, mês, ano) já representa o
+        # mês inteiro "lançado" (ao contrário do CEAI, aqui não há dimensão
+        # de unidade dentro de um JSON — a existência da linha já basta).
+        existing = self._get_existing_report(directorate, month, year)
+        is_locked = bool(existing)
+
         initial = {}
         if not report:
-            initial["year"] = timezone.now().year
-            
+            initial["year"] = year
+            initial["month"] = month
+
         form = PopRuaForm(instance=report, initial=initial)
         return render(request, "poprua/form.html", {
             "form": form,
             "directorate": directorate,
-            "report": report
+            "report": report,
+            "selected_month": month,
+            "selected_year": year,
+            "is_locked": is_locked,
+            "is_admin_user": self.is_admin(),
+            "month_options": MONTH_OPTIONS,
         })
 
     def post(self, request, pk=None):
         directorate = self.get_directorate()
         report = None
-        
+
         # Primary check: ID based
         if pk:
             report = get_object_or_404(PopRuaReport, pk=pk)
-            
+
         form = PopRuaForm(request.POST, instance=report)
         if form.is_valid():
-            # Secondary check: Monthly/Yearly uniqueness (Upsert logic)
             month = form.cleaned_data["month"]
             year = form.cleaned_data["year"]
-            
-            existing = PopRuaReport.objects.filter(directorate=directorate, month=month, year=year).first()
-            if existing and (not report or existing.id != report.id):
-                # We found an existing record that is not the one we are editing
-                # Switch instance to the existing one to update it instead of creating duplicate
-                form = PopRuaForm(request.POST, instance=existing)
-                # Re-validate just in case, though it should be valid
-                form.is_valid()
+
+            existing = self._get_existing_report(directorate, month, year)
+            if existing:
+                # Mês já lançado (linha já existe para diretoria/mês/ano) --
+                # rejeita a gravação, mesmo em POST direto. É preciso um
+                # administrador "reabrir o mês" (apagar o registro) antes de
+                # permitir um novo preenchimento.
+                messages.error(
+                    request,
+                    "Este mês já foi lançado. Peça a um administrador para reabrir antes de preencher novamente.",
+                )
+                return redirect(
+                    reverse("poprua:update_data") + f"?year={year}&month={month}"
+                )
 
             new_report = form.save(commit=False)
             new_report.directorate = directorate
@@ -187,11 +233,15 @@ class PopRuaUpdateView(PopRuaBaseMixin, View):
             error_msg = "Erro ao salvar dados. Verifique os campos: "
             error_fields = [form.fields[f].label for f in form.errors]
             messages.error(request, error_msg + ", ".join(error_fields))
-        
+
         return render(request, "poprua/form.html", {
             "form": form,
             "directorate": directorate,
-            "report": report
+            "report": report,
+            "selected_month": form.data.get("month"),
+            "selected_year": form.data.get("year"),
+            "is_locked": False,
+            "is_admin_user": self.is_admin(),
         })
 
 class PopRuaQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):

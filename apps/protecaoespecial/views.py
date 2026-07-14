@@ -252,38 +252,62 @@ class CreasProtetivoFormView(ProteacaoEspecialBaseMixin, FormView):
         initial = super().get_initial()
         initial["month"] = self.get_month_number()
         initial["year"] = self.get_year()
-        r = CreasProtetivoReport.objects.filter(
-            directorate=self.get_directorate(), month=self.get_month_number(), year=self.get_year()
-        ).first()
+        r = self._get_existing_report()
         if r:
             for f in self.form_class.Meta.model._meta.fields:
                 if f.name in self.form_class.base_fields:
                     initial[f.name] = getattr(r, f.name)
         return initial
 
+    def _get_existing_report(self):
+        return CreasProtetivoReport.objects.filter(
+            directorate=self.get_directorate(), month=self.get_month_number(), year=self.get_year()
+        ).first()
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         form = ctx["form"]
         items = [{"title": t, "fields": [form[f] for f in fs]} for t, fs in self.form_class.section_map]
+        existing_report = self._get_existing_report()
         ctx.update({
             "directorate": self.get_directorate(), "section_items": items,
-            "subcategory": "protetivo", "selected_year": self.get_year(), "selected_month": self.get_month_number()
+            "subcategory": "protetivo", "selected_year": self.get_year(), "selected_month": self.get_month_number(),
+            "is_locked": bool(existing_report), "is_admin_user": self.is_admin(),
+            "month_options": MONTH_OPTIONS
         })
         return ctx
+
+    def post(self, request, *args, **kwargs):
+        if self._get_existing_report():
+            messages.error(
+                request,
+                "Este mês já foi lançado. Peça a um administrador para reabrir antes de preencher novamente.",
+            )
+            directorate = self.get_directorate()
+            return redirect(
+                reverse("protecaoespecial:form-protetivo", kwargs={"pk": directorate.pk})
+                + f"?year={self.get_year()}&month={self.get_month_number()}"
+            )
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         d = self.get_directorate()
         r, created = CreasProtetivoReport.objects.get_or_create(
             directorate=d, month=form.cleaned_data["month"], year=form.cleaned_data["year"],
+            defaults={
+                "user_id": self.request.user.pk,
+                "created_by": self.request.user.email or self.request.user.username,
+                "created_at": datetime.now(),
+            },
         )
         if created:
             r.created_at = datetime.now()
-            
+
         try:
             r.user_id = self.request.user.pk
         except Exception:
             pass
-            
+
         r.created_by = self.request.user.email or self.request.user.username
         
         for k, v in form.cleaned_data.items():
@@ -302,38 +326,62 @@ class CreasSocioeducativoFormView(ProteacaoEspecialBaseMixin, FormView):
         initial = super().get_initial()
         initial["month"] = self.get_month_number()
         initial["year"] = self.get_year()
-        r = CreasSocioeducativoReport.objects.filter(
-            directorate=self.get_directorate(), month=self.get_month_number(), year=self.get_year()
-        ).first()
+        r = self._get_existing_report()
         if r:
             for f in self.form_class.Meta.model._meta.fields:
                 if f.name in self.form_class.base_fields:
                     initial[f.name] = getattr(r, f.name)
         return initial
 
+    def _get_existing_report(self):
+        return CreasSocioeducativoReport.objects.filter(
+            directorate=self.get_directorate(), month=self.get_month_number(), year=self.get_year()
+        ).first()
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         form = ctx["form"]
         items = [{"title": t, "fields": [form[f] for f in fs]} for t, fs in self.form_class.section_map]
+        existing_report = self._get_existing_report()
         ctx.update({
             "directorate": self.get_directorate(), "section_items": items,
-            "subcategory": "socioeducativo", "selected_year": self.get_year(), "selected_month": self.get_month_number()
+            "subcategory": "socioeducativo", "selected_year": self.get_year(), "selected_month": self.get_month_number(),
+            "is_locked": bool(existing_report), "is_admin_user": self.is_admin(),
+            "month_options": MONTH_OPTIONS
         })
         return ctx
+
+    def post(self, request, *args, **kwargs):
+        if self._get_existing_report():
+            messages.error(
+                request,
+                "Este mês já foi lançado. Peça a um administrador para reabrir antes de preencher novamente.",
+            )
+            directorate = self.get_directorate()
+            return redirect(
+                reverse("protecaoespecial:form-socioeducativo", kwargs={"pk": directorate.pk})
+                + f"?year={self.get_year()}&month={self.get_month_number()}"
+            )
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         d = self.get_directorate()
         r, created = CreasSocioeducativoReport.objects.get_or_create(
             directorate=d, month=form.cleaned_data["month"], year=form.cleaned_data["year"],
+            defaults={
+                "user_id": self.request.user.pk,
+                "created_by": self.request.user.email or self.request.user.username,
+                "created_at": datetime.now(),
+            },
         )
         if created:
             r.created_at = datetime.now()
-            
+
         try:
             r.user_id = self.request.user.pk
         except Exception:
             pass
-            
+
         r.created_by = self.request.user.email or self.request.user.username
         
         for k, v in form.cleaned_data.items():
@@ -400,6 +448,30 @@ class CreasSocioeducativoDataView(ProteacaoEspecialBaseMixin, TemplateView):
             "can_delete": self.is_admin(),
         })
         return ctx
+
+
+class CreasProtetivoDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):
+    allowed_roles = ["admin"]
+
+    def post(self, request, *args, **kwargs):
+        month = request.POST.get("month")
+        year = request.POST.get("year")
+        deleted, _ = CreasProtetivoReport.objects.filter(
+            directorate_id=kwargs["pk"], month=month, year=year
+        ).delete()
+        return JsonResponse({"status": "success", "deleted": deleted})
+
+
+class CreasSocioeducativoDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):
+    allowed_roles = ["admin"]
+
+    def post(self, request, *args, **kwargs):
+        month = request.POST.get("month")
+        year = request.POST.get("year")
+        deleted, _ = CreasSocioeducativoReport.objects.filter(
+            directorate_id=kwargs["pk"], month=month, year=year
+        ).delete()
+        return JsonResponse({"status": "success", "deleted": deleted})
 
 
 class CreasSharedQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
