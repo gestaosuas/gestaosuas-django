@@ -69,6 +69,7 @@ Além disso, como o compose faz merge por concatenação de listas, o serviço `
 - Um `tailscale serve reset` limpa TODAS as rotas configuradas (inclusive as de outros apps expostos no mesmo domínio/Tailscale). Nunca rodar reset sem re-aplicar imediatamente todas as rotas existentes (checar `tailscale serve status` antes).
 - Reiniciar o container `tailscale` (`docker restart tailscale`) derruba a própria conectividade Tailscale por alguns segundos — inclusive a sessão SSH em uso, se ela também passar pelo Tailscale.
 - Depois de reset/restart do tailscale, as rotas voltam como "tailnet only" — é preciso reabilitar o Funnel (acesso público) explicitamente com `tailscale funnel --bg --https=<porta> http://127.0.0.1:<porta-local>`.
+- `./atualizar.sh` (raiz do repo) tinha 4 bugs reais que só apareceram ao rodar de verdade (corrigidos em 2026-07-20, commits `246e9c6`/`ce54e21`/`bafcb4e`): `BACKUP_DIR` usava `$HOME/backups` (`/DATA/backups`, root, sem escrita — sempre falhava no `mkdir`); o passo de `docker compose` não exportava `DOCKER_CONFIG=/tmp/dockercfg` (mesmo gotcha do item acima); o `pg_dump` usava `-U postgres -Fc postgres` fixo, mas a role `postgres` nem existe nesta VPS (banco real é `gestaosuas_prod`/`gestaosuas_user`, agora lido do `.env` do projeto); e uma falha no upload opcional pro Google Drive (rclone sem remote `gdrive` configurado nesta VPS) abortava o script inteiro por causa do `set -e`, antes mesmo do `git pull`/rebuild. O upload pro Drive segue sem funcionar aqui (rclone não configurado) — script agora só avisa e segue, backup fica local em `/DATA/AppData/gestaosuas_backups/`.
 
 ---
 
@@ -337,6 +338,15 @@ Descoberta importante: **o Postgres local vinha recebendo alterações manuais d
 
 **Lição para o cutover real da VPS**: repetir esse mesmo processo de comparação de schema (dump antigo vs. dump novo do Supabase) antes de ir para produção, para não descobrir esses gaps só quando um usuário real bater neles. Comando usado para comparar: restaurar os dois dumps em bancos separados e comparar `information_schema.columns` via `comm` (Postgres não suporta cross-database query direto).
 
+### Passo 7 e Passo 9B aplicados direto no `gestaosuas_prod` da VPS (2026-07-20)
+
+Sem esperar pelo cutover de banco limpo (ainda não aconteceu — ver nota acima), a feature de múltiplos planos de trabalho com Objeto/Objetivos/Metas/Atividades em Emendas e Fundos (`Visit.work_plan` FK + colunas `work_plans.objeto/objetivos/metas/atividades`) precisava ir para produção. Rodado direto contra o banco de produção existente (`gestaosuas_prod`), não um banco limpo:
+
+- Backup manual (`pg_dump -Fc`) tirado imediatamente antes, independente do backup que o próprio `atualizar.sh` já faz.
+- `scripts/migrate_to_pure_pg.sql` inteiro rodado com `psql -v ON_ERROR_STOP=1` — transação commitada sem nenhum erro ou warning de órfãos.
+- Isso finalmente aplicou o **Passo 7** (pendente desde 2026-07-13 — ver item #5 da tabela de débito técnico, agora marcado como concluído) e o novo **Passo 9B**. Passo 9 já era no-op (fix anterior).
+- Deploy completo feito com `./atualizar.sh` na sequência (depois de corrigidos os bugs do próprio script — ver "Gotchas operacionais da VPS" acima). Container `gestaosuas_app` recriado, logs limpos, `HTTP 302` confirmado na porta 8080.
+
 ---
 
 ## Débito Técnico Conhecido
@@ -347,7 +357,7 @@ Descoberta importante: **o Postgres local vinha recebendo alterações manuais d
 | 2 | `ProfileDirectorate.profile` usa `ForeignKey(unique=True)` em vez de `OneToOneField` | Warning Django não-crítico | Baixa |
 | 3 | Colunas JSON de `visits` (identificacao, assinaturas, etc.) podem ter dupla codificação UTF-8 | Texto com acentos corrompido em detalhes de visita | Média |
 | 4 | `strip_accents` e funções utilitárias duplicadas em `core/utils.py` e `monitoramento/views.py` | Inconsistência | Baixa |
-| 5 | **[Parcialmente corrigido]** Colunas `user_id`/`created_by` de quase todas as tabelas de relatório tinham FK física para o schema Supabase residual `auth.users` em vez de `accounts_user` — achado por testes escritos em 2026-07. `scripts/migrate_to_pure_pg.sql` (Passo 7) repontou todas as 18 tabelas para `accounts_user`; **aplicado no banco de dev**, ainda **pendente aplicar na VPS de produção** | Até rodar o script na VPS, qualquer usuário criado lá depois da migração original recebe `IntegrityError` ao salvar relatórios/work plans/OSCs/visitas | **Alta — aplicar na VPS** |
+| 5 | **[Corrigido]** Colunas `user_id`/`created_by` de quase todas as tabelas de relatório tinham FK física para o schema Supabase residual `auth.users` em vez de `accounts_user` — achado por testes escritos em 2026-07. `scripts/migrate_to_pure_pg.sql` (Passo 7) repontou todas as 18 tabelas para `accounts_user`; aplicado no banco de dev em 2026-07-13 e **na VPS de produção em 2026-07-20** (rodado direto contra `gestaosuas_prod`, com backup manual antes — ver seção "Migração Supabase → PostgreSQL puro") | ~~Até rodar o script na VPS, qualquer usuário criado lá depois da migração original recebia `IntegrityError` ao salvar relatórios/work plans/OSCs/visitas~~ Resolvido | Concluída |
 
 Achados e corrigidos na mesma sessão (2026-07-13): rota `quick-edit` do NAICA/CRAS inacessível (ordem de URL), `IntegrityError` ao criar relatório novo via quick-edit do CREAS Idoso/PCD (`updated_at` faltando no `get_or_create`), 500 para admin em diretoria inexistente (query desprotegida em 6 List/CreateViews), drift de nullability em `naica_reports.user_id`, `ValidationError` não capturada em `DirectorateSlugConverter.to_url()`, tipo de coluna incompatível em `creas_pop_rua_reports.created_by` (agora `uuid` com FK), e toast de sucesso+erro simultâneo em `UserPermissionsView`. Ver `git log` para detalhes — não repetidos aqui pois já não são débito técnico atual.
 
