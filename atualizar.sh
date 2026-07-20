@@ -43,10 +43,16 @@ docker exec gestaosuas_db pg_dump -U "$DB_USER" -Fc "$DB_NAME" > "$BACKUP_DIR/$D
 echo "      Salvo em: $BACKUP_DIR/$DUMP_FILE ($(du -sh "$BACKUP_DIR/$DUMP_FILE" | cut -f1))"
 
 # ── 2. Upload para Google Drive ────────────────────────────
+# Best-effort: falha aqui (rclone ausente ou remote "gdrive" não configurado)
+# nunca deve derrubar o deploy — o backup local (passo 1) já está garantido.
 echo "[2/4] Enviando backup para o Google Drive..."
 if command -v rclone &>/dev/null; then
-    rclone copy "$BACKUP_DIR/$DUMP_FILE" "$GDRIVE_REMOTE/" --progress
-    echo "      Upload concluído → $GDRIVE_REMOTE/$DUMP_FILE"
+    if rclone copy "$BACKUP_DIR/$DUMP_FILE" "$GDRIVE_REMOTE/" --progress; then
+        echo "      Upload concluído → $GDRIVE_REMOTE/$DUMP_FILE"
+    else
+        echo "      AVISO: upload para o Google Drive falhou (remote 'gdrive' configurado? rclone config)."
+        echo "      Backup mantido localmente em $BACKUP_DIR/$DUMP_FILE"
+    fi
 else
     echo "      AVISO: rclone não encontrado. Instale com: curl https://rclone.org/install.sh | bash"
     echo "      Backup mantido localmente em $BACKUP_DIR/$DUMP_FILE"
