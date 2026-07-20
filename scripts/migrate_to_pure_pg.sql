@@ -396,6 +396,38 @@ END $$;
 
 
 -- ============================================================
+-- PASSO 9B: Colunas de texto do plano de trabalho + vínculo visita→plano
+-- ============================================================
+-- Feature 2026-07: em Emendas e Fundos, os textos "Objeto do relatório",
+-- "Dos Objetivos", "Das Metas Estabelecidas" e "Das Atividades" passam a
+-- viver no plano de trabalho (uma OSC pode ter vários planos), e a visita
+-- guarda qual plano usar (visits.work_plan_id — coluna que o Supabase já
+-- tinha, mas pode faltar em dumps antigos).
+
+ALTER TABLE work_plans
+    ADD COLUMN IF NOT EXISTS objeto text NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS objetivos text NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS metas text NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS atividades text NOT NULL DEFAULT '';
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'visits' AND column_name = 'work_plan_id'
+    ) THEN
+        ALTER TABLE visits ADD COLUMN work_plan_id uuid;
+        ALTER TABLE visits
+            ADD CONSTRAINT visits_work_plan_id_fkey
+            FOREIGN KEY (work_plan_id) REFERENCES work_plans(id) ON DELETE SET NULL;
+        CREATE INDEX IF NOT EXISTS visits_work_plan_id_idx ON visits (work_plan_id);
+        RAISE NOTICE 'Passo 9B: coluna visits.work_plan_id criada com FK e índice.';
+    END IF;
+    RAISE NOTICE 'Passo 9B OK: colunas de plano de trabalho garantidas.';
+END $$;
+
+
+-- ============================================================
 -- PASSO 10: Verificação final
 -- ============================================================
 

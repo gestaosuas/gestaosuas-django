@@ -613,6 +613,182 @@ class DirectorateDetailViewRedirectTests(TestCase):
         )
 
 
+class WorkPlanObjectivesAndVisitLinkTests(DirectoratesTestBase):
+    """Feature 2026-07 (Emendas e Fundos): os textos 'Objeto do Relatório' e
+    item 2 A/B/C do relatório de visita passam a viver no plano de trabalho
+    (WorkPlanObjectivesView), a visita guarda o plano vinculado
+    (visits.work_plan_id) — auto-selecionado quando a OSC tem um único plano —
+    e o VisitReportView herda os textos do plano com fallback para a OSC."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.emendas = Directorate.objects.filter(name__icontains="emenda").first()
+
+    def setUp(self):
+        if not self.emendas:
+            self.skipTest("Diretoria 'Emendas e Fundos' não encontrada no banco de teste.")
+
+    def _login_admin(self):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        return admin
+
+    def _create_visit_via_post(self, osc, extra=None):
+        url = reverse("directorates:visit-create", kwargs={"pk": osc.directorate.pk})
+        payload = {
+            "osc": str(osc.pk),
+            "status": "draft",
+            "identificacao[visit_date_1]": date.today().isoformat(),
+        }
+        payload.update(extra or {})
+        response = self.client.post(url, payload)
+        self.assertEqual(response.status_code, 302)
+        return Visit.objects.filter(osc=osc).latest("created_at")
+
+    def test_plan_objectives_post_saves_the_four_fields(self):
+        osc = self.make_osc(directorate=self.emendas)
+        plan = self.make_work_plan(osc=osc, directorate=self.emendas)
+        self._login_admin()
+        url = reverse("directorates:plan-objectives", kwargs={"pk": plan.pk})
+        response = self.client.post(
+            url,
+            {
+                "objeto": "Objeto do relatório do plano",
+                "objetivos": "Texto dos objetivos",
+                "metas": "Texto das metas",
+                "atividades": "Texto das atividades",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        plan.refresh_from_db()
+        self.assertEqual(plan.objeto, "Objeto do relatório do plano")
+        self.assertEqual(plan.objetivos, "Texto dos objetivos")
+        self.assertEqual(plan.metas, "Texto das metas")
+        self.assertEqual(plan.atividades, "Texto das atividades")
+
+    def test_plan_objectives_denied_for_user_without_directorate_access(self):
+        osc = self.make_osc(directorate=self.emendas)
+        plan = self.make_work_plan(osc=osc, directorate=self.emendas)
+        outsider_directorate = Directorate.objects.exclude(pk=self.emendas.pk).order_by("name").first()
+        outsider = make_user(role="agente", primary_directorate=outsider_directorate)
+        self.client.force_login(outsider)
+        url = reverse("directorates:plan-objectives", kwargs={"pk": plan.pk})
+        response = self.client.post(url, {"objeto": "hack"}, follow=False)
+        self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
+        plan.refresh_from_db()
+        self.assertEqual(plan.objeto, "")
+
+    def test_visit_create_auto_links_single_work_plan(self):
+        osc = self.make_osc(directorate=self.emendas)
+        plan = self.make_work_plan(osc=osc, directorate=self.emendas)
+        self._login_admin()
+        visit = self._create_visit_via_post(osc)
+        self.assertEqual(visit.work_plan_id, plan.pk)
+
+    def test_visit_create_uses_chosen_plan_when_osc_has_multiple(self):
+        osc = self.make_osc(directorate=self.emendas)
+        self.make_work_plan(osc=osc, directorate=self.emendas)
+        plan_b = self.make_work_plan(osc=osc, directorate=self.emendas)
+        self._login_admin()
+        visit = self._create_visit_via_post(osc, {"work_plan": str(plan_b.pk)})
+        self.assertEqual(visit.work_plan_id, plan_b.pk)
+
+    def test_visit_create_with_multiple_plans_and_no_choice_links_none(self):
+        osc = self.make_osc(directorate=self.emendas)
+        self.make_work_plan(osc=osc, directorate=self.emendas)
+        self.make_work_plan(osc=osc, directorate=self.emendas)
+        self._login_admin()
+        visit = self._create_visit_via_post(osc)
+        self.assertIsNone(visit.work_plan_id)
+
+    def test_visit_create_ignores_plan_belonging_to_another_osc(self):
+        osc = self.make_osc(directorate=self.emendas)
+        self.make_work_plan(osc=osc, directorate=self.emendas)
+        self.make_work_plan(osc=osc, directorate=self.emendas)
+        other_osc = self.make_osc(name="Outra OSC", directorate=self.emendas)
+        foreign_plan = self.make_work_plan(osc=other_osc, directorate=self.emendas)
+        self._login_admin()
+        visit = self._create_visit_via_post(osc, {"work_plan": str(foreign_plan.pk)})
+        self.assertIsNone(visit.work_plan_id)
+
+    def test_visit_create_outside_emendas_links_no_plan(self):
+        non_emendas = (
+            Directorate.objects.exclude(name__icontains="emenda")
+            .exclude(name__icontains="fundo")
+            .filter(name__iexact="Outros")
+            .first()
+        )
+        if not non_emendas:
+            self.skipTest("Diretoria 'Outros' não encontrada no banco de teste.")
+        osc = self.make_osc(directorate=non_emendas)
+        self.make_work_plan(osc=osc, directorate=non_emendas)
+        self._login_admin()
+        visit = self._create_visit_via_post(osc)
+        self.assertIsNone(visit.work_plan_id)
+
+    def test_report_inherits_texts_from_linked_plan(self):
+        osc = self.make_osc(directorate=self.emendas)
+        osc.objeto = "Objeto da OSC"
+        osc.objetivos = "Objetivos da OSC"
+        osc.save()
+        plan = self.make_work_plan(osc=osc, directorate=self.emendas)
+        plan.objeto = "Objeto do plano"
+        plan.objetivos = "Objetivos do plano"
+        plan.metas = "Metas do plano"
+        plan.atividades = "Atividades do plano"
+        plan.save()
+        visit = self.make_visit(osc=osc, directorate=self.emendas)
+        visit.work_plan = plan
+        visit.save()
+        self._login_admin()
+        url = reverse(
+            "directorates:visit-report",
+            kwargs={"pk": visit.pk, "report_type": "parecer_tecnico"},
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        report_data = response.context["report_data"]
+        self.assertEqual(report_data["objeto_relatorio"], "Objeto do plano")
+        self.assertEqual(report_data["item2_a_objetivos"], "Objetivos do plano")
+        self.assertEqual(report_data["item2_b_metas"], "Metas do plano")
+        self.assertEqual(report_data["item2_c_atividades"], "Atividades do plano")
+
+    def test_report_falls_back_to_osc_text_when_plan_field_is_empty(self):
+        osc = self.make_osc(directorate=self.emendas)
+        osc.objeto = "Objeto da OSC"
+        osc.save()
+        plan = self.make_work_plan(osc=osc, directorate=self.emendas)
+        plan.objetivos = "Objetivos do plano"
+        plan.save()
+        visit = self.make_visit(osc=osc, directorate=self.emendas)
+        visit.work_plan = plan
+        visit.save()
+        self._login_admin()
+        url = reverse(
+            "directorates:visit-report",
+            kwargs={"pk": visit.pk, "report_type": "parecer_tecnico"},
+        )
+        response = self.client.get(url)
+        report_data = response.context["report_data"]
+        self.assertEqual(report_data["objeto_relatorio"], "Objeto da OSC")
+        self.assertEqual(report_data["item2_a_objetivos"], "Objetivos do plano")
+
+    def test_report_without_linked_plan_keeps_using_osc_texts(self):
+        osc = self.make_osc(directorate=self.emendas)
+        osc.objeto = "Objeto da OSC"
+        osc.save()
+        visit = self.make_visit(osc=osc, directorate=self.emendas)
+        self._login_admin()
+        url = reverse(
+            "directorates:visit-report",
+            kwargs={"pk": visit.pk, "report_type": "parecer_tecnico"},
+        )
+        response = self.client.get(url)
+        report_data = response.context["report_data"]
+        self.assertEqual(report_data["objeto_relatorio"], "Objeto da OSC")
+
+
 @override_settings(STORAGES=STATIC_TEST_STORAGES)
 class DirectorateListViewTests(TestCase):
     def test_anonymous_user_redirected_to_login(self):

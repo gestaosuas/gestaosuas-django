@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import ValidationError
 from django.db import OperationalError, ProgrammingError
 from django.db.models import Count, Q, Sum
 from django.shortcuts import render, get_object_or_404, redirect
@@ -397,6 +398,67 @@ def read_bracket_parts(key, prefix):
 def is_subvencao_directorate(directorate):
     ascii_name = strip_accents((getattr(directorate, "name", "") or "").lower())
     return "subvencao" in ascii_name or "emenda" in ascii_name or "fundo" in ascii_name
+
+
+def is_emendas_directorate(directorate):
+    """Emendas e Fundos (sem incluir Subvenção): os textos do relatório de
+    visita vêm do plano de trabalho vinculado, não da OSC."""
+    ascii_name = strip_accents((getattr(directorate, "name", "") or "").lower())
+    return "emenda" in ascii_name or "fundo" in ascii_name
+
+
+def get_work_plan_by_id(directorate_id, plan_id):
+    if not plan_id:
+        return None
+    try:
+        return WorkPlan.objects.filter(directorate_id=directorate_id, pk=plan_id).first()
+    except (ValueError, ValidationError):
+        return None
+
+
+def resolve_visit_work_plan(directorate_id, osc_id, plan_id):
+    """Plano de trabalho a vincular na visita: o enviado no formulário (se
+    pertencer à OSC) ou, sem envio válido, o único plano da OSC quando ela
+    tiver exatamente um."""
+    plans = WorkPlan.objects.filter(directorate_id=directorate_id, osc_id=osc_id)
+    if plan_id:
+        try:
+            plan = plans.filter(pk=plan_id).first()
+        except (ValueError, ValidationError):
+            plan = None
+        if plan:
+            return plan
+    found = list(plans[:2])
+    if len(found) == 1:
+        return found[0]
+    return None
+
+
+def build_osc_plans_map(directorate_id):
+    """Mapa osc_id → [{id, title}] para o select de plano na visita."""
+    osc_plans = {}
+    plans = WorkPlan.objects.filter(directorate_id=directorate_id).order_by("-updated_at", "title")
+    for plan in plans:
+        osc_plans.setdefault(str(plan.osc_id), []).append({"id": str(plan.pk), "title": plan.title})
+    return osc_plans
+
+
+def get_visit_report_texts(visit):
+    """Textos-base do relatório de visita: preferem o plano de trabalho
+    vinculado à visita (Emendas e Fundos); sem plano, ou com o campo vazio
+    no plano, caem para os textos da OSC (comportamento original)."""
+    osc = visit.osc
+    plan = visit.work_plan
+
+    def pick(plan_value, osc_value):
+        return (plan_value or "").strip() or (osc_value or "")
+
+    return {
+        "objeto": pick(plan.objeto if plan else "", osc.objeto),
+        "objetivos": pick(plan.objetivos if plan else "", osc.objetivos),
+        "metas": pick(plan.metas if plan else "", osc.metas),
+        "atividades": pick(plan.atividades if plan else "", osc.atividades),
+    }
 
 
 def get_monitoring_back_url(directorate):
@@ -829,11 +891,30 @@ class WorkPlanListView(DirectorateScopedMixin, ListView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["directorate"] = self.get_directorate()
+        directorate = self.get_directorate()
+        context["directorate"] = directorate
+        context["is_emendas"] = is_emendas_directorate(directorate)
         context["selected_osc_id"] = self.request.GET.get("osc", "")
         profile = getattr(self.request.user, 'profile', None)
         context["can_delete"] = self.request.user.is_superuser or (profile and profile.role == 'admin')
         return context
+
+class WorkPlanObjectivesView(WorkPlanScopedMixin, View):
+    """Salva os textos do plano herdados pelo relatório de visita
+    (Emendas e Fundos): objeto, objetivos, metas e atividades."""
+
+    def post(self, request, pk):
+        plan = self.get_scoped_object()
+        plan.objeto = (request.POST.get("objeto") or "").strip()
+        plan.objetivos = (request.POST.get("objetivos") or "").strip()
+        plan.metas = (request.POST.get("metas") or "").strip()
+        plan.atividades = (request.POST.get("atividades") or "").strip()
+        plan.save()
+        messages.success(request, f"Objeto e objetivos do plano \"{plan.title}\" salvos com sucesso.")
+        next_url = get_safe_next_url(request)
+        if next_url:
+            return redirect(next_url)
+        return redirect(reverse("directorates:plan-list", kwargs={"pk": plan.directorate.pk}))
 
 class WorkPlanUpdateView(WorkPlanScopedMixin, UpdateView):
     model = WorkPlan
@@ -903,16 +984,17 @@ class WorkPlanDeleteView(WorkPlanScopedMixin, DeleteView):
 class WorkPlanPreviewView(DirectorateScopedMixin, View):
     def get(self, request, pk):
         osc_id = request.GET.get("osc")
-        if not osc_id:
-            return JsonResponse({"success": False, "error": "Selecione uma OSC para visualizar o plano."}, status=400)
-
-        plan = get_latest_work_plan_for_osc(pk, osc_id)
+        plan = get_work_plan_by_id(pk, request.GET.get("plan"))
+        if not plan:
+            if not osc_id:
+                return JsonResponse({"success": False, "error": "Selecione uma OSC para visualizar o plano."}, status=400)
+            plan = get_latest_work_plan_for_osc(pk, osc_id)
         if not plan:
             return JsonResponse({"success": False, "error": "Nenhum plano de trabalho encontrado para esta OSC."}, status=404)
 
         context = build_work_plan_document_context(plan)
         html = render_to_string("directorates/monitoring/partials/work_plan_preview.html", context, request=request)
-        open_url = reverse("directorates:plan-document", kwargs={"pk": plan.directorate.pk}) + f"?osc={plan.osc.pk}"
+        open_url = reverse("directorates:plan-document", kwargs={"pk": plan.directorate.pk}) + f"?osc={plan.osc.pk}&plan={plan.pk}"
         return JsonResponse(
             {
                 "success": True,
@@ -928,11 +1010,12 @@ class WorkPlanDocumentView(DirectorateScopedMixin, TemplateView):
 
     def get(self, request, *args, **kwargs):
         osc_id = request.GET.get("osc")
-        if not osc_id:
-            messages.error(request, "Selecione uma OSC para visualizar o plano de trabalho.")
-            return redirect("directorates:plan-list", pk=self.kwargs["pk"])
-
-        plan = get_latest_work_plan_for_osc(self.kwargs["pk"], osc_id)
+        plan = get_work_plan_by_id(self.kwargs["pk"], request.GET.get("plan"))
+        if not plan:
+            if not osc_id:
+                messages.error(request, "Selecione uma OSC para visualizar o plano de trabalho.")
+                return redirect("directorates:plan-list", pk=self.kwargs["pk"])
+            plan = get_latest_work_plan_for_osc(self.kwargs["pk"], osc_id)
         if not plan:
             messages.error(request, "Nenhum plano de trabalho encontrado para esta OSC.")
             return redirect("directorates:plan-list", pk=self.kwargs["pk"])
@@ -1009,7 +1092,8 @@ class VisitReportView(VisitScopedMixin, DetailView):
         local_date_default = f"Uberlândia, {now.strftime('%d')} de {MONTH_NAMES.get(now.month)} de {now.year}"
         
         report_data = getattr(self.object, report_type) or {}
-        
+        report_texts = get_visit_report_texts(self.object)
+
         if report_type == "relatorio_final":
             if not report_data:
                 report_data = {
@@ -1019,10 +1103,10 @@ class VisitReportView(VisitScopedMixin, DetailView):
                     "termo_fomento": "",
                     "vigencia": "",
                     "valor_autorizado": "",
-                    "objeto_relatorio": self.object.osc.objeto or "",
+                    "objeto_relatorio": report_texts["objeto"],
                     "referencias": "",
-                    "objetivos": self.object.osc.objetivos or "",
-                    "metas": self.object.osc.metas or "",
+                    "objetivos": report_texts["objetivos"],
+                    "metas": report_texts["metas"],
                     "metas_quantitativas": "",
                     "resultados": "",
                     "execucao_financeira": "",
@@ -1071,10 +1155,10 @@ class VisitReportView(VisitScopedMixin, DetailView):
                     
         elif report_type == "parecer_tecnico":
             osc = self.object.osc
-            osc_objeto = osc.objeto or ""
-            osc_objetivos = osc.objetivos or ""
-            osc_metas = osc.metas or ""
-            osc_atividades = osc.atividades or ""
+            osc_objeto = report_texts["objeto"]
+            osc_objetivos = report_texts["objetivos"]
+            osc_metas = report_texts["metas"]
+            osc_atividades = report_texts["atividades"]
             
             # Dynamically pull defaults from self.object.atendimento if present
             # Dynamically pull defaults from self.object.atendimento or parecer_tecnico if present
@@ -1520,6 +1604,8 @@ class VisitCreateView(DirectorateScopedMixin, TemplateView):
         context["is_new"] = True
         context["object"] = None
         context["is_subvencao_visit"] = is_subvencao_directorate(directorate)
+        context["is_emendas_visit"] = is_emendas_directorate(directorate)
+        context["osc_plans"] = build_osc_plans_map(directorate.pk) if context["is_emendas_visit"] else {}
         context["return_url"] = get_safe_next_url(self.request) or get_monitoring_back_url(directorate)
         return context
 
@@ -1535,10 +1621,15 @@ class VisitCreateView(DirectorateScopedMixin, TemplateView):
             create_url = reverse("directorates:visit-create", kwargs={"pk": directorate.pk})
             return redirect(f"{create_url}?next={next_url}" if next_url else create_url)
 
+        work_plan = None
+        if is_emendas_directorate(directorate):
+            work_plan = resolve_visit_work_plan(directorate.pk, osc_id, data.get("work_plan"))
+
         visit = Visit(
             id=uuid.uuid4(),
             directorate=directorate,
             osc_id=osc_id,
+            work_plan=work_plan,
             visit_date=data.get("identificacao[visit_date_1]", "") or datetime.now(),
             visit_time="09:00",
             status=data.get("status", "draft"),
@@ -1625,6 +1716,11 @@ class VisitInstrumentalView(VisitScopedMixin, UpdateView):
         context["oscs"] = Osc.objects.filter(directorate_id=self.object.directorate.pk).order_by("name")
         context["is_new"] = False
         context["is_subvencao_visit"] = is_subvencao_directorate(self.object.directorate)
+        context["is_emendas_visit"] = is_emendas_directorate(self.object.directorate)
+        if context["is_emendas_visit"]:
+            context["visit_osc_plans"] = WorkPlan.objects.filter(
+                osc_id=self.object.osc_id, directorate_id=self.object.directorate.pk
+            ).order_by("-updated_at", "title")
         context["return_url"] = get_safe_next_url(self.request) or get_monitoring_back_url(self.object.directorate)
         extra_visits = []
         identificacao = self.object.identificacao or {}
@@ -1710,6 +1806,10 @@ class VisitInstrumentalView(VisitScopedMixin, UpdateView):
         self.object.observacoes = data.get("observacoes", "")
         self.object.recomendacoes = data.get("recomendacoes", "")
         self.object.status = data.get("status") or "draft"
+        if is_emendas_directorate(self.object.directorate) and "work_plan" in data:
+            self.object.work_plan = resolve_visit_work_plan(
+                self.object.directorate.pk, self.object.osc_id, data.get("work_plan")
+            )
         append_visit_uploaded_documents(self.object, request.FILES, request)
 
         try:

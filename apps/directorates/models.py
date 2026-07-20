@@ -131,6 +131,12 @@ class WorkPlan(TimeStampedUUIDModel):
     title = models.CharField(max_length=255)
     content = models.JSONField(default=list, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
+    # Textos herdados pelo relatório de visita (Emendas e Fundos): uma OSC
+    # pode ter vários planos, então vivem aqui e não na OSC.
+    objeto = models.TextField(blank=True, default="")
+    objetivos = models.TextField(blank=True, default="")
+    metas = models.TextField(blank=True, default="")
+    atividades = models.TextField(blank=True, default="")
 
     class Meta:
         db_table = "work_plans"
@@ -146,6 +152,7 @@ class WorkPlan(TimeStampedUUIDModel):
 class Visit(TimeStampedUUIDModel):
     STATUS_CHOICES = [("draft", "Rascunho"), ("scheduled", "Agendada"), ("completed", "Concluida")]
     osc = models.ForeignKey(Osc, on_delete=models.CASCADE, related_name="visits")
+    work_plan = models.ForeignKey(WorkPlan, on_delete=models.SET_NULL, null=True, blank=True, related_name="visits")
     directorate = models.ForeignKey(Directorate, on_delete=models.CASCADE, related_name="visits")
     visit_date = models.DateField()
     visit_time = models.TimeField()

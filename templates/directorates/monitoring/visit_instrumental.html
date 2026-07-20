@@ -66,6 +66,25 @@
             </div>
             <div class="visit-section-body">
                 {% if is_new %}
+                {% if is_emendas_visit %}
+                <div class="visit-grid visit-grid-two">
+                    <div class="visit-field">
+                        <label class="premium-label">Selecione a Organizacao Social Civil (OSC)</label>
+                        <select name="osc" required class="form-input-premium">
+                            <option value="">Selecione a OSC...</option>
+                            {% for osc in oscs %}
+                            <option value="{{ osc.pk }}" data-subsidized="{{ osc.subsidized_count|default:0 }}">{{ osc.name }} - {{ osc.activity_type|default:'' }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="visit-field">
+                        <label class="premium-label">Plano de Trabalho vinculado</label>
+                        <select name="work_plan" id="workPlanSelect" class="form-input-premium" disabled>
+                            <option value="">Selecione a OSC primeiro...</option>
+                        </select>
+                    </div>
+                </div>
+                {% else %}
                 <div class="visit-field">
                     <label class="premium-label">Selecione a Organizacao Social Civil (OSC)</label>
                     <select name="osc" required class="form-input-premium">
@@ -75,6 +94,7 @@
                         {% endfor %}
                     </select>
                 </div>
+                {% endif %}
                 <div class="section-divider"><span>Dados da visita</span></div>
                 {% else %}
                 <div class="visit-grid visit-grid-two">
@@ -97,6 +117,19 @@
                         <input type="text" value="{{ object.osc.phone|default:'Nao informado' }}" disabled class="form-input-premium is-readonly">
                     </div>
                 </div>
+                {% if is_emendas_visit %}
+                <div class="visit-grid visit-grid-two">
+                    <div class="visit-field">
+                        <label class="premium-label">Plano de Trabalho vinculado</label>
+                        <select name="work_plan" id="workPlanSelect" class="form-input-premium" {% if visit_osc_plans|length > 1 %}data-needs-choice="1"{% endif %} {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                            <option value="">{% if visit_osc_plans %}Selecione o plano de trabalho...{% else %}Nenhum plano cadastrado para esta OSC{% endif %}</option>
+                            {% for plan in visit_osc_plans %}
+                            <option value="{{ plan.pk }}" {% if object.work_plan_id == plan.pk %}selected{% endif %}>{{ plan.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                {% endif %}
                 <div class="section-divider"><span>Dados da visita</span></div>
                 {% endif %}
 
@@ -837,6 +870,7 @@
 
 {{ object.rh_data|json_script:"rh-data-json" }}
 {{ object.identificacao|json_script:"identificacao-json" }}
+{% if is_new and is_emendas_visit %}{{ osc_plans|json_script:"oscPlansData" }}{% endif %}
 <script>
     // --- Lightbox com navegação e zoom ---
     var lbImages = [], lbIdx = 0, lbScale = 1;
@@ -1070,6 +1104,57 @@
         if (selectedOption && selectedOption.dataset.subsidized !== undefined) {
             subsidizedInput.value = selectedOption.dataset.subsidized === "-1" ? "Conforme Demanda" : selectedOption.dataset.subsidized || 0;
         }
+    }
+
+    // --- Plano de trabalho vinculado (Emendas e Fundos) ---
+    var oscPlansData = null;
+    var oscPlansEl = document.getElementById("oscPlansData");
+    if (oscPlansEl) {
+        try { oscPlansData = JSON.parse(oscPlansEl.textContent) || {}; } catch (e) { oscPlansData = {}; }
+    }
+
+    function updateWorkPlanOptions() {
+        var select = document.getElementById("workPlanSelect");
+        if (!select || !oscPlansData) {
+            return;
+        }
+
+        var oscId = getSelectedOscId();
+        var plans = (oscId && oscPlansData[oscId]) || [];
+
+        select.innerHTML = "";
+        select.removeAttribute("data-needs-choice");
+
+        if (!oscId) {
+            select.appendChild(new Option("Selecione a OSC primeiro...", ""));
+            select.disabled = true;
+            return;
+        }
+
+        if (plans.length === 0) {
+            select.appendChild(new Option("Nenhum plano cadastrado para esta OSC", ""));
+            select.disabled = true;
+            return;
+        }
+
+        if (plans.length === 1) {
+            // Um único plano: já entra selecionado automaticamente.
+            select.appendChild(new Option(plans[0].title, plans[0].id, true, true));
+            select.disabled = false;
+            return;
+        }
+
+        select.appendChild(new Option("Selecione o plano de trabalho...", ""));
+        plans.forEach(function(plan) {
+            select.appendChild(new Option(plan.title, plan.id));
+        });
+        select.disabled = false;
+        select.setAttribute("data-needs-choice", "1");
+    }
+
+    function workPlanChoiceMissing() {
+        var select = document.getElementById("workPlanSelect");
+        return !!(select && !select.disabled && select.getAttribute("data-needs-choice") === "1" && !select.value);
     }
 
     function renderRhRows() {
@@ -1320,6 +1405,12 @@
     }
 
     function openFinalizeModal() {
+        if (workPlanChoiceMissing()) {
+            alert("Esta OSC possui mais de um plano de trabalho. Selecione o plano vinculado a esta visita antes de finalizar.");
+            var wpSelect = document.getElementById("workPlanSelect");
+            if (wpSelect) { wpSelect.focus(); }
+            return;
+        }
         var modal = document.getElementById("finalizeVisitModal");
         modal.style.display = "flex";
         document.body.classList.add("modal-open");
@@ -1469,6 +1560,10 @@
         var title = document.getElementById("planPreviewTitle");
         var openLink = document.getElementById("planPreviewOpenLink");
         var previewUrl = planButton.getAttribute("data-preview-base") + "?osc=" + encodeURIComponent(oscId);
+        var workPlanSelect = document.getElementById("workPlanSelect");
+        if (workPlanSelect && workPlanSelect.value) {
+            previewUrl += "&plan=" + encodeURIComponent(workPlanSelect.value);
+        }
 
         title.textContent = "Carregando plano de trabalho...";
         body.innerHTML = "<div class='plan-preview-loading'><i data-lucide='loader-circle'></i><span>Montando visualizacao do plano...</span></div>";
@@ -1548,7 +1643,9 @@
     if (oscSelectField) {
         oscSelectField.addEventListener("change", updatePlanButtonLink);
         oscSelectField.addEventListener("change", updateSubsidizedFromOsc);
+        oscSelectField.addEventListener("change", updateWorkPlanOptions);
     }
+    updateWorkPlanOptions();
 
     document.querySelectorAll(".attendance-present-input").forEach(function(input) {
         input.addEventListener("input", updateAttendanceTotal);

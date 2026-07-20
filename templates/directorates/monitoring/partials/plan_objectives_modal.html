@@ -1,0 +1,245 @@
+{% comment %}
+Modal para editar os textos do plano de trabalho herdados pelo relatório de
+visita (Emendas e Fundos): Objeto do Relatório + A/B/C do item 2.
+Aberto por botões com onclick="openPlanObjectives(this)" carregando:
+data-action, data-plan-title, data-objeto, data-objetivos, data-metas, data-atividades.
+{% endcomment %}
+<div id="planObjectivesModal" class="plan-objectives-modal" style="display:none;">
+    <div class="plan-objectives-dialog">
+        <form method="post" id="planObjectivesForm">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="plan-objectives-header">
+                <div>
+                    <span class="plan-objectives-eyebrow">Objeto e descrição dos objetivos</span>
+                    <h3 id="planObjectivesTitle">Plano de trabalho</h3>
+                    <p class="plan-objectives-help">Estes textos são herdados pelo Relatório de Visita (Objeto do relatório e item 2 — A, B e C).</p>
+                </div>
+                <button type="button" class="plan-objectives-close" onclick="closePlanObjectives()" aria-label="Fechar">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="plan-objectives-body">
+                <div class="plan-objectives-field">
+                    <label for="planObjetoInput">Objeto do Relatório</label>
+                    <textarea id="planObjetoInput" name="objeto" rows="4"></textarea>
+                </div>
+                <div class="plan-objectives-field">
+                    <label for="planObjetivosInput">A) Dos Objetivos</label>
+                    <textarea id="planObjetivosInput" name="objetivos" rows="4"></textarea>
+                </div>
+                <div class="plan-objectives-field">
+                    <label for="planMetasInput">B) Das Metas Estabelecidas</label>
+                    <textarea id="planMetasInput" name="metas" rows="4"></textarea>
+                </div>
+                <div class="plan-objectives-field">
+                    <label for="planAtividadesInput">C) Das Atividades</label>
+                    <textarea id="planAtividadesInput" name="atividades" rows="4"></textarea>
+                </div>
+            </div>
+            <div class="plan-objectives-actions">
+                <button type="button" class="plan-objectives-cancel" onclick="closePlanObjectives()">Cancelar</button>
+                <button type="submit" class="plan-objectives-save"><i data-lucide="check"></i> Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openPlanObjectives(button) {
+    var modal = document.getElementById("planObjectivesModal");
+    var form = document.getElementById("planObjectivesForm");
+    form.action = button.dataset.action;
+    document.getElementById("planObjectivesTitle").textContent = button.dataset.planTitle || "Plano de trabalho";
+    document.getElementById("planObjetoInput").value = button.dataset.objeto || "";
+    document.getElementById("planObjetivosInput").value = button.dataset.objetivos || "";
+    document.getElementById("planMetasInput").value = button.dataset.metas || "";
+    document.getElementById("planAtividadesInput").value = button.dataset.atividades || "";
+    modal.style.display = "flex";
+    document.body.classList.add("modal-open");
+    if (window.lucide) { lucide.createIcons(); }
+}
+
+function closePlanObjectives() {
+    document.getElementById("planObjectivesModal").style.display = "none";
+    document.body.classList.remove("modal-open");
+}
+
+document.getElementById("planObjectivesModal").addEventListener("click", function(event) {
+    if (event.target.id === "planObjectivesModal") {
+        closePlanObjectives();
+    }
+});
+</script>
+
+<style>
+    .plan-objectives-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 1400;
+        background: rgba(15, 23, 42, 0.48);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 22px;
+        backdrop-filter: blur(6px);
+    }
+
+    .plan-objectives-dialog {
+        width: min(720px, 100%);
+        max-height: min(90vh, 880px);
+        background: #ffffff;
+        border-radius: 24px;
+        border: 1px solid #dbe4ee;
+        box-shadow: 0 30px 60px rgba(15, 23, 42, 0.24);
+        overflow: hidden;
+    }
+
+    .plan-objectives-dialog form {
+        display: flex;
+        flex-direction: column;
+        max-height: inherit;
+    }
+
+    .plan-objectives-header,
+    .plan-objectives-actions {
+        padding: 18px 22px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .plan-objectives-header {
+        border-bottom: 1px solid #e2e8f0;
+        align-items: flex-start;
+    }
+
+    .plan-objectives-actions {
+        border-top: 1px solid #e2e8f0;
+        justify-content: flex-end;
+    }
+
+    .plan-objectives-eyebrow {
+        display: inline-block;
+        margin-bottom: 6px;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #64748b;
+    }
+
+    .plan-objectives-header h3 {
+        margin: 0;
+        font-size: 18px;
+        color: #0f172a;
+    }
+
+    .plan-objectives-help {
+        margin: 6px 0 0;
+        font-size: 12px;
+        color: #94a3b8;
+    }
+
+    .plan-objectives-close {
+        width: 42px;
+        height: 42px;
+        flex-shrink: 0;
+        border-radius: 12px;
+        border: 1px solid #dbe4ee;
+        background: #f8fafc;
+        color: #475569;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .plan-objectives-close i {
+        width: 18px;
+        height: 18px;
+    }
+
+    .plan-objectives-body {
+        flex: 1;
+        overflow: auto;
+        padding: 20px 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: #f8fafc;
+    }
+
+    .plan-objectives-field label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #1e3a8a;
+    }
+
+    .plan-objectives-field textarea {
+        width: 100%;
+        border-radius: 12px;
+        border: 1.5px solid #cbd5e1;
+        padding: 12px 14px;
+        font-size: 13px;
+        line-height: 1.6;
+        font-family: inherit;
+        color: #0f172a;
+        resize: vertical;
+        background: #ffffff;
+        outline: none;
+    }
+
+    .plan-objectives-field textarea:focus {
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+    }
+
+    .plan-objectives-cancel,
+    .plan-objectives-save {
+        min-height: 40px;
+        padding: 0 18px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+    }
+
+    .plan-objectives-cancel {
+        border: 1px solid #dbe4ee;
+        background: #ffffff;
+        color: #0f172a;
+    }
+
+    .plan-objectives-cancel:hover {
+        border-color: #93c5fd;
+        color: #2563eb;
+        background: #eff6ff;
+    }
+
+    .plan-objectives-save {
+        border: 1px solid #1d4ed8;
+        background: #2563eb;
+        color: #ffffff;
+    }
+
+    .plan-objectives-save:hover {
+        background: #1d4ed8;
+    }
+
+    .plan-objectives-save i {
+        width: 14px;
+        height: 14px;
+    }
+</style>

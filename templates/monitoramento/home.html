@@ -453,6 +453,48 @@
                             </div>
 
                             <div class="inline-plan-card-body">
+                                {% if is_emendas or is_fundos %}
+                                    {% for plan in osc.work_plans.all %}
+                                    <div class="inline-plan-file inline-plan-file-row">
+                                        <div class="inline-plan-file-icon">
+                                            <i data-lucide="file-pen-line"></i>
+                                        </div>
+                                        <div class="inline-plan-file-copy">
+                                            <strong>{{ plan.title }}</strong>
+                                            <span>{{ plan.created_at|date:"d/m/Y"|default:"Sem data" }}</span>
+                                        </div>
+                                        <div class="inline-plan-row-actions">
+                                            <button type="button" class="inline-plan-icon-btn" title="Visualizar plano" onclick="openInlinePlanPreview('{{ osc.pk }}', '{{ plan.pk }}')">
+                                                <i data-lucide="eye"></i>
+                                            </button>
+                                            <button type="button" class="inline-plan-icon-btn is-accent" title="Objeto e descrição dos objetivos"
+                                                data-action="{% url 'directorates:plan-objectives' plan.pk %}"
+                                                data-plan-title="{{ plan.title }}"
+                                                data-objeto="{{ plan.objeto }}"
+                                                data-objetivos="{{ plan.objetivos }}"
+                                                data-metas="{{ plan.metas }}"
+                                                data-atividades="{{ plan.atividades }}"
+                                                onclick="openPlanObjectives(this)">
+                                                <i data-lucide="list-checks"></i>
+                                            </button>
+                                            <a href="{% url 'directorates:plan-update' plan.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dplans%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-plan-icon-btn" title="Editar plano">
+                                                <i data-lucide="pencil"></i>
+                                            </a>
+                                            {% if can_delete %}
+                                            <form action="{% url 'directorates:plan-delete' plan.pk %}" method="post" onsubmit="return confirm('Excluir plano {{ plan.title }}?')">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="next" value="{% url 'monitoramento:home' directorate.pk %}?tab=plans&bimestre={{ selected_bimester }}&year={{ selected_year }}">
+                                                <button type="submit" class="inline-plan-icon-btn is-danger" title="Excluir plano">
+                                                    <i data-lucide="trash-2"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% empty %}
+                                    <p class="inline-plan-empty">Nenhum plano criado.</p>
+                                    {% endfor %}
+                                {% else %}
                                 {% with latest_plan=osc.work_plans.all|first %}
                                     {% if latest_plan %}
                                     <div class="inline-plan-file">
@@ -468,6 +510,7 @@
                                     <p class="inline-plan-empty">Nenhum plano criado.</p>
                                     {% endif %}
                                 {% endwith %}
+                                {% endif %}
                             </div>
 
                             <div class="inline-plan-actions">
@@ -475,6 +518,7 @@
                                     <i data-lucide="plus"></i>
                                     Novo Plano
                                 </a>
+                                {% if not is_emendas and not is_fundos %}
                                 {% with latest_plan=osc.work_plans.all|first %}
                                     {% if latest_plan %}
                                     <button type="button" class="inline-plan-icon-btn" title="Visualizar plano" onclick="openInlinePlanPreview('{{ osc.pk }}')">
@@ -494,6 +538,7 @@
                                     {% endif %}
                                     {% endif %}
                                 {% endwith %}
+                                {% endif %}
                             </div>
                         </article>
                         {% empty %}
@@ -528,6 +573,57 @@
                     </div>
                 </div>
             </div>
+
+            {% if is_emendas or is_fundos %}
+            {% include "directorates/monitoring/partials/plan_objectives_modal.html" %}
+            <style>
+                .inline-plan-file-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 10px 12px;
+                    border-radius: 12px;
+                    border: 1px solid rgba(148, 163, 184, 0.3);
+                    background: rgba(255, 255, 255, 0.6);
+                }
+
+                .inline-plan-file-row + .inline-plan-file-row {
+                    margin-top: 8px;
+                }
+
+                .inline-plan-file-copy {
+                    min-width: 0;
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                }
+
+                .inline-plan-file-copy strong {
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .inline-plan-row-actions {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    flex-shrink: 0;
+                }
+
+                .inline-plan-icon-btn.is-accent {
+                    border-color: #bfdbfe;
+                    background: #eff6ff;
+                    color: #2563eb;
+                }
+
+                .inline-plan-icon-btn.is-accent:hover {
+                    border-color: #2563eb;
+                    background: #dbeafe;
+                }
+            </style>
+            {% endif %}
             {% elif dashboard_tab == 'reports' %}
             <section class="subvention-inline-panel" id="subventionReportPanel">
                 <div class="inline-panel-header" style="display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 12px;">
@@ -2496,13 +2592,14 @@
         });
     });
 
-    function openInlinePlanPreview(oscId) {
+    function openInlinePlanPreview(oscId, planId) {
         var modal = document.getElementById("inlinePlanPreviewModal");
         var body = document.getElementById("inlinePlanPreviewBody");
         var title = document.getElementById("inlinePlanPreviewTitle");
         var openLink = document.getElementById("inlinePlanPreviewOpenLink");
-        var previewUrl = "{% url 'directorates:plan-preview' directorate.pk %}?osc=" + encodeURIComponent(oscId);
-        var openUrl = "{% url 'directorates:plan-document' directorate.pk %}?osc=" + encodeURIComponent(oscId);
+        var planParam = planId ? "&plan=" + encodeURIComponent(planId) : "";
+        var previewUrl = "{% url 'directorates:plan-preview' directorate.pk %}?osc=" + encodeURIComponent(oscId) + planParam;
+        var openUrl = "{% url 'directorates:plan-document' directorate.pk %}?osc=" + encodeURIComponent(oscId) + planParam;
 
         if (!modal || !body || !title || !openLink) return;
 

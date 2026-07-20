@@ -31,6 +31,57 @@
                     </div>
 
                     <div class="plan-osc-bottom">
+                        {% if is_emendas %}
+                        <div class="plan-osc-copy">
+                            {% for plan in osc.work_plans.all %}
+                            <div class="plan-item-multi">
+                                <div class="plan-item-line">
+                                    <div class="plan-item-line-icon">
+                                        <i data-lucide="file-pen-line"></i>
+                                    </div>
+                                    <div class="plan-item-line-copy">
+                                        <strong>{{ plan.title }}</strong>
+                                        <span>{{ plan.created_at|date:"d/m/Y"|default:"Sem data" }}</span>
+                                    </div>
+                                </div>
+                                <div class="plan-osc-actions plan-item-actions">
+                                    <button type="button" class="plan-icon-btn" title="Visualizar plano" onclick="openPlanPreview('{{ osc.pk }}', '{{ plan.pk }}')">
+                                        <i data-lucide="eye"></i>
+                                    </button>
+                                    <button type="button" class="plan-icon-btn accent" title="Objeto e descrição dos objetivos"
+                                        data-action="{% url 'directorates:plan-objectives' plan.pk %}"
+                                        data-plan-title="{{ plan.title }}"
+                                        data-objeto="{{ plan.objeto }}"
+                                        data-objetivos="{{ plan.objetivos }}"
+                                        data-metas="{{ plan.metas }}"
+                                        data-atividades="{{ plan.atividades }}"
+                                        onclick="openPlanObjectives(this)">
+                                        <i data-lucide="list-checks"></i>
+                                    </button>
+                                    <a href="{% url 'directorates:plan-update' plan.pk %}" class="plan-icon-btn" title="Editar plano">
+                                        <i data-lucide="pencil"></i>
+                                    </a>
+                                    {% if can_delete %}
+                                    <form action="{% url 'directorates:plan-delete' plan.pk %}" method="post" onsubmit="return confirm('Excluir plano {{ plan.title }}?')">
+                                        {% csrf_token %}
+                                        <button type="submit" class="plan-icon-btn danger" title="Excluir plano">
+                                            <i data-lucide="trash-2"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% empty %}
+                            <p class="plan-item-empty">Nenhum plano criado.</p>
+                            {% endfor %}
+                        </div>
+
+                        <div class="plan-osc-actions">
+                            <a href="{% url 'directorates:plan-create' directorate.pk %}?osc={{ osc.pk }}" class="plan-action-btn">
+                                <i data-lucide="plus"></i> Novo Plano
+                            </a>
+                        </div>
+                        {% else %}
                         <div class="plan-osc-copy">
                             {% with latest_plan=osc.work_plans.all|first %}
                                 {% if latest_plan %}
@@ -71,7 +122,8 @@
                             {% endif %}
                             {% endif %}
                         {% endwith %}
-                    </div>
+                        </div>
+                        {% endif %}
                     </div>
                 </article>
                 {% empty %}
@@ -87,6 +139,10 @@
         </div>
     </main>
 </div>
+
+{% if is_emendas %}
+{% include "directorates/monitoring/partials/plan_objectives_modal.html" %}
+{% endif %}
 
 <div id="planPreviewModal" class="plan-preview-modal" style="display:none;">
     <div class="plan-preview-dialog">
@@ -115,13 +171,14 @@ document.getElementById("plan-search")?.addEventListener("input", function() {
     });
 });
 
-function openPlanPreview(oscId) {
+function openPlanPreview(oscId, planId) {
     const modal = document.getElementById("planPreviewModal");
     const body = document.getElementById("planPreviewBody");
     const title = document.getElementById("planPreviewTitle");
     const openLink = document.getElementById("planPreviewOpenLink");
-    const previewUrl = "{% url 'directorates:plan-preview' directorate.pk %}?osc=" + encodeURIComponent(oscId);
-    const openUrl = "{% url 'directorates:plan-document' directorate.pk %}?osc=" + encodeURIComponent(oscId);
+    const planParam = planId ? "&plan=" + encodeURIComponent(planId) : "";
+    const previewUrl = "{% url 'directorates:plan-preview' directorate.pk %}?osc=" + encodeURIComponent(oscId) + planParam;
+    const openUrl = "{% url 'directorates:plan-document' directorate.pk %}?osc=" + encodeURIComponent(oscId) + planParam;
 
     title.textContent = "Carregando plano de trabalho...";
     body.innerHTML = "<div class='plan-preview-loading'><i data-lucide='loader-circle'></i><span>Montando visualizacao do plano...</span></div>";
@@ -367,6 +424,35 @@ document.getElementById("planPreviewModal").addEventListener("click", function(e
         align-items: center;
         gap: 8px;
         flex-shrink: 0;
+    }
+
+    .plan-item-multi {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid #edf2f7;
+        background: #ffffff;
+    }
+
+    .plan-item-multi + .plan-item-multi {
+        margin-top: 8px;
+    }
+
+    .plan-item-actions {
+        flex-wrap: wrap;
+    }
+
+    .plan-icon-btn.accent {
+        border-color: #bfdbfe;
+        background: #eff6ff;
+        color: #2563eb;
+    }
+
+    .plan-icon-btn.accent:hover {
+        border-color: #2563eb;
+        background: #dbeafe;
     }
 
     .plan-action-btn,
