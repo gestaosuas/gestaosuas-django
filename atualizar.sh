@@ -7,7 +7,10 @@
 set -e
 
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"
-BACKUP_DIR="$HOME/backups/gestaosuas"
+# $HOME (/DATA) pertence ao root nesta VPS (CasaOS) — usuário klismanrds não
+# tem escrita direta ali. /DATA/AppData é 777, funciona como diretório de
+# backups compartilhado entre os apps desta máquina.
+BACKUP_DIR="/DATA/AppData/gestaosuas_backups"
 DATE=$(date +%Y%m%d_%H%M%S)
 DUMP_FILE="gestaosuas_${DATE}.dump"
 GDRIVE_REMOTE="gdrive:Gestaosuas/backups"
