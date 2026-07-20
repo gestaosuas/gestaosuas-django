@@ -15,6 +15,20 @@ DATE=$(date +%Y%m%d_%H%M%S)
 DUMP_FILE="gestaosuas_${DATE}.dump"
 GDRIVE_REMOTE="gdrive:Gestaosuas/backups"
 
+# `docker compose` só é reconhecido com DOCKER_CONFIG apontando para um dir
+# gravável — o padrão (/DATA/.docker) pertence ao root nesta VPS.
+export DOCKER_CONFIG="/tmp/dockercfg"
+mkdir -p "$DOCKER_CONFIG"
+
+# Nome/usuário reais do banco (nunca "postgres"/"postgres" nesta VPS — ver .env).
+if [ -f "$APP_DIR/.env" ]; then
+    set -a
+    source "$APP_DIR/.env"
+    set +a
+fi
+DB_NAME="${DB_NAME:-postgres}"
+DB_USER="${DB_USER:-postgres}"
+
 echo ""
 echo "============================================"
 echo "  Gestaosuas — Atualização + Backup"
@@ -25,7 +39,7 @@ echo ""
 # ── 1. Backup do banco ─────────────────────────────────────
 echo "[1/4] Fazendo backup do banco de dados..."
 mkdir -p "$BACKUP_DIR"
-docker exec gestaosuas_db pg_dump -U postgres -Fc postgres > "$BACKUP_DIR/$DUMP_FILE"
+docker exec gestaosuas_db pg_dump -U "$DB_USER" -Fc "$DB_NAME" > "$BACKUP_DIR/$DUMP_FILE"
 echo "      Salvo em: $BACKUP_DIR/$DUMP_FILE ($(du -sh "$BACKUP_DIR/$DUMP_FILE" | cut -f1))"
 
 # ── 2. Upload para Google Drive ────────────────────────────
