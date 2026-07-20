@@ -2,7 +2,9 @@
 # ============================================================
 # Gestaosuas-django — Script de Atualização com Backup
 # Uso: ./atualizar.sh
-# Pré-requisito: rclone configurado com remote "gdrive"
+# Backup no Google Drive: opcional, via mount de pasta local (ex: CasaOS)
+# configurado em GDRIVE_DIR no .env deste projeto (não versionado — o caminho
+# de montagem/conta é específico da VPS e não deve viver no código público).
 # ============================================================
 set -e
 
@@ -13,7 +15,6 @@ APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKUP_DIR="/DATA/AppData/gestaosuas_backups"
 DATE=$(date +%Y%m%d_%H%M%S)
 DUMP_FILE="gestaosuas_${DATE}.dump"
-GDRIVE_REMOTE="gdrive:Gestaosuas/backups"
 
 # `docker compose` só é reconhecido com DOCKER_CONFIG apontando para um dir
 # gravável — o padrão (/DATA/.docker) pertence ao root nesta VPS.
@@ -42,19 +43,22 @@ mkdir -p "$BACKUP_DIR"
 docker exec gestaosuas_db pg_dump -U "$DB_USER" -Fc "$DB_NAME" > "$BACKUP_DIR/$DUMP_FILE"
 echo "      Salvo em: $BACKUP_DIR/$DUMP_FILE ($(du -sh "$BACKUP_DIR/$DUMP_FILE" | cut -f1))"
 
-# ── 2. Upload para Google Drive ────────────────────────────
-# Best-effort: falha aqui (rclone ausente ou remote "gdrive" não configurado)
-# nunca deve derrubar o deploy — o backup local (passo 1) já está garantido.
-echo "[2/4] Enviando backup para o Google Drive..."
-if command -v rclone &>/dev/null; then
-    if rclone copy "$BACKUP_DIR/$DUMP_FILE" "$GDRIVE_REMOTE/" --progress; then
-        echo "      Upload concluído → $GDRIVE_REMOTE/$DUMP_FILE"
-    else
-        echo "      AVISO: upload para o Google Drive falhou (remote 'gdrive' configurado? rclone config)."
-        echo "      Backup mantido localmente em $BACKUP_DIR/$DUMP_FILE"
+# ── 2. Copia para o Google Drive (opcional) ────────────────
+# Best-effort: sem GDRIVE_DIR configurado no .env, ou falha ao copiar
+# (mount ausente, sem espaço etc.), nunca deve derrubar o deploy — o
+# backup local (passo 1) já está garantido.
+echo "[2/4] Copiando backup para o Google Drive..."
+if [ -z "${GDRIVE_DIR:-}" ]; then
+    echo "      Pulado: GDRIVE_DIR não definido no .env deste projeto."
+elif mkdir -p "$GDRIVE_DIR" 2>/dev/null && cp "$BACKUP_DIR/$DUMP_FILE" "$GDRIVE_DIR/$DUMP_FILE" 2>/dev/null; then
+    echo "      Copiado para: $GDRIVE_DIR/$DUMP_FILE"
+    # Mantém apenas os 10 backups mais recentes no Drive (mesma retenção do local).
+    GDRIVE_COUNT=$(ls -1 "$GDRIVE_DIR"/*.dump 2>/dev/null | wc -l)
+    if [ "$GDRIVE_COUNT" -gt 10 ]; then
+        ls -1t "$GDRIVE_DIR"/*.dump | tail -n +11 | xargs rm -f
     fi
 else
-    echo "      AVISO: rclone não encontrado. Instale com: curl https://rclone.org/install.sh | bash"
+    echo "      AVISO: não foi possível copiar para o Google Drive (mount em $GDRIVE_DIR disponível?)."
     echo "      Backup mantido localmente em $BACKUP_DIR/$DUMP_FILE"
 fi
 
