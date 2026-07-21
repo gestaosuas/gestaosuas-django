@@ -503,7 +503,7 @@ a {
 .data-table-card {
     background: var(--bg-white);
     border-radius: 24px;
-    padding: 24px;
+    padding: 16px;
     border: 1px solid rgba(255, 255, 255, 0.52);
     box-shadow: var(--shadow);
 }
@@ -524,7 +524,7 @@ a {
 .section-head h2,
 .data-table-card h2 {
     margin: 0;
-    font-size: 18px;
+    font-size: 15px;
 }
 
 .section-line {
@@ -1739,19 +1739,19 @@ a {
 .dashboard-split-layout {
     display: grid;
     grid-template-columns: 280px 1fr;
-    gap: 20px;
+    gap: 16px;
     align-items: start;
 }
 
 .metrics-stack {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 4px;
 }
 
 .metrics-stack .metric-card-modern {
-    padding: 12px 16px; /* Reduced from 18px 20px */
-    border-radius: 20px;
+    padding: 6px 12px;
+    border-radius: 14px;
     background: white;
     border: 1px solid rgba(0,0,0,0.03);
     box-shadow: 0 4px 12px rgba(0,0,0,0.01);
@@ -1766,9 +1766,9 @@ a {
 
 .metric-card-modern strong {
     display: block;
-    font-size: 38px; /* Reduced by 20% from 48px */
+    font-size: 22px;
     line-height: 1;
-    margin: 4px 0 2px; /* Tighter margins */
+    margin: 1px 0 0;
     font-weight: 800;
 }
 
@@ -1776,13 +1776,13 @@ a {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 12px;
+    margin-bottom: 4px;
 }
 
 .icon-circle {
-    width: 32px;
-    height: 32px;
-    border-radius: 10px;
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1793,10 +1793,10 @@ a {
 .variation {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
+    gap: 3px;
+    padding: 3px 6px;
     border-radius: 20px;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 800;
 }
 
@@ -1806,11 +1806,11 @@ a {
 .variation i { width: 12px; height: 12px; }
 
 .metric-context {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
     color: #94a3b8;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
 }
 
 /* Enhanced Chart Header */
@@ -2230,7 +2230,7 @@ canvas {
 /* Monitoring Modules Premium Styles */
 .monitoring-header-container {
     background: linear-gradient(135deg, #1e3a8a, #3b82f6);
-    padding: 24px 2% 80px;
+    padding: 20px 2% 60px;
     position: relative;
     color: white;
 }
@@ -2331,7 +2331,7 @@ canvas {
     background: white;
     border-radius: 32px;
     box-shadow: 0 20px 50px rgba(0,0,0,0.05);
-    padding: 40px;
+    padding: 20px 28px;
     position: relative;
     z-index: 10;
     min-height: 600px;
@@ -2394,13 +2394,13 @@ canvas {
 .table-monitoring {
     width: 100%;
     border-collapse: separate;
-    border-spacing: 0 16px;
+    border-spacing: 0 6px;
 }
 
 .table-monitoring th {
     text-align: left;
-    padding: 0 20px;
-    font-size: 10px;
+    padding: 0 14px;
+    font-size: 9px;
     font-weight: 800;
     text-transform: uppercase;
     color: #94a3b8;
@@ -2412,9 +2412,11 @@ canvas {
 }
 
 .table-monitoring td {
-    padding: 20px;
+    padding: 10px 14px;
     background: white;
     border-bottom: 1px solid #f1f5f9;
+    font-size: 13px;
+    color: #475569;
 }
 
 .table-monitoring td:first-child { border-radius: 16px 0 0 16px; }
@@ -2744,6 +2746,7 @@ body.dashboard-fit-vh .metrics-stack {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    overflow-y: auto;
 }
 
 body.dashboard-fit-vh .chart-panel {

@@ -38,7 +38,7 @@
                             data-key="{{ row.key }}"
                             {% endif %}>
                             <span class="val-inner" style="display: inline-block; min-width: 30px; padding: 2px 4px; border-radius: 4px;">
-                                {% if item.val != '' and item.val != None and item.val != 0 %}{{ item.val }}{% endif %}
+                                    {% if item.val != '' and item.val != None and item.val != 0 %}{{ item.val }}{% else %}0{% endif %}
                             </span>
                         </td>
                     {% endfor %}

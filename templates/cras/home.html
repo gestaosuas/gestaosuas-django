@@ -104,33 +104,32 @@
                 </div>
             </div>
 
-            <div class="dashboard-split-layout">
-                <aside class="metrics-stack">
-                    {% for card in cards %}
-                    <article class="metric-card-modern">
-                        <div class="metric-top">
-                            <div class="icon-circle" style="--accent-color:{{ card.color }};background:{{ card.color }}15;">
-                                <i data-lucide="{{ card.icon }}"></i>
-                            </div>
-                            {% if card.variation %}
-                            <span class="variation {{ card.variation.direction }}">
-                                <i data-lucide="{{ card.variation.icon }}"></i>
-                                {{ card.variation.text }}
-                            </span>
-                            {% endif %}
+            <div class="cras-kpi-row">
+                {% for card in cards %}
+                <article class="metric-card-modern cras-kpi-card">
+                    <div class="metric-top">
+                        <div class="icon-circle" style="--accent-color:{{ card.color }};background:{{ card.color }}15;">
+                            <i data-lucide="{{ card.icon }}"></i>
                         </div>
-                        <p class="metric-context">{{ card.label }}</p>
-                        <strong>{{ card.value }}{{ card.suffix }}</strong>
-                    </article>
-                    {% endfor %}
-                </aside>
+                        {% if card.variation %}
+                        <span class="variation {{ card.variation.direction }}">
+                            <i data-lucide="{{ card.variation.icon }}"></i>
+                            {{ card.variation.text }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <p class="metric-context">{{ card.label }}</p>
+                    <strong>{{ card.value }}{{ card.suffix }}</strong>
+                </article>
+                {% endfor %}
+            </div>
 
-                <div class="charts-stack">
+            <div class="charts-stack">
                     <div class="charts-row-inner">
                         <article class="chart-panel">
                             <div class="chart-header">
                                 <div>
-                                    <h2>Cadastros e Recadastros</h2>
+                                    <h2>Cadastros e Atualização Cadastral</h2>
                                     <p class="chart-subtitle">Comparativo mensal • {{ period_label }}</p>
                                 </div>
                             </div>
@@ -142,7 +141,7 @@
                         <article class="chart-panel">
                             <div class="chart-header">
                                 <div>
-                                    <h2>Familias Admitidas e Desligadas</h2>
+                                    <h2>Famílias Inseridas e Desligadas - PAIF</h2>
                                     <p class="chart-subtitle">Movimentacao mensal • {{ period_label }}</p>
                                 </div>
                             </div>
@@ -273,24 +272,72 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    makeDualLine('cadRecChart', 'cad-data', 'rec-data', '#3b82f6', '#f59e0b', 'Cadastros', 'Recadastros');
-    makeDualLine('admDeslChart', 'adm-data', 'desl-data', '#10b981', '#ef4444', 'Admitidas', 'Desligadas');
+    makeDualLine('cadRecChart', 'cad-data', 'rec-data', '#3b82f6', '#f59e0b', 'Cadastros', 'Atualização Cadastral');
+    makeDualLine('admDeslChart', 'adm-data', 'desl-data', '#10b981', '#ef4444', 'Inseridas', 'Desligadas');
     makeLine('atendChart', 'aten-data', '#0ea5e9');
     makeLine('paifChart', 'atual-data', '#8b5cf6');
 });
 </script>
 
 <style>
-.dashboard-split-layout {
+.cras-kpi-row {
     display: grid;
-    grid-template-columns: 240px 1fr;
-    gap: 24px;
-    margin-top: 24px;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-shrink: 0;
 }
-.metrics-stack {
+
+.charts-stack {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
+}
+
+.charts-row-inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.chart-panel {
+    padding: 12px 16px !important;
+    min-height: 200px !important;
+}
+
+.chart-panel .chart-header {
+    margin-bottom: 8px !important;
+}
+
+.chart-panel .chart-header h2 {
+    font-size: 13px !important;
+}
+
+.chart-subtitle {
+    font-size: 10px !important;
+}
+
+.monitoring-chart-wrap {
+    flex: 1;
+    min-height: 120px;
+}
+
+@media (max-width: 1200px) {
+    .cras-kpi-row {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+@media (max-width: 768px) {
+    .cras-kpi-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .charts-row-inner {
+        grid-template-columns: 1fr;
+    }
 }
 .metric-card-modern {
     padding: 10px 16px;
@@ -400,6 +447,49 @@ document.addEventListener("DOMContentLoaded", function () {
 @media (max-width: 1100px) {
     .dashboard-split-layout, .charts-row-inner { grid-template-columns: 1fr; }
     .chart-panel { height: auto; min-height: 250px; }
+}
+
+/* ── KPI row compact overrides ── */
+.cras-kpi-card {
+    padding: 8px 10px !important;
+    border-radius: 12px !important;
+    min-width: 0;
+}
+.cras-kpi-card strong {
+    font-size: 18px !important;
+}
+.cras-kpi-card .icon-circle {
+    width: 20px !important;
+    height: 20px !important;
+}
+.cras-kpi-card .icon-circle i {
+    width: 11px !important;
+    height: 11px !important;
+}
+.cras-kpi-card .metric-top {
+    margin-bottom: 2px !important;
+}
+.cras-kpi-card .metric-context {
+    font-size: 7px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cras-kpi-card .variation {
+    font-size: 8px !important;
+    padding: 2px 4px !important;
+    gap: 1px !important;
+}
+.cras-kpi-card .variation i {
+    width: 9px !important;
+    height: 9px !important;
+}
+
+/* ── Force main card to fill height and allow chart scroll ── */
+.monitoring-main-card {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
 }
 </style>
 {% endblock %}

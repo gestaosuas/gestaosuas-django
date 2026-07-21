@@ -26,14 +26,13 @@ CRAS_UNITS = [
 ]
 
 CRAS_CARD_FIELDS = [
-    ("Atendimentos", "atendimentos", "phone-call", "#3b82f6"),
-    ("Cadastros Novos", "cadastros_novos", "user-plus", "#10b981"),
-    ("Recadastros", "recadastros", "refresh-cw", "#f59e0b"),
-    ("Famílias Admitidas", "admitidas", "home", "#8b5cf6"),
-    ("Famílias Desligadas", "desligadas", "user-minus", "#ef4444"),
-    ("Mês Anterior", "anterior", "arrow-left", "#64748b"),
-    ("Atual", "atual", "activity", "#4338ca"),
-    ("Retenção", "__retencao__", "shield-check", "#06b6d4"),
+    ("Ativ. PAIF", "__cumulative_paif__", "phone-call", "#3b82f6"),
+    ("Visita Domiciliar", "visita_domiciliar", "home", "#10b981"),
+    ("Cadastros Novos", "cadastros_novos", "user-plus", "#f59e0b"),
+    ("Atualização Cad Único", "recadastros", "refresh-cw", "#8b5cf6"),
+    ("Famílias Inseridas - PAIF", "admitidas", "user-check", "#ef4444"),
+    ("Famílias Desligadas - PAIF", "desligadas", "user-minus", "#6366f1"),
+    ("Cesta Básica", "cesta_basica", "shopping-basket", "#06b6d4"),
 ]
 
 class CrasBaseMixin(DirectorateAccessMixin):
@@ -126,12 +125,27 @@ class CrasHomeView(TvTemplateMixin, CrasBaseMixin, DetailView):
 
         cards = []
         for label, field_name, icon, color in CRAS_CARD_FIELDS:
-            if field_name == "__retencao__":
-                atual_val = get_unit_value("atual")
-                deslig_val = get_unit_value("desligadas")
-                value = round(((atual_val - deslig_val) / atual_val) * 100, 1) if atual_val > 0 else 0
-                suffix = "%"
-                history = atual_hist
+            if field_name == "__cumulative_paif__":
+                # Acumulado: atual de Janeiro + soma admitidas de cada mês seguinte
+                jan_atual = get_unit_history("atual")[0]
+                admit_hist = get_unit_history("admitidas")
+                
+                cumulative = jan_atual
+                paif_history = []
+                for m_idx in range(12):
+                    if m_idx > 0:
+                        cumulative += admit_hist[m_idx]
+                    paif_history.append(cumulative)
+                
+                if selected_month == "all":
+                    value = paif_history[11]
+                else:
+                    try:
+                        value = paif_history[int(selected_month) - 1]
+                    except (ValueError, IndexError):
+                        value = 0
+                suffix = ""
+                history = paif_history
             else:
                 value = get_unit_value(field_name)
                 suffix = ""

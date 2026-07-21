@@ -360,8 +360,26 @@ Sem esperar pelo cutover de banco limpo (ainda não aconteceu — ver nota acima
 | 3 | Colunas JSON de `visits` (identificacao, assinaturas, etc.) podem ter dupla codificação UTF-8 | Texto com acentos corrompido em detalhes de visita | Média |
 | 4 | `strip_accents` e funções utilitárias duplicadas em `core/utils.py` e `monitoramento/views.py` | Inconsistência | Baixa |
 | 5 | **[Corrigido]** Colunas `user_id`/`created_by` de quase todas as tabelas de relatório tinham FK física para o schema Supabase residual `auth.users` em vez de `accounts_user` — achado por testes escritos em 2026-07. `scripts/migrate_to_pure_pg.sql` (Passo 7) repontou todas as 18 tabelas para `accounts_user`; aplicado no banco de dev em 2026-07-13 e **na VPS de produção em 2026-07-20** (rodado direto contra `gestaosuas_prod`, com backup manual antes — ver seção "Migração Supabase → PostgreSQL puro") | ~~Até rodar o script na VPS, qualquer usuário criado lá depois da migração original recebia `IntegrityError` ao salvar relatórios/work plans/OSCs/visitas~~ Resolvido | Concluída |
+| 6 | `beneficios_reports.user_id` é setado para `None` no `form_valid()` em vez de `request.user.pk` (diferente do padrão de todas as outras diretorias) | Quem preencheu benefícios não é rastreável | Média |
 
 Achados e corrigidos na mesma sessão (2026-07-13): rota `quick-edit` do NAICA/CRAS inacessível (ordem de URL), `IntegrityError` ao criar relatório novo via quick-edit do CREAS Idoso/PCD (`updated_at` faltando no `get_or_create`), 500 para admin em diretoria inexistente (query desprotegida em 6 List/CreateViews), drift de nullability em `naica_reports.user_id`, `ValidationError` não capturada em `DirectorateSlugConverter.to_url()`, tipo de coluna incompatível em `creas_pop_rua_reports.created_by` (agora `uuid` com FK), e toast de sucesso+erro simultâneo em `UserPermissionsView`. Ver `git log` para detalhes — não repetidos aqui pois já não são débito técnico atual.
+
+---
+
+## Manutenção de docs/dominio/
+
+Os arquivos em `docs/dominio/` (`00-modelo-de-dados.md`, `01` a `04`) são a fonte de verdade sobre schema e regras de negócio. Regras de atualização:
+
+1. **NUNCA atualize esses arquivos silenciosamente durante uma tarefa de implementação.** Se descobrir uma regra de negócio não documentada durante um ajuste, PARE e pergunte antes de assumir — não escreva no arquivo por conta própria.
+
+2. **Atualize `00-modelo-de-dados.md` automaticamente** (sem pedir permissão) sempre que:
+   - Uma `ALTER TABLE` for aplicada em dev ou produção
+   - `migrate_to_pure_pg.sql` ganhar um novo Passo
+   - Re-rode o `inspectdb` e atualize o arquivo. Registre no Changelog do próprio arquivo (data + o que mudou) — nunca sobrescreva sem histórico.
+
+3. **Atualize `01` a `04` (regras de negócio) SOMENTE quando o usuário confirmar** resposta nova a uma pergunta de alinhamento, ou uma regra mudar por decisão explícita dele. Nunca infira mudança de regra a partir de um bug corrigido — bug corrigido não vira regra nova automaticamente.
+
+4. **Todo arquivo em `docs/dominio/` mantém uma seção final "Changelog"** (data — o que mudou — por quê).
 
 ---
 

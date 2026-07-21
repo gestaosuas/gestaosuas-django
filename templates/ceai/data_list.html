@@ -27,6 +27,7 @@
                                 <option value="Luizote" {% if unit_filter == 'Luizote' %}selected{% endif %}>CEAI Luizote</option>
                                 <option value="Guarani" {% if unit_filter == 'Guarani' %}selected{% endif %}>CEAI Guarani</option>
                                 <option value="Morumbi" {% if unit_filter == 'Morumbi' %}selected{% endif %}>CEAI Morumbi</option>
+                                <option value="Condomínio do Idoso" {% if unit_filter == 'Condomínio do Idoso' %}selected{% endif %}>Condomínio do Idoso</option>
                             </select>
                         </label>
                         <label class="pill-select">
@@ -88,7 +89,7 @@
                                 data-unit="{{ unit.name }}"
                                 data-key="{{ row.key }}"
                                 {% endif %}>
-                                    {{ item.val|default:'' }}
+                                    {{ item.val|default:'0' }}
                                 </td>
                                 {% endfor %}
                                 <td class="total-cell"><strong>{{ row.total }}</strong></td>
@@ -132,7 +133,7 @@
                                         data-unit="{{ unit.name }}"
                                         data-key="{{ row.key }}"
                                         {% endif %}>
-                                        {{ m.val|default:'' }}
+                                        {{ m.val|default:'0' }}
                                     </td>
                                     {% endfor %}
                                 </tr>
@@ -168,7 +169,7 @@
                                         data-unit="{{ unit.name }}"
                                         data-key="{{ row.key }}"
                                         {% endif %}>
-                                        {% if m.val != '' and m.val != None and m.val != 0 %}{{ m.val }}{% endif %}
+                                        {{ m.val|default:'0' }}
                                     </td>
                                     {% endfor %}
                                 </tr>
@@ -185,6 +186,11 @@
 </div>
 
 <style>
+@media (min-width: 1025px) {
+    .dashboard-main {
+        padding-top: 80px !important;
+    }
+}
 .header-left-group { display: flex; align-items: center; gap: 4px; }
 .header-left-group h1 { margin: 0; line-height: 1; }
 .btn-back { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; background: #f1f5f9; color: #64748b; text-decoration: none; }

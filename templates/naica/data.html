@@ -63,7 +63,7 @@
                                 data-unit="{{ item.unit }}"
                                 {% endif %}>
                                 <span class="val-inner" style="padding: 4px 10px; border-radius: 6px; display: inline-block; min-width: 30px;">
-                                    {% if item.val != '' and item.val != None and item.val != 0 %}{{ item.val }}{% endif %}
+                                    {{ item.val|default:"0" }}
                                 </span>
                             </td>
                             {% endfor %}

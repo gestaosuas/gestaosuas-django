@@ -174,9 +174,8 @@
                         <article class="chart-panel">
                             <div class="chart-header">
                                 <div>
-                                    <h2>Atendimento</h2>
+                                    <h2>Atendimento ao Empregador e Trabalhador</h2>
                                 </div>
-                                <span class="chart-value">{{ sine_total_attendance }}</span>
                             </div>
                             <div class="monitoring-chart-wrap">
                                 <canvas id="sine-attendance-chart"></canvas>
@@ -188,7 +187,6 @@
                                 <div>
                                     <h2>Concluintes</h2>
                                 </div>
-                                <span class="chart-value">{{ cp_peak_concluintes }}</span>
                             </div>
                             <div class="monitoring-chart-wrap">
                                 <canvas id="cp-concluintes-chart"></canvas>
@@ -198,9 +196,8 @@
                         <article class="chart-panel">
                             <div class="chart-header">
                                 <div>
-                                    <h2>Interações</h2>
+                                    <h2>Atendimentos</h2>
                                 </div>
-                                <span class="chart-value">{{ cp_total_interactions }}</span>
                             </div>
                             <div class="monitoring-chart-wrap">
                                 <canvas id="cp-comparison-chart"></canvas>
@@ -209,23 +206,12 @@
 
                         <article class="chart-panel chart-panel-gender">
                             <div class="chart-header" style="margin-bottom: 5px;">
-                                <h2>Gênero</h2>
+                                <h2>Concluintes por Gênero</h2>
                             </div>
                             <div class="sinecp-gender-panel">
                                 <div class="sinecp-gender-canvas-wrap">
                                     <canvas id="cp-gender-chart"></canvas>
                                 </div>
-                                <ul class="donut-legend">
-                                    {% for item in cp_gender %}
-                                        <li>
-                                            <span class="legend-dot" style="background: {{ item.color }};"></span>
-                                            <span>{{ item.label }}</span>
-                                            <strong>{{ item.value }}</strong>
-                                        </li>
-                                    {% empty %}
-                                        <li>Sem dados</li>
-                                    {% endfor %}
-                                </ul>
                             </div>
                         </article>
                     {% endif %}
@@ -279,6 +265,7 @@
 
         const basePlugins = {
             legend: {
+                position: "bottom",
                 labels: {
                     color: "#334155",
                     usePointStyle: true,
@@ -541,6 +528,7 @@
                     }],
                 },
                 options: {
+                    responsive: true,
                     maintainAspectRatio: true,
                     cutout: "50%",
                     layout: {
@@ -551,7 +539,8 @@
                         tooltip: basePlugins.tooltip,
                         datalabels: {
                             color: "#ffffff",
-                            font: { size: 10, weight: "800" },
+                            font: { size: 11, weight: "700" },
+                            display: (context) => context.dataset.data[context.dataIndex] > 0,
                             formatter: (value, context) => context.chart.data.labels[context.dataIndex] === "Sem dados" ? "" : value,
                         },
                     },
@@ -594,8 +583,8 @@
     }
 
     .chart-panel-gender {
-        max-width: 450px;
-        min-height: 220px !important;
+        max-width: 100%;
+        min-height: 200px !important;
     }
 
     .monitoring-chart-wrap {
@@ -609,15 +598,17 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 15px;
+        gap: 12px;
         flex: 1;
         min-height: 0;
     }
 
     .sinecp-gender-canvas-wrap {
-        width: 100px;
-        height: 100px;
+        width: 180px;
+        height: 180px;
         position: relative;
+        flex-shrink: 0;
+        margin: 0 auto;
     }
 
     .donut-legend {

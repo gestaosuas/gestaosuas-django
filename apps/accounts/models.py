@@ -44,6 +44,15 @@ class Profile(models.Model):
     def __str__(self) -> str:
         return self.full_name or self.user.get_username()
 
+    @property
+    def display_name(self):
+        parts = (self.full_name or "").strip().split()
+        if not parts:
+            return self.user.get_username()
+        if len(parts) == 1:
+            return parts[0]
+        return f"{parts[0]} {parts[-1]}"
+
 
 class ProfileDirectorate(models.Model):
     profile = models.ForeignKey(Profile, on_delete=models.DO_NOTHING, db_column="profile_id", primary_key=True)

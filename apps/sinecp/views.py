@@ -21,14 +21,15 @@ from .forms import SineReportForm, QualificacaoReportForm
 
 SINE_CARD_FIELDS = [
     ("Inseridos no Mercado", "inseridos_mercado", "briefcase-business", "#3b82f6"),
-    ("Entrevistas", "entrevistados", "messages-square", "#06b6d4"),
-    ("Vagas Captadas", "vagas_captadas", "clipboard-list", "#0ea5e9"),
+    ("Entrevistados", "entrevistados", "messages-square", "#06b6d4"),
+    ("Vagas de Alto Valor", "vagas_alto_valor", "clipboard-list", "#0ea5e9"),
     ("Primeiro Emprego", "proc_administrativos", "user-check", "#f59e0b"),
 ]
 
 CP_CARD_FIELDS = [
     ("Concluintes", "resumo_concluintes", "graduation-cap", "#3b82f6"),
-    ("Atendimentos", "__atendimentos__", "phone-call", "#06b6d4"),
+    ("Vagas Oferecidas", "resumo_vagas", "briefcase-business", "#06b6d4"),
+    ("Taxa de Ocupação (%)", "resumo_taxa_ocupacao", "trending-up", "#8b5cf6"),
     ("Cursos Total", "resumo_cursos", "book-open", "#f59e0b"),
     ("Turmas Total", "resumo_turmas", "users", "#10b981"),
 ]
@@ -93,9 +94,18 @@ class SineCpHomeView(TvTemplateMixin, SineCpBaseMixin, DetailView):
         
         cp_cards = []
         for label, field, icon, color in CP_CARD_FIELDS:
-            if field == "__atendimentos__":
-                val = sum(current_or_total(cp_by_month, f, selected_month) for f in CP_ATENDIMENTOS_FIELDS)
-                history = [sum(getattr(cp_by_month.get(m), f, 0) or 0 for f in CP_ATENDIMENTOS_FIELDS) for m, _ in MONTH_LABELS]
+            if field == "resumo_taxa_ocupacao":
+                # Taxa de ocupação: média quando ano inteiro, valor do mês quando específico
+                monthly_vals = [float(safe_total(cp_by_month.get(m), field)) for m, _ in MONTH_LABELS]
+                nonzero = [v for v in monthly_vals if v > 0]
+                if selected_month == "all":
+                    val = round(sum(nonzero) / len(nonzero), 1) if nonzero else 0
+                else:
+                    try:
+                        val = round(monthly_vals[int(selected_month) - 1], 1)
+                    except (ValueError, IndexError):
+                        val = 0
+                history = [round(v, 1) for v in monthly_vals]
             else:
                 val = current_or_total(cp_by_month, field, selected_month)
                 history = build_series(cp_by_month, field)

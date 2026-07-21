@@ -91,6 +91,25 @@
         });
     </script>
     {% else %}
+    <div class="period-bar">
+        <div class="period-bar-inner">
+            <span class="period-bar-label">Período de referência</span>
+            <form method="get" class="period-bar-form">
+                <input type="hidden" name="year" value="{{ year }}">
+                <div class="period-bar-selects">
+                    <div class="pill-select pill-select-light">
+                        <span>Mês</span>
+                        <select name="month" onchange="this.form.submit()">
+                            {% for m_num, m_label in month_options %}
+                                <option value="{{ m_num }}" {% if m_num == month %}selected{% endif %}>{{ m_label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <form method="post" class="report-form-container">
         {% csrf_token %}
         <input type="hidden" name="month" value="{{ month }}">
@@ -383,6 +402,56 @@
         border: 1px solid #cbd5e1;
         font-size: 13px;
         font-weight: 600;
+    }
+
+    .period-bar {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 16px 20px;
+        margin-bottom: 24px;
+    }
+    .period-bar-inner {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .period-bar-label {
+        font-size: 13px;
+        font-weight: 700;
+        color: #475569;
+    }
+    .pill-select-light {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 4px 6px;
+    }
+    .pill-select-light span {
+        font-size: 10px;
+        font-weight: 800;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding-left: 6px;
+    }
+    .pill-select-light select {
+        border: none;
+        background: transparent;
+        font-size: 14px;
+        font-weight: 700;
+        color: #1e293b;
+        outline: none;
+        cursor: pointer;
+        padding: 6px 10px;
+        border-radius: 8px;
+        min-width: 150px;
+    }
+    .pill-select-light select:hover {
+        background: #f1f5f9;
     }
 </style>
 

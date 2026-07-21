@@ -463,19 +463,32 @@ class CeaiDataListView(CeaiBaseMixin, RoleRequiredMixin, TemplateView):
             year=year
         ).order_by("month")
 
-        all_territorial_units = ["Brasil", "Laranjeiras", "Luizote", "Guarani", "Morumbi"]
+        all_territorial_units = ["Brasil", "Laranjeiras", "Luizote", "Guarani", "Morumbi", "Condomínio do Idoso"]
         units_to_process = all_territorial_units if unit_filter == "all" else [unit_filter]
 
-        indicators_def = [
-            {"label": "MATRICULADOS NO 1º DIA DO MÊS (MASC)", "key": "atendidos_anterior_masc", "type": "stock"},
-            {"label": "MATRICULADOS NO 1º DIA DO MÊS (FEM)", "key": "atendidos_anterior_fem", "type": "stock"},
-            {"label": "INSERIDOS NO MÊS (MASC)", "key": "inseridos_masc", "type": "flow"},
-            {"label": "INSERIDOS NO MÊS (FEM)", "key": "inseridos_fem", "type": "flow"},
-            {"label": "DESLIGADOS (MASC)", "key": "desligados_masc", "type": "flow"},
-            {"label": "DESLIGADOS (FEM)", "key": "desligados_fem", "type": "flow"},
-            {"label": "TOTAL DE IDOSOS ATENDIDOS (ANO)", "key": "total_inseridos", "type": "stock"},
-            {"label": "ATENDIMENTOS", "key": "total_atendimentos", "type": "flow"},
-        ]
+        is_condominio = (unit_filter == "Condomínio do Idoso" or (
+            unit_filter == "all" and "Condomínio do Idoso" in units_to_process
+        ))
+
+        if is_condominio and unit_filter != "all":
+            indicators_def = [
+                {"label": ind["label"], "key": ind["id"], "type": "flow"}
+                for ind in CONDOMINIO_IDOSO_FORM_DEFINITION["sections"][0]["fields"]
+            ] + [
+                {"label": ind["label"], "key": ind["id"], "type": "flow"}
+                for ind in CONDOMINIO_IDOSO_FORM_DEFINITION["sections"][1]["fields"]
+            ]
+        else:
+            indicators_def = [
+                {"label": "MATRICULADOS NO 1º DIA DO MÊS (MASC)", "key": "atendidos_anterior_masc", "type": "stock"},
+                {"label": "MATRICULADOS NO 1º DIA DO MÊS (FEM)", "key": "atendidos_anterior_fem", "type": "stock"},
+                {"label": "INSERIDOS NO MÊS (MASC)", "key": "inseridos_masc", "type": "flow"},
+                {"label": "INSERIDOS NO MÊS (FEM)", "key": "inseridos_fem", "type": "flow"},
+                {"label": "DESLIGADOS (MASC)", "key": "desligados_masc", "type": "flow"},
+                {"label": "DESLIGADOS (FEM)", "key": "desligados_fem", "type": "flow"},
+                {"label": "TOTAL DE IDOSOS ATENDIDOS (ANO)", "key": "total_inseridos", "type": "stock"},
+                {"label": "ATENDIMENTOS", "key": "total_atendimentos", "type": "flow"},
+            ]
 
         units_data = []
         for u_name in units_to_process:

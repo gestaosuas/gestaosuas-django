@@ -34,7 +34,7 @@
 
         <div class="monitoring-main-card">
             {% for unit_table in units_tables %}
-            <div class="data-table-card" style="margin-top: {% if forloop.first %}0{% else %}40px{% endif %}; border: 1px solid #f1f5f9; padding: 24px; border-radius: 20px;">
+            <div class="data-table-card" style="margin-top: {% if forloop.first %}0{% else %}40px{% endif %}; border: 1px solid #f1f5f9; border-radius: 20px;">
                 <div class="section-head" style="margin-bottom: 24px;">
                     <div class="section-line" style="background:#10b981;"></div>
                     <h2 style="font-size: 20px; font-weight: 800; color: #064e3b;">{{ unit_table.unit }}</h2>
@@ -78,7 +78,7 @@
                                         data-unit="{{ item.unit }}"
                                         {% endif %}>
                                         <span class="val-inner" style="display: inline-block; min-width: 30px; padding: 2px 4px; border-radius: 4px;">
-                                            {% if item.val != '' and item.val != None and item.val != 0 %}{{ item.val }}{% endif %}
+                                            {{ item.val|default:"0" }}
                                         </span>
                                     </td>
                                     {% endfor %}

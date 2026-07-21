@@ -46,7 +46,7 @@
             </div>
         </div>
 
-        {% if request.user.is_superuser or request.user.profile.role == 'admin' %}
+        {% if request.user.is_superuser or user_profile.role == 'admin' %}
         <a href="{% url 'accounts:user_list' %}" class="nav-link {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}">
             <i data-lucide="users"></i>
             <span>Usuários</span>
@@ -75,8 +75,10 @@
     <div class="nav-right">
         <div class="user-profile-mini">
             <div class="user-info-mini">
-                <span class="user-name-mini">{% if profile and profile.full_name %}{{ profile.full_name }}{% else %}{{ request.user.username }}{% endif %}</span>
-                <span class="user-role-mini">{% if profile %}{{ profile.get_role_display }}{% else %}Agente{% endif %}</span>
+                <span class="user-name-mini">{% if user_profile %}{{ user_profile.display_name }}{% else %}{{ request.user.get_short_name|default:request.user.username }}{% endif %}</span>
+                <span class="user-role-mini role-badge-nav {% if user_profile %}role-{{ user_profile.role }}{% else %}role-user{% endif %}">
+                    {% if user_profile %}{{ user_profile.get_role_display }}{% else %}Usuário{% endif %}
+                </span>
             </div>
         </div>
         <form action="{% url 'accounts:logout' %}" method="post" class="no-mobile">
@@ -230,11 +232,23 @@
 
         .user-role-mini {
             font-size: 10px;
-            color: #64748b !important;
             text-transform: uppercase;
             font-weight: 800;
             letter-spacing: 0.02em;
         }
+
+        .role-badge-nav {
+            padding: 2px 8px;
+            border-radius: 10px;
+            display: inline-block;
+            line-height: 1.4;
+        }
+
+        /* Role colors — same as user_list */
+        .role-badge-nav.role-admin  { background: #fee2e2; color: #991b1b; }
+        .role-badge-nav.role-diretor { background: #fef3c7; color: #92400e; }
+        .role-badge-nav.role-agente  { background: #dcfce7; color: #166534; }
+        .role-badge-nav.role-user   { background: #f1f5f9; color: #475569; }
 
         .no-mobile { display: none; }
 
