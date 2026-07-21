@@ -51,6 +51,13 @@ body.theme-amber {
     --nav-text-grad-end: #d97706;
 }
 
+body.theme-rose {
+    --nav-grad-start: #be185d;
+    --nav-grad-end: #831843;
+    --nav-text-grad-start: #831843;
+    --nav-text-grad-end: #db2777;
+}
+
 a {
     color: inherit;
     text-decoration: none;
@@ -2238,6 +2245,7 @@ canvas {
 .header-emerald { background: linear-gradient(135deg, #064e3b, #10b981) !important; }
 .header-indigo { background: linear-gradient(135deg, #1e1b4b, #4338ca) !important; }
 .header-amber { background: linear-gradient(135deg, #78350f, #d97706) !important; }
+.header-rose { background: linear-gradient(135deg, #831843, #db2777) !important; }
 
 .monitoring-header-content {
     width: 96%;
@@ -2779,3 +2787,9 @@ body.dashboard-fit-vh .metrics-stack {
 .monitoring-main-card::-webkit-scrollbar { width: 6px; }
 .monitoring-main-card::-webkit-scrollbar-track { background: #f1f5f9; }
 .monitoring-main-card::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+@media (min-width: 1025px) {
+    .dashboard-main:not(.cras-main):not(.beneficios-main) {
+        padding-top: 80px;
+    }
+}

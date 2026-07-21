@@ -170,9 +170,9 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
             header_class = "header-emerald"
             icon_color = "#059669"
         elif "outros" in normalized:
-            theme_class = "theme-blue"
-            header_class = ""
-            icon_color = "#3b82f6"
+            theme_class = "theme-rose"
+            header_class = "header-rose"
+            icon_color = "#db2777"
         else:
             theme_class = "theme-emerald"
             header_class = "header-emerald"
