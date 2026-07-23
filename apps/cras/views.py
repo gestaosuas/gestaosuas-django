@@ -16,6 +16,7 @@ from apps.core.utils import (
     build_period_label, build_year_range_from_years, build_variation,
     strip_accents
 )
+from apps.core.export import ExcelExportMixin, build_workbook
 from .models import CrasReport
 from .forms import CrasReportForm
 
@@ -274,8 +275,28 @@ class CrasCreateUpdateView(CrasBaseMixin, FormView):
         return redirect(reverse("cras:home", kwargs={"pk": directorate.pk}) + f"?year={year_val}&month={month_val}&unit={unit_name}")
 
 
-class CrasDataView(CrasBaseMixin, TemplateView):
+class CrasDataView(ExcelExportMixin, CrasBaseMixin, TemplateView):
     template_name = "cras/data.html"
+    export_filename = "CRAS.xlsx"
+
+    def export_excel(self):
+        ctx = self.get_context_data()
+        month_labels = [label for _, label in MONTH_LABELS]
+        sheets = []
+        for unit_table in ctx.get("units_tables", []):
+            rows = []
+            # Collect all rows from all groups into one sheet per unit
+            for group in unit_table.get("groups", []):
+                # Add section header
+                rows.append([group["title"]] + [""] * 12)
+                for row in group.get("rows", []):
+                    rows.append([row["label"]] + [v["val"] for v in row["values"]])
+            sheets.append({
+                "title": unit_table["unit"],
+                "headers": month_labels,
+                "rows": rows,
+            })
+        return build_workbook(sheets, self.export_filename)
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         directorate = self.get_directorate()

@@ -98,6 +98,9 @@
             <div class="field-group"><label for="{{ form.month.id_for_label }}">{{ form.month.label }}</label>{{ form.month }}</div>
             <div class="field-group"><label for="{{ form.year.id_for_label }}">{{ form.year.label }}</label>{{ form.year }}</div>
         </div>
+        {% if subcategory == 'protetivo' %}
+            {{ matrix_html|safe }}
+        {% else %}
         {% for s in section_items %}
         <div class="report-section-card">
             <div class="section-head">
@@ -115,6 +118,7 @@
             </div>
         </div>
         {% endfor %}
+        {% endif %}
         <div class="form-actions-row">
             <a class="secondary-button" href="{% url 'protecaoespecial:home' directorate.pk %}">Voltar</a>
             <button type="submit" class="primary-button">Salvar</button>
@@ -135,6 +139,16 @@
         if (yearEl) yearEl.addEventListener("change", reloadWithPeriod);
     });
     </script>
+    <style>
+        .matrix-input-table { width:100%; border-collapse:collapse; margin-bottom:6px; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; }
+        .matrix-input-table th { font-size:10px; font-weight:700; color:#64748b; padding:6px 10px; text-align:center; background:#f8fafc; border-bottom:2px solid #e2e8f0; }
+        .matrix-input-table td { padding:3px 6px; text-align:center; border-right:1px solid #f1f5f9; }
+        .matrix-input-table td:first-child { text-align:left; border-right:2px solid #e2e8f0; }
+        .matrix-input-table tr:not(:last-child) td { border-bottom:1px solid #f1f5f9; }
+        .matrix-gen-label { font-size:11px; font-weight:600; color:#334155; min-width:80px; padding-left:8px !important; }
+        .matrix-input-table input { width:64px; height:32px; text-align:center; border:1px solid #e2e8f0; border-radius:6px; font-size:12px; font-weight:600; color:#1e293b; }
+        .matrix-input-table input:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,0.1); }
+    </style>
     {% endif %}
 </section>
     </main>

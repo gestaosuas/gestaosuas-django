@@ -245,6 +245,51 @@ Então [definir após alinhamento]
 
 ---
 
+## E) Convenção de Estratificação por Gênero/Faixa Etária
+
+A partir de 2026-07-21, as tabelas de violação do CREAS foram reestruturadas.
+
+### E.1 Prefixos de violação
+
+| Tabela | Prefixo DB |
+|--------|-----------|
+| Violência física/psic. | `violencia_fisica` (idoso) / `def_violencia_fisica` (PCD) / `vf` (protetivo) |
+| Abuso sexual | `abuso_sexual` / `def_abuso_sexual` / `as` |
+| Exploração sexual | `exploracao_sexual` / `def_exploracao_sexual` / `es` |
+| Negligência/abandono | `negligencia` / `def_negligencia` / `ng` |
+| Exploração financeira | `exploracao_financeira` / `def_exploracao_financeira` |
+| Trabalho infantil | — / — / `ti` |
+
+### E.2 Sufixos de subcategoria
+
+| Sufixo | Significado |
+|--------|------------|
+| `atendidas_anterior` / `at` | Atendidas no mês anterior |
+| `inseridos` / `in` | Inseridos/Novos no mês |
+| `desligados` / `de` | Desligados no mês |
+
+### E.3 Gênero e faixa etária (protetivo)
+
+| Código | Significado |
+|--------|------------|
+| `m0`, `m7`, `m13` | Masculino: 0-6, 7-12, 13-17 anos |
+| `f0`, `f7`, `f13` | Feminino: 0-6, 7-12, 13-17 anos |
+
+### E.4 Gênero (idoso, PCD)
+
+| Sufixo | Significado |
+|--------|------------|
+| `masc` / `_masc` | Masculino |
+| `fem` / `_fem` | Feminino |
+
+### E.5 Campos computados
+
+- Totais por violação: `{pref}_total_{gen}` (idoso/PCD) ou `{pref}_{suf}_total_{gen}` — calculados em `clean()` do form
+- Totais gerais: `idoso_total_geral_{gen}`, `def_total_geral_{gen}` — soma de todos os totais por gênero
+- `fam_atual` / `paefi_total_acompanhamento`: computado como `mes_anterior + inseridos`
+
+---
+
 ## Changelog
 
 | Data | Mudança | Motivo |
@@ -252,3 +297,4 @@ Então [definir após alinhamento]
 | 2026-07-21 | Criação do arquivo | Mapeamento do fluxo de preenchimento mensal multi-usuário |
 | 2026-07-21 | Respostas Q1-Q5, Q7, Q8, Q9, Q11, Q12 confirmadas | Concorrência, bloqueio, admin-only, bug beneficios user_id, permissões |
 | 2026-07-21 | Débito técnico #6 adicionado ao CLAUDE.md | Bug beneficios_reports.user_id = None |
+| 2026-07-21 | Seção E: convenção de estratificação | Idoso e PCD ganharam estratificação por gênero; Protetivo por gênero + faixa etária |

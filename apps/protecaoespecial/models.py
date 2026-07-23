@@ -16,29 +16,110 @@ class CreasProtetivoReport(models.Model):
     created_at = models.DateTimeField(null=True, blank=True, auto_now_add=True)
     updated_at = models.DateTimeField(null=True, blank=True, auto_now=True)
 
-    # Famílias
     fam_mes_anterior = models.IntegerField(null=True, blank=True, default=0)
     fam_admitidas = models.IntegerField(null=True, blank=True, default=0)
     fam_desligadas = models.IntegerField(null=True, blank=True, default=0)
     fam_atual = models.IntegerField(null=True, blank=True, default=0)
 
-    # Direitos Violados
-    viol_fis_psic_masc = models.IntegerField(null=True, blank=True, default=0)
-    viol_fis_psic_fem = models.IntegerField(null=True, blank=True, default=0)
-    abuso_sexual_masc = models.IntegerField(null=True, blank=True, default=0)
-    abuso_sexual_fem = models.IntegerField(null=True, blank=True, default=0)
-    expl_sexual_masc = models.IntegerField(null=True, blank=True, default=0)
-    expl_sexual_fem = models.IntegerField(null=True, blank=True, default=0)
-    negli_aband_masc = models.IntegerField(null=True, blank=True, default=0)
-    negli_aband_fem = models.IntegerField(null=True, blank=True, default=0)
-    trab_infantil_masc = models.IntegerField(null=True, blank=True, default=0)
-    trab_infantil_fem = models.IntegerField(null=True, blank=True, default=0)
+    # 90 campos de violações — 5 tipos × 3 subcategorias × 6 gender-age
+    # Pref: vf=violencia fisica, as=abuso sexual, es=exploracao sexual, ng=negligencia, ti=trabalho infantil
+    # Suf: at=atendidas anterior, in=inseridos, de=desligados
+    # GA: m0=masc 0-6, m7=masc 7-12, m13=masc 13-17, f0=fem 0-6, f7=fem 7-12, f13=fem 13-17
 
-    # Atendimentos
-    atend_mes_anterior = models.IntegerField(null=True, blank=True, default=0)
-    atend_admitidas = models.IntegerField(null=True, blank=True, default=0)
-    atend_desligadas = models.IntegerField(null=True, blank=True, default=0)
-    atend_atual = models.IntegerField(null=True, blank=True, default=0)
+    vf_at_m0 = models.IntegerField(null=True, blank=True, default=0)
+    vf_at_m7 = models.IntegerField(null=True, blank=True, default=0)
+    vf_at_m13 = models.IntegerField(null=True, blank=True, default=0)
+    vf_at_f0 = models.IntegerField(null=True, blank=True, default=0)
+    vf_at_f7 = models.IntegerField(null=True, blank=True, default=0)
+    vf_at_f13 = models.IntegerField(null=True, blank=True, default=0)
+    vf_in_m0 = models.IntegerField(null=True, blank=True, default=0)
+    vf_in_m7 = models.IntegerField(null=True, blank=True, default=0)
+    vf_in_m13 = models.IntegerField(null=True, blank=True, default=0)
+    vf_in_f0 = models.IntegerField(null=True, blank=True, default=0)
+    vf_in_f7 = models.IntegerField(null=True, blank=True, default=0)
+    vf_in_f13 = models.IntegerField(null=True, blank=True, default=0)
+    vf_de_m0 = models.IntegerField(null=True, blank=True, default=0)
+    vf_de_m7 = models.IntegerField(null=True, blank=True, default=0)
+    vf_de_m13 = models.IntegerField(null=True, blank=True, default=0)
+    vf_de_f0 = models.IntegerField(null=True, blank=True, default=0)
+    vf_de_f7 = models.IntegerField(null=True, blank=True, default=0)
+    vf_de_f13 = models.IntegerField(null=True, blank=True, default=0)
+
+    as_at_m0 = models.IntegerField(null=True, blank=True, default=0)
+    as_at_m7 = models.IntegerField(null=True, blank=True, default=0)
+    as_at_m13 = models.IntegerField(null=True, blank=True, default=0)
+    as_at_f0 = models.IntegerField(null=True, blank=True, default=0)
+    as_at_f7 = models.IntegerField(null=True, blank=True, default=0)
+    as_at_f13 = models.IntegerField(null=True, blank=True, default=0)
+    as_in_m0 = models.IntegerField(null=True, blank=True, default=0)
+    as_in_m7 = models.IntegerField(null=True, blank=True, default=0)
+    as_in_m13 = models.IntegerField(null=True, blank=True, default=0)
+    as_in_f0 = models.IntegerField(null=True, blank=True, default=0)
+    as_in_f7 = models.IntegerField(null=True, blank=True, default=0)
+    as_in_f13 = models.IntegerField(null=True, blank=True, default=0)
+    as_de_m0 = models.IntegerField(null=True, blank=True, default=0)
+    as_de_m7 = models.IntegerField(null=True, blank=True, default=0)
+    as_de_m13 = models.IntegerField(null=True, blank=True, default=0)
+    as_de_f0 = models.IntegerField(null=True, blank=True, default=0)
+    as_de_f7 = models.IntegerField(null=True, blank=True, default=0)
+    as_de_f13 = models.IntegerField(null=True, blank=True, default=0)
+
+    es_at_m0 = models.IntegerField(null=True, blank=True, default=0)
+    es_at_m7 = models.IntegerField(null=True, blank=True, default=0)
+    es_at_m13 = models.IntegerField(null=True, blank=True, default=0)
+    es_at_f0 = models.IntegerField(null=True, blank=True, default=0)
+    es_at_f7 = models.IntegerField(null=True, blank=True, default=0)
+    es_at_f13 = models.IntegerField(null=True, blank=True, default=0)
+    es_in_m0 = models.IntegerField(null=True, blank=True, default=0)
+    es_in_m7 = models.IntegerField(null=True, blank=True, default=0)
+    es_in_m13 = models.IntegerField(null=True, blank=True, default=0)
+    es_in_f0 = models.IntegerField(null=True, blank=True, default=0)
+    es_in_f7 = models.IntegerField(null=True, blank=True, default=0)
+    es_in_f13 = models.IntegerField(null=True, blank=True, default=0)
+    es_de_m0 = models.IntegerField(null=True, blank=True, default=0)
+    es_de_m7 = models.IntegerField(null=True, blank=True, default=0)
+    es_de_m13 = models.IntegerField(null=True, blank=True, default=0)
+    es_de_f0 = models.IntegerField(null=True, blank=True, default=0)
+    es_de_f7 = models.IntegerField(null=True, blank=True, default=0)
+    es_de_f13 = models.IntegerField(null=True, blank=True, default=0)
+
+    ng_at_m0 = models.IntegerField(null=True, blank=True, default=0)
+    ng_at_m7 = models.IntegerField(null=True, blank=True, default=0)
+    ng_at_m13 = models.IntegerField(null=True, blank=True, default=0)
+    ng_at_f0 = models.IntegerField(null=True, blank=True, default=0)
+    ng_at_f7 = models.IntegerField(null=True, blank=True, default=0)
+    ng_at_f13 = models.IntegerField(null=True, blank=True, default=0)
+    ng_in_m0 = models.IntegerField(null=True, blank=True, default=0)
+    ng_in_m7 = models.IntegerField(null=True, blank=True, default=0)
+    ng_in_m13 = models.IntegerField(null=True, blank=True, default=0)
+    ng_in_f0 = models.IntegerField(null=True, blank=True, default=0)
+    ng_in_f7 = models.IntegerField(null=True, blank=True, default=0)
+    ng_in_f13 = models.IntegerField(null=True, blank=True, default=0)
+    ng_de_m0 = models.IntegerField(null=True, blank=True, default=0)
+    ng_de_m7 = models.IntegerField(null=True, blank=True, default=0)
+    ng_de_m13 = models.IntegerField(null=True, blank=True, default=0)
+    ng_de_f0 = models.IntegerField(null=True, blank=True, default=0)
+    ng_de_f7 = models.IntegerField(null=True, blank=True, default=0)
+    ng_de_f13 = models.IntegerField(null=True, blank=True, default=0)
+
+    ti_at_m0 = models.IntegerField(null=True, blank=True, default=0)
+    ti_at_m7 = models.IntegerField(null=True, blank=True, default=0)
+    ti_at_m13 = models.IntegerField(null=True, blank=True, default=0)
+    ti_at_f0 = models.IntegerField(null=True, blank=True, default=0)
+    ti_at_f7 = models.IntegerField(null=True, blank=True, default=0)
+    ti_at_f13 = models.IntegerField(null=True, blank=True, default=0)
+    ti_in_m0 = models.IntegerField(null=True, blank=True, default=0)
+    ti_in_m7 = models.IntegerField(null=True, blank=True, default=0)
+    ti_in_m13 = models.IntegerField(null=True, blank=True, default=0)
+    ti_in_f0 = models.IntegerField(null=True, blank=True, default=0)
+    ti_in_f7 = models.IntegerField(null=True, blank=True, default=0)
+    ti_in_f13 = models.IntegerField(null=True, blank=True, default=0)
+    ti_de_m0 = models.IntegerField(null=True, blank=True, default=0)
+    ti_de_m7 = models.IntegerField(null=True, blank=True, default=0)
+    ti_de_m13 = models.IntegerField(null=True, blank=True, default=0)
+    ti_de_f0 = models.IntegerField(null=True, blank=True, default=0)
+    ti_de_f7 = models.IntegerField(null=True, blank=True, default=0)
+    ti_de_f13 = models.IntegerField(null=True, blank=True, default=0)
 
     class Meta:
         db_table = "creas_protetivo_reports"
@@ -49,9 +130,7 @@ class CreasProtetivoReport(models.Model):
         verbose_name_plural = "Relatórios CREAS Protetivo"
 
     def save(self, *args, **kwargs):
-        # Auto-compute totals
-        self.fam_atual = (self.fam_mes_anterior or 0) + (self.fam_admitidas or 0) - (self.fam_desligadas or 0)
-        self.atend_atual = (self.atend_mes_anterior or 0) + (self.atend_admitidas or 0) - (self.atend_desligadas or 0)
+        self.fam_atual = (self.fam_mes_anterior or 0) + (self.fam_admitidas or 0)
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -72,25 +151,21 @@ class CreasSocioeducativoReport(models.Model):
     created_at = models.DateTimeField(null=True, blank=True, auto_now_add=True)
     updated_at = models.DateTimeField(null=True, blank=True, auto_now=True)
 
-    # Famílias
     fam_acompanhamento_1_dia = models.IntegerField(null=True, blank=True, default=0)
     fam_inseridas = models.IntegerField(null=True, blank=True, default=0)
     fam_desligadas = models.IntegerField(null=True, blank=True, default=0)
     fam_total_acompanhamento = models.IntegerField(null=True, blank=True, default=0)
 
-    # Acompanhamento Masculino
     masc_acompanhamento_1_dia = models.IntegerField(null=True, blank=True, default=0)
     masc_admitidos = models.IntegerField(null=True, blank=True, default=0)
     masc_desligados = models.IntegerField(null=True, blank=True, default=0)
     masc_total_parcial = models.IntegerField(null=True, blank=True, default=0)
 
-    # Acompanhamento Feminino
     fem_acompanhamento_1_dia = models.IntegerField(null=True, blank=True, default=0)
     fem_admitidos = models.IntegerField(null=True, blank=True, default=0)
     fem_desligadas = models.IntegerField(null=True, blank=True, default=0)
     fem_total_parcial = models.IntegerField(null=True, blank=True, default=0)
 
-    # Medidas Masculino
     med_masc_la_andamento = models.IntegerField(null=True, blank=True, default=0)
     med_masc_psc_andamento = models.IntegerField(null=True, blank=True, default=0)
     med_masc_la_novas = models.IntegerField(null=True, blank=True, default=0)
@@ -100,7 +175,6 @@ class CreasSocioeducativoReport(models.Model):
     med_masc_la_total_parcial = models.IntegerField(null=True, blank=True, default=0)
     med_masc_psc_total_parcial = models.IntegerField(null=True, blank=True, default=0)
 
-    # Medidas Feminino
     med_fem_la_andamento = models.IntegerField(null=True, blank=True, default=0)
     med_fem_psc_andamento = models.IntegerField(null=True, blank=True, default=0)
     med_fem_la_novas = models.IntegerField(null=True, blank=True, default=0)
@@ -110,7 +184,6 @@ class CreasSocioeducativoReport(models.Model):
     med_fem_la_total_parcial = models.IntegerField(null=True, blank=True, default=0)
     med_fem_psc_total_parcial = models.IntegerField(null=True, blank=True, default=0)
 
-    # Totais Gerais
     med_total_la_geral = models.IntegerField(null=True, blank=True, default=0)
     med_total_psc_geral = models.IntegerField(null=True, blank=True, default=0)
 
@@ -123,20 +196,15 @@ class CreasSocioeducativoReport(models.Model):
         verbose_name_plural = "Relatórios CREAS Socioeducativo"
 
     def save(self, *args, **kwargs):
-        # Auto-compute totals
         self.fam_total_acompanhamento = (self.fam_acompanhamento_1_dia or 0) + (self.fam_inseridas or 0) - (self.fam_desligadas or 0)
         self.masc_total_parcial = (self.masc_acompanhamento_1_dia or 0) + (self.masc_admitidos or 0) - (self.masc_desligados or 0)
         self.fem_total_parcial = (self.fem_acompanhamento_1_dia or 0) + (self.fem_admitidos or 0) - (self.fem_desligadas or 0)
-        
         self.med_masc_la_total_parcial = (self.med_masc_la_andamento or 0) + (self.med_masc_la_novas or 0) - (self.med_masc_la_encerradas or 0)
         self.med_masc_psc_total_parcial = (self.med_masc_psc_andamento or 0) + (self.med_masc_psc_novas or 0) - (self.med_masc_psc_encerradas or 0)
-        
         self.med_fem_la_total_parcial = (self.med_fem_la_andamento or 0) + (self.med_fem_la_novas or 0) - (self.med_fem_la_encerradas or 0)
         self.med_fem_psc_total_parcial = (self.med_fem_psc_andamento or 0) + (self.med_fem_psc_novas or 0) - (self.med_fem_psc_encerradas or 0)
-        
         self.med_total_la_geral = (self.med_masc_la_total_parcial or 0) + (self.med_fem_la_total_parcial or 0)
         self.med_total_psc_geral = (self.med_masc_psc_total_parcial or 0) + (self.med_fem_psc_total_parcial or 0)
-        
         super().save(*args, **kwargs)
 
     def __str__(self):

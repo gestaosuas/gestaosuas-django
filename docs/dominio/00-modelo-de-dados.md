@@ -194,3 +194,11 @@ Diretorias como "Subvenção", "Emendas e Fundos" usam `form_definition` para cr
 | Data | Mudança | Motivo |
 |------|---------|--------|
 | 2026-07-21 | Criação do arquivo | Primeira introspecção completa do banco dev local via inspectdb + information_schema |
+| 2026-07-21 | `creas_pcd_reports` reestruturada | Estratificação por gênero: 5 violações × 4 campos × 2 gêneros = 40 campos. Removidas 20 colunas antigas, adicionadas 42 novas (inclui totais gerais) |
+| 2026-07-21 | `creas_idoso_reports` reestruturada | Estratificação por gênero: 5 violações × 4 campos × 2 gêneros = 40 campos + 5 totais gerais. PAEFI: removido `paefi_novos_casos`, adicionado `paefi_total_acompanhamento` |
+| 2026-07-21 | `creas_protetivo_reports` reestruturada | Estratificação por gênero + faixa etária: 5 violações × 3 subcategorias × 6 gender-age = 90 campos. Removidas 14 colunas antigas (viol_*, atend_*) |
+| 2026-07-21 | Export Excel implementado | Função `build_workbook()` + mixin `ExcelExportMixin` em `apps/core/export.py`. Botão verde em todas as páginas "Ver Dados" (admin only). `openpyxl` adicionado às dependências |
+| 2026-07-21 | Navbar: badge de cargo colorido | Context processor `user_profile_context` injeta perfil. Cores: admin=vermelho, diretor=âmbar, agente=verde |
+| 2026-07-21 | Tema rosa para "Outros" | Novo `body.theme-rose` + `.header-rose` no CSS |
+| 2026-07-21 | Tabelas de dados compactadas | `.table-monitoring` reduzido: padding 20→10px, fonte 10→9px(header)/14→13px(células), espaçamento 16→6px |
+| 2026-07-21 | Células vazias mostram "0" | 9 templates de "Ver Dados" alterados: branco → `0` |

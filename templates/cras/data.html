@@ -27,6 +27,11 @@
                         <a href="{% url 'cras:form' directorate.pk %}?year={{ selected_year }}" class="btn-primary-premium" style="text-decoration:none;">
                             <i data-lucide="file-plus"></i> Novo Preenchimento
                         </a>
+                        {% if can_delete %}
+                        <a href="?{% for k, v in request.GET.items %}{% if k != 'export' %}{{ k }}={{ v }}&{% endif %}{% endfor %}export=xlsx" class="btn-excel" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#16a34a;color:#fff;border-radius:10px;font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap;">
+                            <i data-lucide="file-spreadsheet" style="width:14px;height:14px;"></i> Exportar Excel
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>

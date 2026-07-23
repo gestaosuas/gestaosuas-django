@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.views.generic import DetailView, FormView, TemplateView, View
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
 from apps.core.mixins import TvTemplateMixin
+from apps.core.export import ExcelExportMixin, build_workbook
 from apps.directorates.models import Directorate
 
 from .models import CasaDaMulherReport, DiversidadeReport, NucleoDiversidadeReport
@@ -356,7 +357,7 @@ class NucleoDiversidadeFormView(CasaMulherGenericFormView):
     delete_month_url_name = "delete-month-nucleo-diversidade"
 
 
-class CasaMulherGenericDataView(CasaMulherBaseMixin, TemplateView):
+class CasaMulherGenericDataView(ExcelExportMixin, CasaMulherBaseMixin, TemplateView):
     template_name = "casamulher/data.html"
     form_class = None
     model = None
@@ -387,23 +388,40 @@ class CasaMulherGenericDataView(CasaMulherBaseMixin, TemplateView):
         })
         return ctx
 
+    def export_excel(self):
+        ctx = self.get_context_data()
+        table_groups = ctx["table_groups"]
+        month_labels = ctx["month_labels"]
+
+        sheets = []
+        for group in table_groups:
+            rows = []
+            for row in group["rows"]:
+                rows.append([row["label"]] + [v["val"] for v in row["values"]])
+            sheets.append({"title": group["title"], "headers": month_labels, "rows": rows})
+
+        return build_workbook(sheets, self.export_filename)
+
 
 class CasaDaMulherDataView(CasaMulherGenericDataView):
     form_class = CasaDaMulherForm
     model = CasaDaMulherReport
     subcategory = "casa-da-mulher"
+    export_filename = "casa_da_mulher_dados.xlsx"
 
 
 class DiversidadeDataView(CasaMulherGenericDataView):
     form_class = DiversidadeForm
     model = DiversidadeReport
     subcategory = "diversidade"
+    export_filename = "diversidade_dados.xlsx"
 
 
 class NucleoDiversidadeDataView(CasaMulherGenericDataView):
     form_class = NucleoDiversidadeForm
     model = NucleoDiversidadeReport
     subcategory = "nucleo-diversidade"
+    export_filename = "nucleo_diversidade_dados.xlsx"
 
 
 class CasaMulherSharedDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):

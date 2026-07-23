@@ -13,6 +13,7 @@ from django.views.generic import DetailView, FormView, TemplateView, View
 
 from apps.accounts.mixins import DirectorateAccessMixin, RoleRequiredMixin
 from apps.accounts.models import Profile, ProfileDirectorate
+from apps.core.export import ExcelExportMixin, build_workbook
 from apps.directorates.models import Directorate, FormDelegation, MonthlyReport, Osc, Visit, WorkPlan
 from apps.directorates.forms import OscForm
 from apps.core.utils import (
@@ -339,8 +340,9 @@ class MonitoramentoFormView(MonitoramentoBaseMixin, FormView):
         return redirect(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + f"?year={year}")
 
 
-class MonitoramentoDataView(MonitoramentoBaseMixin, TemplateView):
+class MonitoramentoDataView(ExcelExportMixin, MonitoramentoBaseMixin, TemplateView):
     template_name = "monitoramento/shared/data.html"
+    export_filename = "monitoramento_dados.xlsx"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -391,6 +393,21 @@ class MonitoramentoDataView(MonitoramentoBaseMixin, TemplateView):
             "form_url": reverse("monitoramento:form", kwargs={"pk": directorate.pk}) + f"?year={selected_year}",
         })
         return context
+
+    def export_excel(self):
+        ctx = self.get_context_data()
+        table_groups = ctx["table_groups"]
+        month_labels = ctx["month_labels"]
+
+        sheets = []
+        for group in table_groups:
+            headers = month_labels
+            rows = []
+            for row in group["rows"]:
+                rows.append([row["label"]] + [v["val"] for v in row["values"]])
+            sheets.append({"title": group["title"], "headers": headers, "rows": rows})
+
+        return build_workbook(sheets, self.export_filename)
 
 
 class MonitoramentoDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):

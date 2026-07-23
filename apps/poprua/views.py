@@ -7,11 +7,26 @@ from django.http import JsonResponse, Http404
 from django.contrib import messages
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
 from apps.core.mixins import TvTemplateMixin
-from apps.core.utils import MONTH_OPTIONS
+from apps.core.export import ExcelExportMixin, build_workbook
+from apps.core.utils import (
+    MONTH_LABELS, MONTH_OPTIONS, build_sparkline,
+    build_year_range_from_years, build_variation,
+    safe_total, build_series, current_or_total
+)
 from apps.directorates.models import Directorate
 from .models import PopRuaReport
 from .forms import PopRuaForm
 import json
+
+
+POPRUA_CARD_FIELDS = [
+    ("Total de Atendimentos", "num_atend_total", "users", "#3b82f6"),
+    ("Centro de Referência", "num_atend_centro_ref", "building-2", "#06b6d4"),
+    ("Abordagem Social", "num_atend_abordagem", "map-pin", "#f59e0b"),
+    ("Núcleo Migrante", "num_atend_migracao", "truck", "#10b981"),
+    ("Cad. Único", "cr_cad_unico", "id-card", "#8b5cf6"),
+    ("Passagens Deferidas", "nm_passagens_deferidas", "ticket", "#ec4899"),
+]
 
 
 class PopRuaBaseMixin(DirectorateAccessMixin):
@@ -35,68 +50,57 @@ class PopRuaDashboardView(TvTemplateMixin, PopRuaBaseMixin, TemplateView):
         month_param = self.request.GET.get("month", "all")
         context["selected_year"] = year
         context["selected_month"] = month_param
-        
-        reports_query = PopRuaReport.objects.filter(directorate=directorate, year=year)
-        
-        # Monthly charts data (always show full year evolution)
-        months_labels = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
-        atend_centro = [0]*12
-        atend_abordagem = [0]*12
-        atend_migracao = [0]*12
-        persistentes_mensal = [0]*12
-        
-        all_reports = reports_query.order_by("month")
-        for r in all_reports:
-            m_idx = r.month - 1
-            atend_centro[m_idx] = r.num_atend_centro_ref or 0
-            atend_abordagem[m_idx] = r.num_atend_abordagem or 0
-            atend_migracao[m_idx] = r.num_atend_migracao or 0
-            persistentes_mensal[m_idx] = r.ar_persistentes or 0
 
+        reports = PopRuaReport.objects.filter(directorate=directorate, year=year).order_by("month")
+        reports_by_month = {r.month: r for r in reports}
+
+        # Cards
+        cards = []
+        for label, field, icon, color in POPRUA_CARD_FIELDS:
+            history = build_series(reports_by_month, field)
+            cards.append({
+                "label": label,
+                "value": current_or_total(reports_by_month, field, month_param),
+                "sparkline": build_sparkline(history),
+                "icon": icon,
+                "color": color,
+                "variation": build_variation(history, month_param),
+            })
+        context["cards"] = cards
+
+        # Chart labels
+        months_labels = [label for _, label in MONTH_LABELS]
+
+        # Line chart: Centro Ref, Abordagem, Migração
         context["chart_labels"] = json.dumps(months_labels)
-        context["chart_centro"] = json.dumps(atend_centro)
-        context["chart_abordagem"] = json.dumps(atend_abordagem)
-        context["chart_migracao"] = json.dumps(atend_migracao)
-        context["persistentes_data"] = json.dumps(persistentes_mensal)
+        context["chart_centro"] = json.dumps(build_series(reports_by_month, "num_atend_centro_ref"))
+        context["chart_abordagem"] = json.dumps(build_series(reports_by_month, "num_atend_abordagem"))
+        context["chart_migracao"] = json.dumps(build_series(reports_by_month, "num_atend_migracao"))
 
-        # Filtered totals for cards and doughnut
-        if month_param != "all":
-            target_month = int(month_param)
-            filtered_reports = reports_query.filter(month=target_month)
-        else:
-            filtered_reports = reports_query
-
-        total_cr = 0
-        total_as = 0
-        total_nm = 0
-        drogas_cr = 0
-        drogas_ar = 0
-        
-        for r in filtered_reports:
-            total_cr += r.num_atend_centro_ref or 0
-            total_as += r.num_atend_abordagem or 0
-            total_nm += r.num_atend_migracao or 0
-            drogas_cr += r.cr_b1_drogas or 0
-            drogas_ar += r.ar_e5_drogas or 0
-
-        context["total_atend_centro"] = total_cr
-        context["total_atend_abordagem"] = total_as
-        context["total_atend_migracao"] = total_nm
-        context["total_geral"] = total_cr + total_as + total_nm
-        
+        # Doughnut: Drogas CR vs AR
+        drogas_cr = current_or_total(reports_by_month, "cr_b1_drogas", month_param)
+        drogas_ar = current_or_total(reports_by_month, "ar_e5_drogas", month_param)
         context["drogas_data"] = json.dumps([drogas_cr, drogas_ar])
         context["drogas_labels"] = json.dumps(["Centro de Referência", "Abordagem Social"])
-        
-        context["years_range"] = range(2023, timezone.now().year + 1)
-        context["months_range"] = [
-            (1, "JAN."), (2, "FEV."), (3, "MAR."), (4, "ABR."),
-            (5, "MAI."), (6, "JUN."), (7, "JUL."), (8, "AGO."),
-            (9, "SET."), (10, "OUT."), (11, "NOV."), (12, "DEZ.")
-        ]
+
+        # Passagens bar chart
+        context["passagens_deferidas"] = json.dumps(build_series(reports_by_month, "nm_passagens_deferidas"))
+        context["passagens_indeferidas"] = json.dumps(build_series(reports_by_month, "nm_passagens_indeferidas"))
+
+        # Encaminhamentos bar chart
+        context["enc_mercado"] = json.dumps(build_series(reports_by_month, "cr_enc_mercado"))
+        context["enc_caps"] = json.dumps(build_series(reports_by_month, "cr_enc_caps"))
+        context["enc_saude"] = json.dumps(build_series(reports_by_month, "cr_enc_saude"))
+        context["enc_consultorio"] = json.dumps(build_series(reports_by_month, "cr_enc_consultorio"))
+
+        available_years = PopRuaReport.objects.filter(directorate=directorate).values_list("year", flat=True)
+        context["years_range"] = build_year_range_from_years(available_years, year)
+        context["months_range"] = MONTH_OPTIONS
         return context
 
-class PopRuaDataListView(PopRuaBaseMixin, TemplateView):
+class PopRuaDataListView(ExcelExportMixin, PopRuaBaseMixin, TemplateView):
     template_name = "poprua/data_list.html"
+    export_filename = "pop_rua_dados.xlsx"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -138,6 +142,21 @@ class PopRuaDataListView(PopRuaBaseMixin, TemplateView):
         context["directorate"] = directorate
         context["can_delete"] = self.is_admin()
         return context
+
+    def export_excel(self):
+        ctx = self.get_context_data()
+        matrix_data = ctx["matrix_data"]
+        month_headers = ctx["month_headers"]
+
+        sheets = []
+        for section in matrix_data:
+            headers = month_headers + ["TOTAL"]
+            rows = []
+            for row in section["rows"]:
+                rows.append([row["label"]] + [m["val"] for m in row["months"]] + [row["total"]])
+            sheets.append({"title": section["title"], "headers": headers, "rows": rows})
+
+        return build_workbook(sheets, self.export_filename)
 
 class PopRuaDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):
     allowed_roles = ["admin"]

@@ -12,6 +12,7 @@ from apps.ceai.constants import CEAI_UNITS, CEAI_FORM_DEFINITION, CONDOMINIO_IDO
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
 from apps.core.mixins import TvTemplateMixin
 from apps.core.utils import MONTH_OPTIONS
+from apps.core.export import ExcelExportMixin, build_workbook
 
 
 class CeaiBaseMixin(DirectorateAccessMixin):
@@ -447,8 +448,28 @@ class CeaiMonthlyNarrativeView(CeaiBaseMixin, RoleRequiredMixin, View):
 
         return redirect("ceai:dashboard")
 
-class CeaiDataListView(CeaiBaseMixin, RoleRequiredMixin, TemplateView):
+class CeaiDataListView(ExcelExportMixin, CeaiBaseMixin, RoleRequiredMixin, TemplateView):
     template_name = "ceai/data_list.html"
+    export_filename = "CEAI.xlsx"
+
+    def export_excel(self):
+        ctx = self.get_context_data()
+        months = ctx.get("month_headers", [])
+        sheets = []
+        for unit_data in ctx.get("units_data", []):
+            # Main indicators
+            for row in unit_data.get("matrix", []):
+                pass  # handled below
+            # One sheet per unit
+            rows = []
+            for row in unit_data.get("matrix", []):
+                rows.append([row["label"]] + [str(m["val"]) for m in row.get("months", [])])
+            sheets.append({
+                "title": unit_data["name"][:31],
+                "headers": months,
+                "rows": rows,
+            })
+        return build_workbook(sheets, self.export_filename)
     allowed_roles = ["admin", "diretor", "agente"]
 
     def get_context_data(self, **kwargs):

@@ -10,6 +10,8 @@ from django.http import JsonResponse
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
 from apps.core.mixins import TvTemplateMixin
 from apps.directorates.models import Directorate, MonthlyReport
+from apps.core.export import ExcelExportMixin, build_workbook
+from apps.core.utils import MONTH_LABELS as MONTH_LABELS_ARR
 from apps.core.utils import (
     MONTH_LABELS, MONTH_OPTIONS, build_sparkline, build_column_points,
     build_period_label, build_year_range_from_years, build_variation,
@@ -188,8 +190,9 @@ class BeneficiosCreateUpdateView(BeneficiosBaseMixin, FormView):
         return redirect(reverse("beneficios:home"))
 
 
-class BeneficiosDataView(BeneficiosBaseMixin, TemplateView):
+class BeneficiosDataView(ExcelExportMixin, BeneficiosBaseMixin, TemplateView):
     template_name = "beneficios/data.html"
+    export_filename = "Beneficios.xlsx"
 
     month_labels = MONTH_LABELS
 
@@ -238,6 +241,20 @@ class BeneficiosDataView(BeneficiosBaseMixin, TemplateView):
             }
         )
         return context
+
+    def export_excel(self):
+        ctx = self.get_context_data()
+        sheets = []
+        for group in ctx.get("table_groups", []):
+            rows = []
+            for row in group.get("rows", []):
+                rows.append([row["label"]] + [v["val"] for v in row["values"]])
+            sheets.append({
+                "title": group["title"],
+                "headers": [label for _, label in MONTH_LABELS],
+                "rows": rows,
+            })
+        return build_workbook(sheets, self.export_filename)
 
 
 class BeneficiosMonthlyNarrativeView(BeneficiosBaseMixin, TemplateView):

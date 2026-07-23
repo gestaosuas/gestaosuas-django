@@ -4,6 +4,23 @@ from .models import CreasProtetivoReport, CreasSocioeducativoReport
 MONTH_CHOICES = [(1, "JAN"), (2, "FEV"), (3, "MAR"), (4, "ABR"), (5, "MAI"), (6, "JUN"),
                   (7, "JUL"), (8, "AGO"), (9, "SET"), (10, "OUT"), (11, "NOV"), (12, "DEZ")]
 
+PROTETIVO_VIOLATION_PREFIXES = [
+    ("vf", "Crianças/adolescentes vítimas de violência física ou psicológica"),
+    ("as", "Crianças/adolescentes vítimas de abuso sexual"),
+    ("es", "Crianças/adolescentes vítimas de exploração sexual"),
+    ("ng", "Crianças/adolescentes vítimas de negligência ou abandono"),
+    ("ti", "Crianças/adolescentes em situação de trabalho infantil"),
+]
+
+PROTETIVO_SUBCATEGORIES = [
+    ("at", "Atendidas no mês anterior"),
+    ("in", "Inseridos / Novos"),
+    ("de", "Desligados no PAEFI"),
+]
+
+PROTETIVO_GENDERS = [("masc", "Masculino"), ("fem", "Feminino")]
+PROTETIVO_AGES = [("0", "0 a 6"), ("7", "7 a 12"), ("13", "13 a 17")]
+
 
 class CreasProtetivoForm(forms.ModelForm):
     month = forms.ChoiceField(label="Mês", choices=MONTH_CHOICES, widget=forms.Select(attrs={"class": "form-input"}))
@@ -13,45 +30,8 @@ class CreasProtetivoForm(forms.ModelForm):
         model = CreasProtetivoReport
         exclude = ("id", "directorate", "user_id", "created_by", "status", "created_at", "updated_at")
 
-    section_map = [
-        (
-            "Famílias em Acompanhamento",
-            ["fam_mes_anterior", "fam_admitidas", "fam_desligadas", "fam_atual"]
-        ),
-        (
-            "Direitos Violados (Criança/Adolescente)",
-            ["viol_fis_psic_masc", "viol_fis_psic_fem", "abuso_sexual_masc", "abuso_sexual_fem",
-             "expl_sexual_masc", "expl_sexual_fem", "negli_aband_masc", "negli_aband_fem",
-             "trab_infantil_masc", "trab_infantil_fem"]
-        ),
-        (
-            "Atendimento Criança/Adolescentes",
-            ["atend_mes_anterior", "atend_admitidas", "atend_desligadas", "atend_atual"]
-        )
-    ]
-
-    labels = {
-        "fam_mes_anterior": "Mês Anterior",
-        "fam_admitidas": "Admitidas",
-        "fam_desligadas": "Desligadas",
-        "fam_atual": "Atual (Calculado)",
-        
-        "viol_fis_psic_masc": "Violência Física/Psicológica - Masculino",
-        "viol_fis_psic_fem": "Violência Física/Psicológica - Feminino",
-        "abuso_sexual_masc": "Abuso Sexual - Masculino",
-        "abuso_sexual_fem": "Abuso Sexual - Feminino",
-        "expl_sexual_masc": "Exploração Sexual - Masculino",
-        "expl_sexual_fem": "Exploração Sexual - Feminino",
-        "negli_aband_masc": "Negligência/Abandono - Masculino",
-        "negli_aband_fem": "Negligência/Abandono - Feminino",
-        "trab_infantil_masc": "Trabalho Infantil - Masculino",
-        "trab_infantil_fem": "Trabalho Infantil - Feminino",
-        
-        "atend_mes_anterior": "Mês Anterior",
-        "atend_admitidas": "Admitidas",
-        "atend_desligadas": "Desligadas",
-        "atend_atual": "Atual (Calculado)",
-    }
+    labels = {}
+    matrix_sections = []
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -61,9 +41,43 @@ class CreasProtetivoForm(forms.ModelForm):
             field.widget = forms.NumberInput(attrs={"class": "form-input", "min": 0})
             field.required = False
             field.initial = field.initial or 0
-            if name in {"fam_atual", "atend_atual"}:
+            if name == "fam_atual":
                 field.disabled = True
                 field.widget.attrs["readonly"] = True
+
+        # Build labels
+        self.labels = {
+            "fam_mes_anterior": "Famílias em Acomp. 1º Dia Mês",
+            "fam_admitidas": "Famílias inseridas (PAEFI)",
+            "fam_desligadas": "Famílias desligadas (PAEFI)",
+            "fam_atual": "Total de famílias em acompanhamento (PAEFI)",
+        }
+        for pref, _ in PROTETIVO_VIOLATION_PREFIXES:
+            for suf, _ in PROTETIVO_SUBCATEGORIES:
+                for g, g_label in PROTETIVO_GENDERS:
+                    for a, a_label in PROTETIVO_AGES:
+                        self.labels[f"{pref}_{suf}_{g[0]}{a}"] = f"{g_label} {a_label}"
+
+        # Apply labels to fields
+        for name, lbl in self.labels.items():
+            if name in self.fields:
+                self.fields[name].label = lbl
+
+        # Build matrix sections for the view
+        self.matrix_sections = []
+        for pref, label in PROTETIVO_VIOLATION_PREFIXES:
+            self.matrix_sections.append({
+                "title": label,
+                "prefix": pref,
+                "subcategories": PROTETIVO_SUBCATEGORIES,
+                "genders": PROTETIVO_GENDERS,
+                "ages": PROTETIVO_AGES,
+            })
+
+    def clean(self):
+        cleaned = super().clean()
+        cleaned["fam_atual"] = int(cleaned.get("fam_mes_anterior") or 0) + int(cleaned.get("fam_admitidas") or 0)
+        return cleaned
 
 
 class CreasSocioeducativoForm(forms.ModelForm):
@@ -150,7 +164,6 @@ class CreasSocioeducativoForm(forms.ModelForm):
             field.required = False
             field.initial = field.initial or 0
             
-            # Disable calculated fields
             if name.endswith("_total_parcial") or name.endswith("_geral") or name == "fam_total_acompanhamento":
                 field.disabled = True
                 field.widget.attrs["readonly"] = True

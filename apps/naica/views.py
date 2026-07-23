@@ -8,6 +8,7 @@ from django.views.generic import DetailView, FormView, TemplateView, View
 from django.http import JsonResponse
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
 from apps.core.mixins import TvTemplateMixin
+from apps.core.export import ExcelExportMixin, build_workbook
 
 from apps.directorates.models import Directorate, MonthlyReport
 from apps.core.utils import (
@@ -283,8 +284,9 @@ class NaicaCreateUpdateView(NaicaBaseMixin, FormView):
         )
 
 
-class NaicaDataView(NaicaBaseMixin, TemplateView):
+class NaicaDataView(ExcelExportMixin, NaicaBaseMixin, TemplateView):
     template_name = "naica/data.html"
+    export_filename = "naica_dados.xlsx"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -334,6 +336,27 @@ class NaicaDataView(NaicaBaseMixin, TemplateView):
             "can_delete": self.is_admin(),
         })
         return context
+
+    def export_excel(self):
+        ctx = self.get_context_data()
+        units_tables = ctx["units_tables"]
+        month_labels = ctx["month_labels"]
+
+        sheets = []
+        for unit_data in units_tables:
+            unit_name = unit_data["unit"]
+            rows = []
+            for group in unit_data["groups"]:
+                rows.append([group["title"]] + [""] * 12)
+                for row in group["rows"]:
+                    rows.append([row["label"]] + [v["val"] for v in row["values"]])
+            sheets.append({
+                "title": unit_name,
+                "headers": month_labels,
+                "rows": rows
+            })
+
+        return build_workbook(sheets, self.export_filename)
 
 
 class NaicaMonthlyNarrativeView(NaicaBaseMixin, TemplateView):

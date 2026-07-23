@@ -10,10 +10,12 @@ from django.views.generic import DetailView, FormView, TemplateView, View
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
 from apps.core.mixins import TvTemplateMixin
 from apps.directorates.models import Directorate, MonthlyReport
+from apps.core.export import ExcelExportMixin, build_workbook
 from apps.core.utils import (
-    MONTH_LABELS, MONTH_OPTIONS, build_sparkline, build_column_points,
-    build_period_label, build_year_range_from_years, build_variation,
-    safe_total, build_series, current_or_total, sum_fields_by_month,
+    MONTH_LABELS, MONTH_LABELS as MONTH_LABELS_ARR, MONTH_OPTIONS,
+    build_sparkline, build_column_points, build_period_label,
+    build_year_range_from_years, build_variation, safe_total,
+    build_series, current_or_total, sum_fields_by_month,
     selected_or_total_fields, build_highlight_badge
 )
 from .models import SineReport, QualificacaoReport
@@ -305,18 +307,43 @@ class SharedDataView(SineCpBaseMixin, TemplateView):
         })
         return context
 
-class SineDataView(SharedDataView):
+    def export_excel(self):
+        directorate = self.get_directorate()
+        selected_year = self.get_year()
+        reports = {
+            r.month: r
+            for r in self.model.objects.filter(
+                directorate=directorate, year=selected_year
+            )
+        }
+        month_labels = [label for _, label in MONTH_LABELS_ARR]
+        sheets = []
+        for title, fields in self.form_class.section_map:
+            rows = []
+            for f in fields:
+                row = [self.form_class.labels.get(f, f)]
+                for m, _ in MONTH_LABELS_ARR:
+                    r = reports.get(m)
+                    row.append(getattr(r, f, "") if r else "")
+                rows.append(row)
+            sheets.append({"title": title, "headers": month_labels, "rows": rows})
+        return build_workbook(sheets, self.export_filename)
+
+
+class SineDataView(ExcelExportMixin, SharedDataView):
     model = SineReport
     form_class = SineReportForm
     module_title = "SINE"
+    export_filename = "SINE.xlsx"
     back_tab = "sine"
     form_view_name = "sinecp:sine-form"
     monthly_report_view_name = "sinecp:sine-monthly-report"
 
-class QualificacaoDataView(SharedDataView):
+class QualificacaoDataView(ExcelExportMixin, SharedDataView):
     model = QualificacaoReport
     form_class = QualificacaoReportForm
     module_title = "Qualificacao Profissional"
+    export_filename = "Qualificacao_Profissional.xlsx"
     back_tab = "cp"
     form_view_name = "sinecp:qualificacao-form"
     monthly_report_view_name = "sinecp:qualificacao-monthly-report"

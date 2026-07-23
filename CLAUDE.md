@@ -351,6 +351,45 @@ Sem esperar pelo cutover de banco limpo (ainda não aconteceu — ver nota acima
 
 ---
 
+## Export Excel
+
+Todas as páginas "Ver Dados" têm botão **Exportar Excel** (visível só para admin, verifica `can_delete`).
+
+- **Módulo**: `apps/core/export.py` — função `build_workbook(sheets, filename)` + mixin `ExcelExportMixin`
+- **Dependência**: `openpyxl>=3.1` em `requirements/base.txt`
+- **Trigger**: `?export=xlsx` na URL (o mixin intercepta no `get()`)
+- **Templates**: botão verde `<a href="?{{ request.GET.urlencode }}&export=xlsx" class="btn-excel">`
+- **Regra de abas**:
+  - Apps com unidades (CRAS, NAICA): 1 aba por unidade (todas seções juntas)
+  - Apps sem unidades (demais): 1 aba por seção/tabela
+- **Sanitização**: títulos de aba têm caracteres inválidos (`\ / * ? : [ ]`) substituídos por `-`, truncados em 31 chars
+
+---
+
+## Estratificação de Formulários CREAS
+
+A partir de 2026-07-21, os formulários de violação do CREAS foram estratificados:
+
+### Idoso e PCD — por gênero
+5 violações × 4 subcampos × 2 gêneros = 40 campos por tabela.
+- Labels no form: `f"{suf_label} — Masculino"` / `"Feminino"`
+- Exemplo DB: `violencia_fisica_atendidas_anterior_masc`, `violencia_fisica_total_fem`
+- Campos computados: `total_masc`, `total_fem`, `total_geral` por violação; `idoso_total_geral_masc`/`fem`
+
+### Protetivo — por gênero + faixa etária
+5 violações × 3 subcategorias × 6 gender-age = 90 campos.
+- Prefixos: `vf`, `as`, `es`, `ng`, `ti`
+- Sufixos: `at` (atendidas anterior), `in` (inseridos), `de` (desligados)
+- Gender-age: `m0`, `m7`, `m13`, `f0`, `f7`, `f13` (Masc/Fem × 0-6/7-12/13-17)
+- Exemplo DB: `vf_at_m0`, `ng_de_f13`
+
+### Seções vs labels (convenção)
+- Título da seção: nome completo (ex: "Pessoas idosas vítimas de violência física ou psicológica")
+- Labels dos campos: só o sufixo + gênero (ex: "Mês Anterior — Masculino"), sem repetir o título da seção
+- `(PAEFI)` e `(casos novos)` removidos dos labels do PAEFI (redundantes com o título da seção)
+
+---
+
 ## Débito Técnico Conhecido
 
 | # | Problema | Impacto | Prioridade |

@@ -8,10 +8,11 @@ from django.urls import reverse
 from django.views.generic import DetailView, FormView, TemplateView, View
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
 from apps.core.mixins import TvTemplateMixin
+from apps.core.export import ExcelExportMixin, build_workbook
 from apps.directorates.models import Directorate
 
 from .models import CreasProtetivoReport, CreasSocioeducativoReport
-from .forms import CreasProtetivoForm, CreasSocioeducativoForm
+from .forms import CreasProtetivoForm, CreasSocioeducativoForm, PROTETIVO_VIOLATION_PREFIXES, PROTETIVO_SUBCATEGORIES, PROTETIVO_GENDERS, PROTETIVO_AGES
 
 MONTH_LABELS = [
     (1, "JAN"), (2, "FEV"), (3, "MAR"), (4, "ABR"), (5, "MAI"), (6, "JUN"),
@@ -185,18 +186,22 @@ class ProtecaoEspecialHomeView(TvTemplateMixin, ProteacaoEspecialBaseMixin, Deta
             },
         ]
 
-        # Doughnut 1: Rights Violations Categories
+        # Doughnut 1: Rights Violations Categories (sum all gender-age fields per prefix)
         violation_types = [
-            ("Violência Física/Psic.", ["viol_fis_psic_masc", "viol_fis_psic_fem"]),
-            ("Abuso Sexual", ["abuso_sexual_masc", "abuso_sexual_fem"]),
-            ("Exploração Sexual", ["expl_sexual_masc", "expl_sexual_fem"]),
-            ("Negligência/Abandono", ["negli_aband_masc", "negli_aband_fem"]),
-            ("Trabalho Infantil", ["trab_infantil_masc", "trab_infantil_fem"]),
+            ("Violência Física/Psic.", "vf"),
+            ("Abuso Sexual", "as"),
+            ("Exploração Sexual", "es"),
+            ("Negligência/Abandono", "ng"),
+            ("Trabalho Infantil", "ti"),
         ]
         donut_colors = ["#3b82f6", "#ef4444", "#8b5cf6", "#f59e0b", "#10b981"]
         donut_protetivo_items = []
-        for (label, fields), color in zip(violation_types, donut_colors):
-            total_val = sum(get_val(protetivo_by_month, f) for f in fields)
+        for (label, pref), color in zip(violation_types, donut_colors):
+            total_val = 0
+            for suf, _ in PROTETIVO_SUBCATEGORIES:
+                for gen, _ in PROTETIVO_GENDERS:
+                    for age, _ in PROTETIVO_AGES:
+                        total_val += get_val(protetivo_by_month, f"{pref}_{suf}_{gen[0]}{age}")
             if total_val > 0:
                 donut_protetivo_items.append({"label": label, "value": total_val, "color": color})
 
@@ -216,8 +221,13 @@ class ProtecaoEspecialHomeView(TvTemplateMixin, ProteacaoEspecialBaseMixin, Deta
             donut_socio_items.append({"label": "Prest. Serviço Comunidade (PSC)", "value": psc_total, "color": "#10b981"})
 
         # Bar 1: Violations by Gender
-        masc_violations = sum(get_val(protetivo_by_month, f) for label, fields in violation_types for f in fields if f.endswith("_masc"))
-        fem_violations = sum(get_val(protetivo_by_month, f) for label, fields in violation_types for f in fields if f.endswith("_fem"))
+        masc_violations = 0
+        fem_violations = 0
+        for prefl, pref in violation_types:
+            for suf, _ in PROTETIVO_SUBCATEGORIES:
+                for age, _ in PROTETIVO_AGES:
+                    masc_violations += get_val(protetivo_by_month, f"{pref}_{suf}_m{age}")
+                    fem_violations += get_val(protetivo_by_month, f"{pref}_{suf}_f{age}")
         bar_protetivo_items = [
             {"label": "Masculino", "value": masc_violations, "color": "#3b82f6"},
             {"label": "Feminino", "value": fem_violations, "color": "#f43f5e"},
@@ -267,10 +277,46 @@ class CreasProtetivoFormView(ProteacaoEspecialBaseMixin, FormView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         form = ctx["form"]
-        items = [{"title": t, "fields": [form[f] for f in fs]} for t, fs in self.form_class.section_map]
+
+        pieces = []
+        # PAEFI section
+        pieces.append('<div class="report-section-card">'
+            '<div class="section-head"><div class="section-line"></div>'
+            '<h2>Famílias em acompanhamento no PAEFI</h2></div>'
+            '<div class="report-form-grid">')
+        for fname in ["fam_mes_anterior", "fam_admitidas", "fam_desligadas", "fam_atual"]:
+            field = form[fname]
+            pieces.append(f'<div class="field-group"><label for="{field.id_for_label}">{field.label}</label>{field}</div>')
+        pieces.append('</div></div>')
+
+        # Matrix sections
+        for ms in form.matrix_sections:
+            pieces.append(f'<div class="report-section-card">'
+                f'<div class="section-head"><div class="section-line"></div>'
+                f'<h2>{ms["title"]}</h2></div>')
+            for suf_key, suf_label in ms["subcategories"]:
+                pieces.append(f'<div style="margin-bottom:16px;">'
+                    f'<p style="font-weight:700;font-size:13px;color:#475569;margin-bottom:8px;">{suf_label}</p>'
+                    '<table class="matrix-input-table"><thead><tr><th></th>')
+                for age_key, age_label in ms["ages"]:
+                    pieces.append(f'<th>{age_label} anos</th>')
+                pieces.append('</tr></thead><tbody>')
+                for gen_key, gen_label in ms["genders"]:
+                    pieces.append(f'<tr><td class="matrix-gen-label">{gen_label}</td>')
+                    for age_key, age_label in ms["ages"]:
+                        fname = f"{ms['prefix']}_{suf_key}_{gen_key[0]}{age_key}"
+                        if fname in form.fields:
+                            pieces.append(f'<td>{str(form[fname])}</td>')
+                        else:
+                            pieces.append('<td></td>')
+                    pieces.append('</tr>')
+                pieces.append('</tbody></table></div>')
+            pieces.append('</div>')
+
         existing_report = self._get_existing_report()
         ctx.update({
-            "directorate": self.get_directorate(), "section_items": items,
+            "directorate": self.get_directorate(),
+            "matrix_html": "".join(pieces),
             "subcategory": "protetivo", "selected_year": self.get_year(), "selected_month": self.get_month_number(),
             "is_locked": bool(existing_report), "is_admin_user": self.is_admin(),
             "month_options": MONTH_OPTIONS
@@ -392,8 +438,9 @@ class CreasSocioeducativoFormView(ProteacaoEspecialBaseMixin, FormView):
         return redirect(reverse("protecaoespecial:home", kwargs={"pk": d.pk}) + f"?year={form.cleaned_data['year']}")
 
 
-class CreasProtetivoDataView(ProteacaoEspecialBaseMixin, TemplateView):
+class CreasProtetivoDataView(ExcelExportMixin, ProteacaoEspecialBaseMixin, TemplateView):
     template_name = "protecaoespecial/data.html"
+    export_filename = "creas_protetivo_dados.xlsx"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -401,18 +448,46 @@ class CreasProtetivoDataView(ProteacaoEspecialBaseMixin, TemplateView):
         year = self.get_year()
         reports = CreasProtetivoReport.objects.filter(directorate=d, year=year).order_by("month")
         by_month = {r.month: r for r in reports}
-        groups = []
-        for title, fields in CreasProtetivoForm.section_map:
-            rows = [{"label": CreasProtetivoForm.labels.get(f, f),
-                     "key": f,
-                     "is_readonly": f in {"fam_atual", "atend_atual"},
-                     "values": [{"val": getattr(by_month.get(m, None), f, "") if by_month.get(m) else "",
-                                 "sub_id": by_month.get(m).id if by_month.get(m) else None,
-                                 "month": m,
-                                 "year": year}
-                                for m in range(1, 13)]}
-                    for f in fields]
-            groups.append({"title": title, "rows": rows})
+
+        # PAEFI section
+        paefi_fields = ["fam_mes_anterior", "fam_admitidas", "fam_desligadas", "fam_atual"]
+        paefi_labels = {
+            "fam_mes_anterior": "Famílias em Acomp. 1º Dia Mês",
+            "fam_admitidas": "Famílias inseridas (PAEFI)",
+            "fam_desligadas": "Famílias desligadas (PAEFI)",
+            "fam_atual": "Total de famílias em acompanhamento (PAEFI)",
+        }
+
+        groups = [{
+            "title": "Famílias em acompanhamento no PAEFI",
+            "rows": [{
+                "label": paefi_labels.get(f, f), "key": f,
+                "is_readonly": f == "fam_atual",
+                "values": [{"val": getattr(by_month.get(m, None), f, "") if by_month.get(m) else "",
+                            "sub_id": by_month.get(m).id if by_month.get(m) else None,
+                            "month": m, "year": year}
+                           for m in range(1, 13)]
+            } for f in paefi_fields]
+        }]
+
+        # Violation sections
+        for pref, label in PROTETIVO_VIOLATION_PREFIXES:
+            rows = []
+            for suf_key, suf_label in PROTETIVO_SUBCATEGORIES:
+                for gen_key, gen_label in PROTETIVO_GENDERS:
+                    for age_key, age_label in PROTETIVO_AGES:
+                        fname = f"{pref}_{suf_key}_{gen_key[0][0]}{age_key}"
+                        display = f"{suf_label} — {gen_label}, {age_label} anos"
+                        rows.append({
+                            "label": display, "key": fname,
+                            "is_readonly": False,
+                            "values": [{"val": getattr(by_month.get(m, None), fname, "") if by_month.get(m) else "",
+                                        "sub_id": by_month.get(m).id if by_month.get(m) else None,
+                                        "month": m, "year": year}
+                                       for m in range(1, 13)]
+                        })
+            groups.append({"title": label, "rows": rows})
+
         ctx.update({
             "directorate": d, "selected_year": year, "subcategory": "protetivo",
             "month_labels": [l for _, l in MONTH_LABELS], "table_groups": groups,
@@ -420,9 +495,24 @@ class CreasProtetivoDataView(ProteacaoEspecialBaseMixin, TemplateView):
         })
         return ctx
 
+    def export_excel(self):
+        ctx = self.get_context_data()
+        table_groups = ctx["table_groups"]
+        month_labels = [l for _, l in MONTH_LABELS]
 
-class CreasSocioeducativoDataView(ProteacaoEspecialBaseMixin, TemplateView):
+        sheets = []
+        for group in table_groups:
+            rows = []
+            for row in group["rows"]:
+                rows.append([row["label"]] + [v["val"] for v in row["values"]])
+            sheets.append({"title": group["title"], "headers": month_labels, "rows": rows})
+
+        return build_workbook(sheets, self.export_filename)
+
+
+class CreasSocioeducativoDataView(ExcelExportMixin, ProteacaoEspecialBaseMixin, TemplateView):
     template_name = "protecaoespecial/data.html"
+    export_filename = "creas_socioeducativo_dados.xlsx"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -448,6 +538,20 @@ class CreasSocioeducativoDataView(ProteacaoEspecialBaseMixin, TemplateView):
             "can_delete": self.is_admin(),
         })
         return ctx
+
+    def export_excel(self):
+        ctx = self.get_context_data()
+        table_groups = ctx["table_groups"]
+        month_labels = [l for _, l in MONTH_LABELS]
+
+        sheets = []
+        for group in table_groups:
+            rows = []
+            for row in group["rows"]:
+                rows.append([row["label"]] + [v["val"] for v in row["values"]])
+            sheets.append({"title": group["title"], "headers": month_labels, "rows": rows})
+
+        return build_workbook(sheets, self.export_filename)
 
 
 class CreasProtetivoDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):

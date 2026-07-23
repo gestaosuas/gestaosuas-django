@@ -11,10 +11,12 @@ from django.http import JsonResponse
 from django.utils import timezone
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
 from apps.core.mixins import TvTemplateMixin
+from apps.core.export import ExcelExportMixin, build_workbook
 from django.views.generic import DetailView, FormView, TemplateView, View
+from apps.core.export import ExcelExportMixin, build_workbook
 from apps.directorates.models import Directorate, MonthlyReport
 
-from .forms import CreasIdosoForm, CreasPcdForm, VICTIM_PREFIXES
+from .forms import CreasIdosoForm, CreasPcdForm, IDOSO_VIOLATION_PREFIXES, IDOSO_SUFFIXES, PCD_VIOLATION_PREFIXES, PCD_SUFFIXES
 from .models import CreasIdosoReport, CreasPcdReport
 
 MONTH_LABELS = [
@@ -135,23 +137,21 @@ class CreasHomeView(TvTemplateMixin, CreasBaseMixin, DetailView):
         def get_history(qs_by_month, field):
             return [safe_int(getattr(qs_by_month.get(m, None), field, 0) if qs_by_month.get(m) else 0) for m in range(1, 13)]
 
-        # KPI 1: Violencia Idoso
-        idoso_victim_fields = [f"{p}_total" for p, _ in VICTIM_PREFIXES]
+        # KPI 1: Violencia Idoso (soma masc+fem de todos os totais)
+        idoso_victim_fields = [f"{p}_total_{g}" for p, _ in IDOSO_VIOLATION_PREFIXES for g in ["masc", "fem"]]
         idoso_violencia = get_val(idoso_by_month, "paefi_inseridos") + sum(get_val(idoso_by_month, f) for f in idoso_victim_fields)
         idoso_violencia_hist = get_history(idoso_by_month, "paefi_inseridos")
         for f in idoso_victim_fields:
             f_hist = get_history(idoso_by_month, f)
             idoso_violencia_hist = [idoso_violencia_hist[i] + f_hist[i] for i in range(12)]
 
-        # KPI 2: Violencia PCD
-        pcd_victim_fields = [f"def_{p}_total" for p, _ in VICTIM_PREFIXES]
+        # KPI 2: Violencia PCD (soma masc+fem de todos os totais)
+        pcd_victim_fields = [f"def_{p}_total_{g}" for p, _ in PCD_VIOLATION_PREFIXES for g in ["masc", "fem"]]
         pcd_violencia = sum(get_val(pcd_by_month, f) for f in pcd_victim_fields)
-        pcd_violencia_hist = []
-        for i in range(12):
-            total = 0
-            for f in pcd_victim_fields:
-                total += get_history(pcd_by_month, f)[i]
-            pcd_violencia_hist.append(total)
+        pcd_violencia_hist = [0] * 12
+        for f in pcd_victim_fields:
+            f_hist = get_history(pcd_by_month, f)
+            pcd_violencia_hist = [pcd_violencia_hist[i] + f_hist[i] for i in range(12)]
 
         # KPI 3: Familias Acomp.
         familias = get_val(idoso_by_month, "paefi_acomp_inicio") + get_val(idoso_by_month, "paefi_inseridos")
@@ -173,34 +173,44 @@ class CreasHomeView(TvTemplateMixin, CreasBaseMixin, DetailView):
              "variation": build_variation(familias_hist, month)},
         ]
 
-        # Donut 1: Idoso slices
+        # Donut 1: Idoso slices (soma masc+fem)
         donut_idoso_labels = ["Negligencia/Abandono", "Violencia Fisica/Psic.", "Exploracao Financeira",
                                "Abuso Sexual", "Exploracao Sexual"]
-        donut_idoso_fields = ["negligencia_total", "violencia_fisica_total", "exploracao_financeira_total",
-                              "abuso_sexual_total", "exploracao_sexual_total"]
-        donut_idoso_data = [get_val(idoso_by_month, f) for f in donut_idoso_fields]
+        donut_idoso_base = ["negligencia_total", "violencia_fisica_total", "exploracao_financeira_total",
+                            "abuso_sexual_total", "exploracao_sexual_total"]
+        donut_idoso_data = []
+        for f in donut_idoso_base:
+            donut_idoso_data.append(get_val(idoso_by_month, f"{f}_masc") + get_val(idoso_by_month, f"{f}_fem"))
         donut_colors = ["#3b82f6", "#f59e0b", "#ef4444", "#10b981", "#8b5cf6"]
         donut_idoso_items = [{"label": l, "value": v, "color": c} for l, v, c in zip(donut_idoso_labels, donut_idoso_data, donut_colors) if v > 0]
 
-        # Donut 2: PCD slices
-        donut_pcd_fields = [f"def_{f}" for f in donut_idoso_fields]
-        donut_pcd_data = [get_val(pcd_by_month, f) for f in donut_pcd_fields]
+        # Donut 2: PCD slices (soma masc+fem)
+        donut_pcd_fields_flat = [f"def_{f}_total" for f in donut_idoso_base]
+        donut_pcd_data = []
+        for f in donut_pcd_fields_flat:
+            donut_pcd_data.append(get_val(pcd_by_month, f"{f}_masc") + get_val(pcd_by_month, f"{f}_fem"))
         donut_pcd_items = [{"label": l, "value": v, "color": c} for l, v, c in zip(donut_idoso_labels, donut_pcd_data, donut_colors) if v > 0]
 
-        # Bar 1: Idoso bars
+        # Bar 1: Idoso bars (soma masc+fem)
+        def idoso_bar_val(field):
+            return get_val(idoso_by_month, f"{field}_masc") + get_val(idoso_by_month, f"{field}_fem")
+
         bar_idoso_items = [
-            {"label": "Violencia Fis/Psic", "value": get_val(idoso_by_month, "violencia_fisica_total")},
-            {"label": "Negligencia/Abandono", "value": get_val(idoso_by_month, "negligencia_total")},
-            {"label": "Exploracao Financeira", "value": get_val(idoso_by_month, "exploracao_financeira_total")},
-            {"label": "Abuso/Expl. Sexual", "value": get_val(idoso_by_month, "abuso_sexual_total") + get_val(idoso_by_month, "exploracao_sexual_total")},
+            {"label": "Violencia Fis/Psic", "value": idoso_bar_val("violencia_fisica_total")},
+            {"label": "Negligencia/Abandono", "value": idoso_bar_val("negligencia_total")},
+            {"label": "Exploracao Financeira", "value": idoso_bar_val("exploracao_financeira_total")},
+            {"label": "Abuso/Expl. Sexual", "value": idoso_bar_val("abuso_sexual_total") + idoso_bar_val("exploracao_sexual_total")},
         ]
 
-        # Bar 2: PCD bars
+        # Bar 2: PCD bars (soma masc+fem)
+        def pcd_bar_val(field):
+            return get_val(pcd_by_month, f"{field}_masc") + get_val(pcd_by_month, f"{field}_fem")
+
         bar_pcd_items = [
-            {"label": "Violencia Fis/Psic", "value": get_val(pcd_by_month, "def_violencia_fisica_total")},
-            {"label": "Negligencia/Abandono", "value": get_val(pcd_by_month, "def_negligencia_total")},
-            {"label": "Exploracao Financeira", "value": get_val(pcd_by_month, "def_exploracao_financeira_total")},
-            {"label": "Abuso/Expl. Sexual", "value": get_val(pcd_by_month, "def_abuso_sexual_total") + get_val(pcd_by_month, "def_exploracao_sexual_total")},
+            {"label": "Violencia Fis/Psic", "value": pcd_bar_val("def_violencia_fisica_total")},
+            {"label": "Negligencia/Abandono", "value": pcd_bar_val("def_negligencia_total")},
+            {"label": "Exploracao Financeira", "value": pcd_bar_val("def_exploracao_financeira_total")},
+            {"label": "Abuso/Expl. Sexual", "value": pcd_bar_val("def_abuso_sexual_total") + pcd_bar_val("def_exploracao_sexual_total")},
         ]
 
         ctx.update({
@@ -240,7 +250,7 @@ class CreasIdosoFormView(CreasBaseMixin, FormView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         form = ctx["form"]
-        items = [{"title": t, "fields": [form[f] for f in fs]} for t, fs in self.form_class.section_map]
+        items = [{"title": t, "fields": [form[f] for f in fs]} for t, fs in form.section_map]
         existing_report = self._get_existing_report()
         ctx.update({"directorate": self.get_directorate(), "section_items": items,
                      "subcategory": "idoso", "selected_year": self.get_year(), "selected_month": self.get_month_number(),
@@ -301,7 +311,7 @@ class CreasPcdFormView(CreasBaseMixin, FormView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         form = ctx["form"]
-        items = [{"title": t, "fields": [form[f] for f in fs]} for t, fs in self.form_class.section_map]
+        items = [{"title": t, "fields": [form[f] for f in fs]} for t, fs in form.section_map]
         existing_report = self._get_existing_report()
         ctx.update({"directorate": self.get_directorate(), "section_items": items,
                      "subcategory": "pcd", "selected_year": self.get_year(), "selected_month": self.get_month_number(),
@@ -339,8 +349,23 @@ class CreasPcdFormView(CreasBaseMixin, FormView):
         return redirect(reverse("creasidoso:home", kwargs={"pk": d.pk}) + f"?year={year_val}")
 
 
-class CreasIdosoDataView(CreasBaseMixin, TemplateView):
+class CreasIdosoDataView(ExcelExportMixin, CreasBaseMixin, TemplateView):
     template_name = "creasidoso/data.html"
+    export_filename = "creas_idoso_dados.xlsx"
+
+    def export_excel(self):
+        ctx = self.get_context_data()
+        sheets = []
+        for group in ctx["table_groups"]:
+            sheets.append({
+                "title": group["title"],
+                "headers": [l for _, l in MONTH_LABELS],
+                "rows": [
+                    [row["label"]] + [v["val"] for v in row["values"]]
+                    for row in group["rows"]
+                ],
+            })
+        return build_workbook(sheets, self.export_filename)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -348,9 +373,41 @@ class CreasIdosoDataView(CreasBaseMixin, TemplateView):
         year = self.get_year()
         reports = CreasIdosoReport.objects.filter(directorate=d, year=year).order_by("month")
         by_month = {r.month: r for r in reports}
+
+        # Build section_map and labels (matches CreasIdosoForm.__init__)
+        idoso_section_map = [
+            (
+                "Famílias em acompanhamento no PAEFI",
+                ["paefi_acomp_inicio", "paefi_inseridos", "paefi_desligados",
+                 "paefi_total_acompanhamento", "paefi_bolsa_familia", "paefi_bpc", "paefi_substancias"],
+            )
+        ]
+        for pref, label in IDOSO_VIOLATION_PREFIXES:
+            fields = []
+            for suf, _suf_label in IDOSO_SUFFIXES:
+                fields.append(f"{pref}_{suf}_masc")
+                fields.append(f"{pref}_{suf}_fem")
+            fields.append(f"{pref}_total_geral")
+            idoso_section_map.append((label, fields))
+
+        idoso_labels = {
+            "paefi_acomp_inicio": "Famílias em Acomp. 1º Dia Mês",
+            "paefi_inseridos": "Famílias inseridas",
+            "paefi_desligados": "Famílias desligadas",
+            "paefi_total_acompanhamento": "Total de famílias em acompanhamento",
+            "paefi_bolsa_familia": "Famílias benef. Bolsa Família",
+            "paefi_bpc": "Famílias com BPC",
+            "paefi_substancias": "Famílias com dep. Substâncias psicoativas",
+        }
+        for pref, label in IDOSO_VIOLATION_PREFIXES:
+            for suf, suf_label in IDOSO_SUFFIXES:
+                idoso_labels[f"{pref}_{suf}_masc"] = f"{suf_label} — Masculino"
+                idoso_labels[f"{pref}_{suf}_fem"] = f"{suf_label} — Feminino"
+            idoso_labels[f"{pref}_total_geral"] = "Total Geral"
+
         groups = []
-        for title, fields in CreasIdosoForm.section_map:
-            rows = [{"label": CreasIdosoForm.labels.get(f, f),
+        for title, fields in idoso_section_map:
+            rows = [{"label": idoso_labels.get(f, f),
                      "key": f,
                      "values": [{"val": getattr(by_month.get(m, None), f, "") if by_month.get(m) else "",
                                  "sub_id": by_month.get(m).id if by_month.get(m) else None,
@@ -365,8 +422,23 @@ class CreasIdosoDataView(CreasBaseMixin, TemplateView):
         return ctx
 
 
-class CreasPcdDataView(CreasBaseMixin, TemplateView):
+class CreasPcdDataView(ExcelExportMixin, CreasBaseMixin, TemplateView):
     template_name = "creasidoso/data.html"
+    export_filename = "creas_pcd_dados.xlsx"
+
+    def export_excel(self):
+        ctx = self.get_context_data()
+        sheets = []
+        for group in ctx["table_groups"]:
+            sheets.append({
+                "title": group["title"],
+                "headers": [l for _, l in MONTH_LABELS],
+                "rows": [
+                    [row["label"]] + [v["val"] for v in row["values"]]
+                    for row in group["rows"]
+                ],
+            })
+        return build_workbook(sheets, self.export_filename)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -375,8 +447,22 @@ class CreasPcdDataView(CreasBaseMixin, TemplateView):
         reports = CreasPcdReport.objects.filter(directorate=d, year=year).order_by("month")
         by_month = {r.month: r for r in reports}
         groups = []
-        for title, fields in CreasPcdForm.section_map:
-            rows = [{"label": CreasPcdForm.labels.get(f, f),
+        # Build section_map and labels from constants (matches what CreasPcdForm builds in __init__)
+        pcd_section_map = []
+        pcd_labels = {}
+        for pref, label in PCD_VIOLATION_PREFIXES:
+            fields = []
+            for suf, suf_label in PCD_SUFFIXES:
+                fields.append(f"def_{pref}_{suf}_masc")
+                fields.append(f"def_{pref}_{suf}_fem")
+            pcd_section_map.append((f"{label} (Pessoa com Deficiência)", fields))
+        for pref, label in PCD_VIOLATION_PREFIXES:
+            for suf, suf_label in PCD_SUFFIXES:
+                pcd_labels[f"def_{pref}_{suf}_masc"] = f"{suf_label} (Masculino)"
+                pcd_labels[f"def_{pref}_{suf}_fem"] = f"{suf_label} (Feminino)"
+
+        for title, fields in pcd_section_map:
+            rows = [{"label": pcd_labels.get(f, f),
                      "key": f,
                      "values": [{"val": getattr(by_month.get(m, None), f, "") if by_month.get(m) else "",
                                  "sub_id": by_month.get(m).id if by_month.get(m) else None,
