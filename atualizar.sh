@@ -79,7 +79,7 @@ BACKUP_COUNT=$(ls -1 "$BACKUP_DIR"/*.dump 2>/dev/null | wc -l)
 if [ "$BACKUP_COUNT" -gt 10 ]; then
     echo ""
     echo "[*] Removendo backups antigos (mantendo os 10 mais recentes)..."
-    ls -1t "$BACKUP_DIR"/*.dump | tail -n +11 | xargs rm -f
+    ls -1t "$BACKUP_DIR"/*.dump | tail -n +11 | while read f; do rm -f "$f"; done
 fi
 
 echo ""

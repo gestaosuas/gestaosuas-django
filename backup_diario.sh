@@ -34,7 +34,7 @@ DB_USER="${DB_USER:-postgres}"
     # Retenção local: mantém só os $KEEP mais recentes
     BACKUP_COUNT=$(ls -1 "$BACKUP_DIR"/*.dump 2>/dev/null | wc -l)
     if [ "$BACKUP_COUNT" -gt "$KEEP" ]; then
-        ls -1t "$BACKUP_DIR"/*.dump | tail -n +$((KEEP + 1)) | xargs rm -f
+        ls -1t "$BACKUP_DIR"/*.dump | tail -n +$((KEEP + 1)) | while read f; do rm -f "$f"; done
         echo "Retenção local: mantidos os $KEEP mais recentes."
     fi
 
@@ -45,7 +45,7 @@ DB_USER="${DB_USER:-postgres}"
         echo "Google Drive: $GDRIVE_DIR/$DUMP_FILE"
         GDRIVE_COUNT=$(ls -1 "$GDRIVE_DIR"/*.dump 2>/dev/null | wc -l)
         if [ "$GDRIVE_COUNT" -gt "$KEEP" ]; then
-            ls -1t "$GDRIVE_DIR"/*.dump | tail -n +$((KEEP + 1)) | xargs rm -f
+            ls -1t "$GDRIVE_DIR"/*.dump | tail -n +$((KEEP + 1)) | while read f; do rm -f "$f"; done
             echo "Retenção no Drive: mantidos os $KEEP mais recentes."
         fi
     else
