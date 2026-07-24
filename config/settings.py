@@ -32,7 +32,13 @@ load_local_env(LOCAL_ENV_FILE)
 
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost,192.168.137.143").split(",")
+if DEBUG:
+    # Dev roda em redes diferentes (casa, trabalho, etc.) com IP local
+    # trocando a cada rede — travar em hosts fixos aqui só gera 400 a cada
+    # troca de rede. Sem risco: nunca vale para produção (DEBUG=0 na VPS).
+    ALLOWED_HOSTS = ["*"]
+else:
+    ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
 
 INSTALLED_APPS = [
     "django.contrib.admin",

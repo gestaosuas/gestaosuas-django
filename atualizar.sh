@@ -6,7 +6,11 @@
 # configurado em GDRIVE_DIR no .env deste projeto (não versionado — o caminho
 # de montagem/conta é específico da VPS e não deve viver no código público).
 # ============================================================
-set -e
+set -eo pipefail
+# pipefail é necessário porque o passo 4 (ALTER TABLEs pendentes) roda o psql
+# dentro de um pipe (`| grep -c ...`) — sem pipefail, `set -e` só olha o exit
+# code do grep, e uma falha real do psql (ON_ERROR_STOP=1) passaria batida,
+# deixando o script seguir para o rebuild com o schema aplicado pela metade.
 
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 # $HOME (/DATA) pertence ao root nesta VPS (CasaOS) — usuário klismanrds não
@@ -38,7 +42,7 @@ echo "============================================"
 echo ""
 
 # ── 1. Backup do banco ─────────────────────────────────────
-echo "[1/4] Fazendo backup do banco de dados..."
+echo "[1/5] Fazendo backup do banco de dados..."
 mkdir -p "$BACKUP_DIR"
 docker exec gestaosuas_db pg_dump -U "$DB_USER" -Fc "$DB_NAME" > "$BACKUP_DIR/$DUMP_FILE"
 echo "      Salvo em: $BACKUP_DIR/$DUMP_FILE ($(du -sh "$BACKUP_DIR/$DUMP_FILE" | cut -f1))"
@@ -47,7 +51,7 @@ echo "      Salvo em: $BACKUP_DIR/$DUMP_FILE ($(du -sh "$BACKUP_DIR/$DUMP_FILE" 
 # Best-effort: sem GDRIVE_DIR configurado no .env, ou falha ao copiar
 # (mount ausente, sem espaço etc.), nunca deve derrubar o deploy — o
 # backup local (passo 1) já está garantido.
-echo "[2/4] Copiando backup para o Google Drive..."
+echo "[2/5] Copiando backup para o Google Drive..."
 if [ -z "${GDRIVE_DIR:-}" ]; then
     echo "      Pulado: GDRIVE_DIR não definido no .env deste projeto."
 elif mkdir -p "$GDRIVE_DIR" 2>/dev/null && cp "$BACKUP_DIR/$DUMP_FILE" "$GDRIVE_DIR/$DUMP_FILE" 2>/dev/null; then
@@ -63,14 +67,24 @@ else
 fi
 
 # ── 3. Pull do GitHub ──────────────────────────────────────
-echo "[3/4] Baixando atualizações do GitHub..."
+echo "[3/5] Baixando atualizações do GitHub..."
 cd "$APP_DIR"
 git fetch origin
 git reset --hard origin/master
 echo "      Código atualizado para $(git log -1 --format='%h %s')"
 
-# ── 4. Rebuild dos containers ──────────────────────────────
-echo "[4/4] Reconstruindo e reiniciando containers..."
+# ── 4. Aplicar ALTER TABLEs pendentes ──────────────────────
+echo "[4/5] Aplicando alterações de schema pendentes..."
+ALTERS_FILE="$APP_DIR/scripts/pending_alters.sql"
+if [ -f "$ALTERS_FILE" ]; then
+    ALTER_COUNT=$(docker exec -i gestaosuas_db psql -U "${DB_USER:-postgres}" -d "${DB_NAME:-postgres}" -v ON_ERROR_STOP=1 < "$ALTERS_FILE" 2>&1 | grep -c "ALTER TABLE")
+    echo "      $ALTER_COUNT coluna(s) verificada(s)."
+else
+    echo "      Nenhum $ALTERS_FILE encontrado — pulado."
+fi
+
+# ── 5. Rebuild dos containers ──────────────────────────────
+echo "[5/5] Reconstruindo e reiniciando containers..."
 docker compose -f docker-compose.yml up -d --build
 echo "      Containers reiniciados."
 

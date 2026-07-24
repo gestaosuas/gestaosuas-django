@@ -85,10 +85,10 @@
 
 | Model | Campo | Model (nullable) | Banco (nullable) |
 |-------|-------|-----------------|-----------------|
-| `CreaIdosoReport` | `created_at` | `null=True` | `NOT NULL` |
-| `CreaspcdReport` | `created_at` | `null=True` | `NOT NULL` |
-| `CreaIdosoReport` | `updated_at` | `null=True` | `NOT NULL` |
-| `CreaspcdReport` | `updated_at` | `null=True` | `NOT NULL` |
+| `CreasIdosoReport` | `created_at` | `null=True` | `NOT NULL` |
+| `CreasPcdReport` | `created_at` | `null=True` | `NOT NULL` |
+| `CreasIdosoReport` | `updated_at` | `null=True` | `NOT NULL` |
+| `CreasPcdReport` | `updated_at` | `null=True` | `NOT NULL` |
 | `CrasReport` | `directorate` | `null=True, blank=True` | O banco permite NULL (coluna nullable), mas o unique_together do banco não inclui directorate |
 | `BeneficiosReport` | `directorate` | `null=True, blank=True` | O banco tem `directorate_id` NOT NULL (após correção do Passo 9) |
 | `NaicaReport` | `created_by` | `TextField` (NOT NULL implícito) | `text NOT NULL` ✔ |
@@ -202,3 +202,4 @@ Diretorias como "Subvenção", "Emendas e Fundos" usam `form_definition` para cr
 | 2026-07-21 | Tema rosa para "Outros" | Novo `body.theme-rose` + `.header-rose` no CSS |
 | 2026-07-21 | Tabelas de dados compactadas | `.table-monitoring` reduzido: padding 20→10px, fonte 10→9px(header)/14→13px(células), espaçamento 16→6px |
 | 2026-07-21 | Células vazias mostram "0" | 9 templates de "Ver Dados" alterados: branco → `0` |
+| 2026-07-24 | Corrigido typo `CreaIdosoReport`/`CreaspcdReport` → `CreasIdosoReport`/`CreasPcdReport` na seção 2.4 | Nomes de model errados, achado durante verificação geral de alinhamento entre `.md`s |

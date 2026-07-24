@@ -189,7 +189,7 @@ ascii_name = strip_accents(directorate.name.lower())
 is_subvencao = "subvencao" in ascii_name or "emendas" in ascii_name or "fundos" in ascii_name
 ```
 
-Se o nome contém "subvencao" → tema verde. Se contém "emendas" → tema âmbar. Se contém "fundos" → tema indigo. Se contém "outros" → tema azul. Caso contrário → verde (default).
+Se o nome contém "subvencao" → tema verde (emerald). Se contém "emendas" → tema âmbar. Se contém "fundos" → tema indigo. Se contém "outros" → tema **rosa** (rose). Caso contrário → verde (default).
 
 **Inferência**: Esses são os 4 tipos de diretoria que usam `GenericMonitoringReport`. Cada uma pode ter `form_definition` diferente para definir campos customizados.
 
@@ -401,3 +401,4 @@ E a visita é válida e funcional
 | 2026-07-21 | Permissões A.6 confirmadas | Agente edita só as próprias visitas, diretor só visualiza, admin acesso total |
 | 2026-07-21 | C.1 STATUS_CHOICES divergente identificado | Model usa [draft, scheduled, completed]; fluxo real usa [draft, finalized] |
 | 2026-07-21 | Resposta Q11 confirmada | form_definition gerenciado por devs, não editável em runtime pelo usuário |
+| 2026-07-24 | B.1 corrigido: "outros" → rosa (não azul) | Texto desatualizado — código (`apps/monitoramento/views.py`) já usava tema rosa desde o commit 17ca164 ("rose theme for Outros"), doc não tinha sido atualizado. Achado durante verificação geral de alinhamento entre `.md`s |

@@ -51,6 +51,10 @@ Outro projeto (`gq-app`) já ocupa a porta 8000 — nunca use 8000 para este pro
 
 Além disso, como o compose faz merge por concatenação de listas, o serviço `app` do dev herda a porta `8080:8000` do compose base (mapeada para o serviço de produção) **e** adiciona `8001:8000` — ou seja, o container `gestaosuas_app_dev` também ocupa a porta 8080 localmente. Não é um problema em uso normal (só um container de app roda por vez localmente), mas explica confusão se algum dia tentar subir o compose de produção (`docker-compose.yml` sozinho) em paralelo ao dev na mesma máquina — vai dar conflito de porta 8080.
 
+**Ambiente dev funciona em qualquer rede (2026-07-24)**: o usuário troca de rede com frequência (casa, trabalho, etc.), e o IP local muda a cada uma. `config/settings.py` força `ALLOWED_HOSTS = ["*"]` sempre que `DEBUG=1`, então isso nunca mais precisa ser configurado por rede — acesse por `http://localhost:8001/` (mais simples, nunca muda) ou pelo IP LAN atual da máquina (`ipconfig`/`Get-NetIPAddress`, muda por rede) se for acessar de outro aparelho. `docker-compose.dev.yml` já setava isso explicitamente (`DJANGO_ALLOWED_HOSTS=*`); agora `settings.py` garante o mesmo mesmo fora do Docker (`.env` local).
+
+**Gotcha Windows/Docker Desktop**: nunca use `taskkill` bruto num PID só porque ele aparece "escutando" numa porta do projeto (`netstat -ano`) sem antes confirmar de quem é o processo (`Get-Process -Id <pid>` ou `Get-CimInstance Win32_Process`). Um PID em `0.0.0.0:<porta>` pode ser o proxy de encaminhamento do próprio Docker Desktop para um container publicado nessa porta, não um processo solto — matá-lo à força pode derrubar o backend do Docker inteiro (`com.docker.service`), exigindo reiniciar o Docker Desktop (ou o PC) pra recuperar. Aconteceu nesta sessão.
+
 ### VPS Produção
 
 - IP Tailscale: `100.76.30.36` (NAS CasaOS, não é uma VPS tradicional — `$HOME` do usuário SSH é `/DATA`, pertence a `root`, sem escrita direta)
@@ -83,6 +87,8 @@ Além disso, como o compose faz merge por concatenação de listas, o serviço `
 | VPS | db (serviço Docker) | 5432 | postgres | postgres | (via env) |
 
 **CRÍTICO — `managed = False`**: Todos os models de negócio têm `managed=False`. O Django não cria nem altera tabelas via migrations. Migrations só existem para tabelas internas do Django (sessions, admin, auth). Nunca rodar `makemigrations` em apps de negócio sem entender essa constraint.
+
+**CRÍTICO — ALTER TABLEs no deploy**: Como `managed=False`, `migrate` não aplica mudanças de schema nas tabelas de negócio. Toda vez que uma `ALTER TABLE` for feita em dev, o SQL deve ser adicionado a `scripts/pending_alters.sql` (idempotente, sempre usa `ADD COLUMN IF NOT EXISTS`). O `atualizar.sh` executa esse arquivo automaticamente após o `git pull` (passo 3.5). **Nunca faça deploy sem atualizar esse arquivo** — senão a VPS quebra com erro 500 de coluna inexistente.
 
 ---
 
@@ -428,7 +434,7 @@ Os arquivos em `docs/dominio/` (`00-modelo-de-dados.md`, `01` a `04`) são a fon
 |---|---|---|
 | `DJANGO_SECRET_KEY` | Sim | Chave secreta Django |
 | `DJANGO_DEBUG` | Sim | `1` = dev com runserver, `0` = prod com gunicorn |
-| `DJANGO_ALLOWED_HOSTS` | Sim | Lista separada por vírgula |
+| `DJANGO_ALLOWED_HOSTS` | Sim | Lista separada por vírgula. **Ignorada em dev** (`DJANGO_DEBUG=1`) — `config/settings.py` força `ALLOWED_HOSTS = ["*"]` nesse caso, então o dev funciona em qualquer rede (casa, trabalho, etc.) sem precisar atualizar essa variável a cada troca de IP. Só é lida/obrigatória de fato quando `DEBUG=0` (produção) |
 | `DB_ENGINE` | Sim | Sempre `django.db.backends.postgresql` |
 | `DB_NAME` | Sim | Nome do banco (padrão: `postgres`) |
 | `DB_USER` | Sim | Usuário do banco |

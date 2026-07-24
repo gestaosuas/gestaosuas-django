@@ -13,10 +13,12 @@ The application follows a "Viewport-Locked" layout to avoid unnecessary scrollba
 
 ### 1.2 Monitoring Header (`.monitoring-header-container`)
 The header provides the module's identity and primary filters.
-- **Gradients**:
-  - **Emerald (CRAS)**: `linear-gradient(135deg, #064e3b, #10b981)`
-  - **Indigo (Benefícios)**: `linear-gradient(135deg, #1e1b4b, #4338ca)`
-  - **Amber (SINE/CP)**: `linear-gradient(135deg, #78350f, #d97706)`
+- **Gradients** (modifier class on `.monitoring-header-container`; verified against `static/css/app.css` and `apps/monitoramento/views.py` theme detection, 2026-07-24):
+  - **Default / no modifier (Benefícios)**: `linear-gradient(135deg, #1e3a8a, #3b82f6)` — base color of `.monitoring-header-container` itself
+  - **`.header-emerald` (CRAS; Monitoramento → "Subvenção" and fallback)**: `linear-gradient(135deg, #064e3b, #10b981)`
+  - **`.header-indigo` (SINE/CP; Monitoramento → "Fundos")**: `linear-gradient(135deg, #1e1b4b, #4338ca)`
+  - **`.header-amber` (Monitoramento → "Emendas")**: `linear-gradient(135deg, #78350f, #d97706)`
+  - **`.header-rose` (Monitoramento → "Outros", added 2026-07-23)**: `linear-gradient(135deg, #831843, #db2777)`
 - **Padding**: `24px 2% 80px`.
 - **Align Items**: `center` (Title and Actions on the same line).
 
@@ -57,4 +59,4 @@ Refer to `static/css/app.css` for these core definitions:
 - `.dashboard-split-layout` (Side-by-side metrics/charts).
 
 ---
-*Last updated: May 13, 2026 - Migration to Premium Emerald Design.*
+*Last updated: 2026-07-24 - Corrected gradient/module mapping in §1.2 (previous mapping predated the amber/indigo/rose theme additions and no longer matched the code).*
