@@ -25,7 +25,10 @@ RUN chmod +x /app/entrypoint.sh
 
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 RUN chown -R appuser:appgroup /app
-USER appuser
+# Sem USER aqui de proposito: o entrypoint precisa rodar como root por um
+# instante pra corrigir a dono de volumes montados em runtime (ex.: media_volume,
+# que pode ja existir com dono != appuser de antes desse setup) antes de trocar
+# pra appuser e subir o servidor de fato. Ver entrypoint.sh.
 
 EXPOSE 8000
 
