@@ -265,6 +265,13 @@ class NaicaCreateUpdateView(NaicaBaseMixin, FormView):
                 + f"?year={year_val}&month={month_val}"
             )
 
+        if not self.require_unit_access(unit_name):
+            messages.error(self.request, "Você não tem acesso a esta unidade.")
+            return redirect(
+                reverse("naica:form", kwargs={"pk": directorate.pk})
+                + f"?year={year_val}&month={month_val}"
+            )
+
         report, _ = NaicaReport.objects.get_or_create(
             directorate=directorate,
             month=month_val,

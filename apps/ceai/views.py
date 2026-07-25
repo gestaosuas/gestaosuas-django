@@ -182,6 +182,9 @@ class CeaiUpdateDataView(CeaiBaseMixin, RoleRequiredMixin, View):
 
     def get(self, request, unit):
         directorate = get_object_or_404(Directorate, name__icontains="CEAI")
+        if not self.require_unit_access(unit):
+            messages.error(request, "Você não tem acesso a esta unidade.")
+            return redirect("ceai:dashboard")
         now = timezone.now()
         month = int(request.GET.get("month", now.month))
         year = int(request.GET.get("year", now.year))
@@ -230,6 +233,9 @@ class CeaiUpdateDataView(CeaiBaseMixin, RoleRequiredMixin, View):
 
     def post(self, request, unit):
         directorate = get_object_or_404(Directorate, name__icontains="CEAI")
+        if not self.require_unit_access(unit):
+            messages.error(request, "Você não tem acesso a esta unidade.")
+            return redirect("ceai:dashboard")
         month = int(request.POST.get("month"))
         year = int(request.POST.get("year"))
 

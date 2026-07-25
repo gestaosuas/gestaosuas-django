@@ -117,6 +117,12 @@ class DirectorateAccessMixin(LoginRequiredMixin):
             return list(all_units)
         return [u for u in all_units if u in allowed]
 
+    def require_unit_access(self, unit_name):
+        """True se o usuario pode enviar/ver dados desta unidade/sub-area.
+        None em get_allowed_units() = acesso total (admin/diretor/sem restricao)."""
+        allowed = self.get_allowed_units()
+        return allowed is None or unit_name in allowed
+
     # --- Controle de acesso ---
 
     def dispatch(self, request, *args, **kwargs):

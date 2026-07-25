@@ -1,0 +1,33 @@
+{% load custom_filters %}
+<div class="directorate-item">
+    <label class="checkbox-group">
+        <input type="checkbox" name="directorates" value="{{ dir.pk }}"
+               class="dir-checkbox" data-dir-id="{{ dir.pk }}"
+               {% if dir.pk in current_links %}checked{% endif %}>
+        <span class="checkbox-label">{{ dir.name }}</span>
+    </label>
+
+    {% with dir_pk=dir.pk|stringformat:"s" %}
+    {% with options=unit_options_map|get_item:dir_pk %}
+    {% if options %}
+    <div id="units-field-{{ dir.pk }}" class="units-field {% if dir.pk not in current_links %}hidden{% endif %}" data-has-units="1">
+        <div class="unit-picker">
+            <div class="units-checkbox-grid">
+                {% with link=current_links|get_item:dir.pk %}
+                {% for unit in options %}
+                <label class="unit-checkbox-item">
+                    <input type="checkbox" name="units_{{ dir.pk }}" value="{{ unit }}"
+                           {% if link and unit in link %}checked{% endif %}>
+                    <span>{{ unit }}</span>
+                </label>
+                {% endfor %}
+                {% endwith %}
+            </div>
+            <small>Selecione as unidades que o usuário poderá acessar.</small>
+        </div>
+        <p class="diretor-full-access-note hidden">Diretor: acesso a todas as unidades desta diretoria.</p>
+    </div>
+    {% endif %}
+    {% endwith %}
+    {% endwith %}
+</div>

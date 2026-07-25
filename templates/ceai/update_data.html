@@ -110,7 +110,7 @@
         </div>
     </div>
 
-    <form method="post" class="report-form-container">
+    <form method="post" class="report-form-container" onsubmit="return confirm('Confirma o envio dos dados deste mês? Depois de enviado, só um administrador pode reabrir para edição.')">
         {% csrf_token %}
         <input type="hidden" name="month" value="{{ month }}">
         <input type="hidden" name="year" value="{{ year }}">

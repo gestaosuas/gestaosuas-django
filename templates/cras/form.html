@@ -125,7 +125,7 @@
                 });
             </script>
             {% else %}
-            <form method="post" class="report-form-shell" enctype="multipart/form-data">
+            <form method="post" class="report-form-shell" enctype="multipart/form-data" onsubmit="return confirm('Confirma o envio dos dados deste mês? Depois de enviado, só um administrador pode reabrir para edição.')">
                 {% csrf_token %}
                 {% if form.non_field_errors %}<div class="error-text" style="background: #fef2f2; color: #ef4444; padding: 12px; border-radius: 12px; margin-bottom: 20px; font-weight: 700;">{{ form.non_field_errors }}</div>{% endif %}
                 <input type="hidden" name="unit_name" value="{{ selected_unit }}">

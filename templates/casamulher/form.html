@@ -84,7 +84,7 @@
         });
     </script>
     {% else %}
-    <form method="post" class="report-form-shell" style="margin-top:24px">{% csrf_token %}
+    <form method="post" class="report-form-shell" style="margin-top:24px" onsubmit="return confirm('Confirma o envio dos dados deste mês? Depois de enviado, só um administrador pode reabrir para edição.')">{% csrf_token %}
         {% if form.non_field_errors %}<div class="error-text">{{ form.non_field_errors }}</div>{% endif %}
         <div class="report-period-grid">
             <div class="field-group"><label for="{{ form.month.id_for_label }}">{{ form.month.label }}</label>{{ form.month }}</div>

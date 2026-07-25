@@ -87,23 +87,51 @@ class UserPermissionsView(AdminRequiredMixin, UpdateView):
     def get_success_url(self):
         return reverse_lazy('accounts:user_list')
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        directorates = Directorate.objects.all().order_by('name')
-        context['all_directorates'] = directorates
-        
-        # Unit options for each directorate type
+    def get_unit_options_map(self, directorates):
+        """Unidades/sub-áreas marcáveis por diretoria, quando existir o conceito.
+        Ausência de entrada aqui = diretoria é só liga/desliga (sem unidade) —
+        ver docs/dominio/03 e CLAUDE.md sobre managed=False/schema por diretoria."""
+        from apps.core.utils import strip_accents
+
         unit_options = {}
         for d in directorates:
-            name = d.name.lower()
+            name = strip_accents(d.name.lower())
             if 'cras' in name:
                 from apps.cras.views import CRAS_UNITS
                 unit_options[str(d.pk)] = CRAS_UNITS
+            elif 'naica' in name:
+                from apps.naica.views import NAICA_UNITS
+                unit_options[str(d.pk)] = NAICA_UNITS
+            elif 'ceai' in name:
+                from apps.ceai.constants import CEAI_UNITS
+                unit_options[str(d.pk)] = CEAI_UNITS
+            elif 'protecao especial' in name:
+                unit_options[str(d.pk)] = ["Creas Protetivo", "Creas Socioeducativo"]
             elif 'sine' in name or 'qual' in name or 'profissional' in name:
                 unit_options[str(d.pk)] = ["Centro Profissionalizante", "SINE"]
-        
-        context['unit_options_map'] = unit_options
-        
+        return unit_options
+
+    def get_context_data(self, **kwargs):
+        from apps.core.utils import strip_accents
+
+        context = super().get_context_data(**kwargs)
+        directorates = Directorate.objects.all().order_by('name')
+        context['all_directorates'] = directorates
+        context['unit_options_map'] = self.get_unit_options_map(directorates)
+
+        # Agrupa Subvenção/Emendas e Fundos/Outros num único card visual "Monitoramento"
+        # (pedido do usuário) — continuam sendo 3 vínculos independentes.
+        monitoramento_directorates = []
+        other_directorates = []
+        for d in directorates:
+            name = strip_accents(d.name.strip().lower())
+            if name in ('outros',) or 'subvencao' in name or 'emendas' in name or 'fundos' in name:
+                monitoramento_directorates.append(d)
+            else:
+                other_directorates.append(d)
+        context['monitoramento_directorates'] = monitoramento_directorates
+        context['other_directorates'] = other_directorates
+
         # Get current links and their allowed_units
         current_links = {
             link['directorate_id']: link['allowed_units'] 
@@ -143,28 +171,36 @@ class UserPermissionsView(AdminRequiredMixin, UpdateView):
 
             # Handle profile_directorates (additional access)
             selected_directorates = request.POST.getlist('directorates')
-            
-            # We are using managed=False, but Django can still do basic CRUD 
-            # if the table structure matches. 
-            # However, for profile_directorates, it's safer to use manual logic 
+            unit_options_map = self.get_unit_options_map(
+                Directorate.objects.filter(pk__in=selected_directorates)
+            )
+
+            # We are using managed=False, but Django can still do basic CRUD
+            # if the table structure matches.
+            # However, for profile_directorates, it's safer to use manual logic
             # if we want to update allowed_units per directorate.
-            
+
             # 1. Clear existing links (or update them)
             ProfileDirectorate.objects.filter(profile=profile).delete()
-            
+
             # 2. Add new links
             for dir_id in selected_directorates:
-                units_data = request.POST.getlist(f'units_{dir_id}')
-                
-                # If it's a single item with a comma, it might be from the text input fallback
-                if len(units_data) == 1 and ',' in units_data[0]:
-                    allowed_units = [u.strip() for u in units_data[0].split(',') if u.strip()]
-                else:
-                    allowed_units = [u.strip() for u in units_data if u.strip()]
-                
-                if not allowed_units:
+                checked_units = [u.strip() for u in request.POST.getlist(f'units_{dir_id}') if u.strip()]
+
+                if dir_id not in unit_options_map:
+                    # Diretoria sem conceito de unidade (ex.: Benefícios, Casa da
+                    # Mulher): marcar a diretoria já dá acesso total, sem lista.
                     allowed_units = None
-                
+                elif profile.role == Profile.ROLE_DIRECTOR:
+                    # Diretor sempre enxerga/envia para todas as unidades da
+                    # diretoria, mesmo sem marcar nenhuma individualmente.
+                    allowed_units = None
+                else:
+                    # Agente: só as unidades marcadas. Lista vazia fica vazia de
+                    # propósito (== nenhum acesso ainda) — antes isso virava
+                    # None (acesso total) por engano.
+                    allowed_units = checked_units
+
                 ProfileDirectorate.objects.create(
                     profile=profile,
                     directorate_id=dir_id,

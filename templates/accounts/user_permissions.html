@@ -83,42 +83,21 @@
                         <p class="card-help">Selecione outras diretorias que este usuário pode acessar e monitore.</p>
 
                         <div class="directorate-list">
-                            {% for dir in all_directorates %}
-                            <div class="directorate-item">
-                                <label class="checkbox-group">
-                                    <input type="checkbox" name="directorates" value="{{ dir.pk }}" 
-                                           class="dir-checkbox" data-dir-id="{{ dir.pk }}"
-                                           {% if dir.pk in current_links %}checked{% endif %}>
-                                    <span class="checkbox-label">{{ dir.name }}</span>
-                                </label>
-                                
-                                <div id="units-field-{{ dir.pk }}" class="units-field {% if dir.pk not in current_links %}hidden{% endif %}">
-                                    {% with dir_pk=dir.pk|stringformat:"s" %}
-                                    {% with options=unit_options_map|get_item:dir_pk %}
-                                    {% if options %}
-                                        <div class="units-checkbox-grid">
-                                            {% with link=current_links|get_item:dir.pk %}
-                                            {% for unit in options %}
-                                            <label class="unit-checkbox-item">
-                                                <input type="checkbox" name="units_{{ dir.pk }}" value="{{ unit }}"
-                                                       {% if link and unit in link %}checked{% endif %}>
-                                                <span>{{ unit }}</span>
-                                            </label>
-                                            {% endfor %}
-                                            {% endwith %}
-                                        </div>
-                                        <small>Selecione as unidades que o usuário poderá acessar.</small>
-                                    {% else %}
-                                        <input type="text" name="units_{{ dir.pk }}" 
-                                               value="{% with link=current_links|get_item:dir.pk %}{% if link %}{{ link|join:', ' }}{% endif %}{% endwith %}"
-                                               placeholder="Ex: Unidade 1, Unidade 2"
-                                               class="form-control-sm">
-                                        <small>Separe por vírgula para restringir o acesso apenas a certas unidades.</small>
-                                    {% endif %}
-                                    {% endwith %}
-                                    {% endwith %}
+                            {% if monitoramento_directorates %}
+                            <div class="directorate-item monitoramento-group">
+                                <div class="monitoramento-group-header">
+                                    <i data-lucide="bar-chart-3"></i>
+                                    <span>Monitoramento</span>
+                                </div>
+                                <div class="monitoramento-group-body">
+                                    {% for dir in monitoramento_directorates %}
+                                        {% include "accounts/_directorate_permission_item.html" with dir=dir %}
+                                    {% endfor %}
                                 </div>
                             </div>
+                            {% endif %}
+                            {% for dir in other_directorates %}
+                                {% include "accounts/_directorate_permission_item.html" with dir=dir %}
                             {% endfor %}
                         </div>
                     </div>
@@ -309,15 +288,6 @@
         color: #64748b;
     }
 
-    .form-control-sm {
-        width: 100%;
-        height: 36px;
-        padding: 0 10px;
-        border-radius: 8px;
-        border: 1px solid #cbd5e1;
-        font-size: 13px;
-    }
-
     .units-field small {
         display: block;
         font-size: 11px;
@@ -363,6 +333,48 @@
         font-weight: 500;
     }
 
+    .diretor-full-access-note {
+        margin-top: 10px;
+        padding: 8px 12px;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #1d4ed8;
+    }
+
+    .monitoramento-group {
+        background: #fdf2f8;
+        border-color: #fbcfe8;
+    }
+
+    .monitoramento-group-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #be185d;
+        margin-bottom: 12px;
+    }
+
+    .monitoramento-group-header i {
+        width: 16px;
+        height: 16px;
+    }
+
+    .monitoramento-group-body {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .monitoramento-group-body .directorate-item {
+        background: #fff;
+        padding: 12px;
+    }
+
     .form-actions {
         margin-top: 40px;
         padding-top: 24px;
@@ -399,15 +411,32 @@
     // Handle role description visibility
     const roleSelect = document.getElementById('id_role');
     const roleDescs = document.querySelectorAll('.role-desc');
-    
+
     roleSelect.addEventListener('change', (e) => {
         const selectedRole = e.target.value;
         roleDescs.forEach(desc => desc.classList.add('hidden'));
-        
+
         const target = document.getElementById(`role-desc-${selectedRole}`);
         if (target) target.classList.remove('hidden');
         else if (selectedRole === 'user') document.getElementById('role-desc-agente').classList.remove('hidden');
+
+        applyRoleUnitVisibility();
     });
+
+    // Diretor sempre tem acesso a todas as unidades (o backend força isso mesmo
+    // que nada esteja marcado) — escondemos os checkboxes de unidade nesse caso
+    // e mostramos um aviso, pra não parecer que dá pra restringir o diretor.
+    function applyRoleUnitVisibility() {
+        const isDiretor = roleSelect.value === 'diretor';
+        document.querySelectorAll('.units-field[data-has-units="1"]').forEach((field) => {
+            const picker = field.querySelector('.unit-picker');
+            const note = field.querySelector('.diretor-full-access-note');
+            if (!picker || !note) return;
+            picker.classList.toggle('hidden', isDiretor);
+            note.classList.toggle('hidden', !isDiretor);
+        });
+    }
+    applyRoleUnitVisibility();
 
     // Handle units field visibility based on checkbox
     const dirCheckboxes = document.querySelectorAll('.dir-checkbox');
@@ -415,6 +444,7 @@
         checkbox.addEventListener('change', (e) => {
             const dirId = e.target.dataset.dirId;
             const unitsField = document.getElementById(`units-field-${dirId}`);
+            if (!unitsField) return; // diretoria sem conceito de unidade - nada a mostrar/esconder
             if (e.target.checked) {
                 unitsField.classList.remove('hidden');
             } else {

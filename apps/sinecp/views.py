@@ -43,6 +43,10 @@ CP_ATENDIMENTOS_FIELDS = [
 ]
 
 class SineCpBaseMixin(DirectorateAccessMixin):
+    # "SINE" ou "Centro Profissionalizante" — setado pelas views concretas que
+    # precisam do gate. Ver apps/accounts/views.py (get_unit_options_map).
+    required_unit = None
+
     def get_directorate(self):
         directorate = Directorate.objects.filter(name__icontains="sine").first()
         if not directorate:
@@ -56,6 +60,14 @@ class SineCpBaseMixin(DirectorateAccessMixin):
 
     def get_month(self):
         return self.request.GET.get("month") or "all"
+
+    def check_required_unit(self):
+        """Se a view define required_unit, bloqueia quem nao tem essa sub-area
+        (SINE ou Centro Profissionalizante) liberada."""
+        if self.required_unit and not self.require_unit_access(self.required_unit):
+            messages.error(self.request, "Você não tem acesso a esta área.")
+            return redirect(reverse("sinecp:home"))
+        return None
 
 
 class SineCpHomeView(TvTemplateMixin, SineCpBaseMixin, DetailView):
@@ -217,7 +229,16 @@ class SharedCreateUpdateView(SineCpBaseMixin, FormView):
         context["month_options"] = MONTH_OPTIONS
         return context
 
+    def get(self, request, *args, **kwargs):
+        blocked = self.check_required_unit()
+        if blocked:
+            return blocked
+        return super().get(request, *args, **kwargs)
+
     def post(self, request, *args, **kwargs):
+        blocked = self.check_required_unit()
+        if blocked:
+            return blocked
         if self.get_existing_report():
             messages.error(
                 request,
@@ -232,6 +253,7 @@ class SineCreateUpdateView(SharedCreateUpdateView):
     success_view_name = "sinecp:sine-data"
     report_title = "SINE"
     delete_month_view_name = "sinecp:sine-delete-month"
+    required_unit = "SINE"
 
     def form_valid(self, form):
         directorate = self.get_directorate()
@@ -254,6 +276,7 @@ class QualificacaoCreateUpdateView(SharedCreateUpdateView):
     success_view_name = "sinecp:qualificacao-data"
     report_title = "Qualificacao"
     delete_month_view_name = "sinecp:qualificacao-delete-month"
+    required_unit = "Centro Profissionalizante"
 
     def form_valid(self, form):
         directorate = self.get_directorate()
@@ -338,6 +361,13 @@ class SineDataView(ExcelExportMixin, SharedDataView):
     back_tab = "sine"
     form_view_name = "sinecp:sine-form"
     monthly_report_view_name = "sinecp:sine-monthly-report"
+    required_unit = "SINE"
+
+    def get(self, request, *args, **kwargs):
+        blocked = self.check_required_unit()
+        if blocked:
+            return blocked
+        return super().get(request, *args, **kwargs)
 
 class QualificacaoDataView(ExcelExportMixin, SharedDataView):
     model = QualificacaoReport
@@ -347,6 +377,13 @@ class QualificacaoDataView(ExcelExportMixin, SharedDataView):
     back_tab = "cp"
     form_view_name = "sinecp:qualificacao-form"
     monthly_report_view_name = "sinecp:qualificacao-monthly-report"
+    required_unit = "Centro Profissionalizante"
+
+    def get(self, request, *args, **kwargs):
+        blocked = self.check_required_unit()
+        if blocked:
+            return blocked
+        return super().get(request, *args, **kwargs)
 
 class SharedMonthlyNarrativeView(SineCpBaseMixin, TemplateView):
     template_name = "sinecp/shared/monthly_report.html"

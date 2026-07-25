@@ -250,6 +250,9 @@ class CrasCreateUpdateView(CrasBaseMixin, FormView):
         if not unit_name:
             messages.error(self.request, "Selecione uma unidade CRAS.")
             return redirect(reverse("cras:form", kwargs={"pk": directorate.pk}) + f"?year={year_val}&month={month_val}")
+        if not self.require_unit_access(unit_name):
+            messages.error(self.request, "Você não tem acesso a esta unidade.")
+            return redirect(reverse("cras:form", kwargs={"pk": directorate.pk}) + f"?year={year_val}&month={month_val}")
         report, _ = CrasReport.objects.get_or_create(directorate=directorate, month=month_val, year=year_val, unit_name=unit_name)
         for field_name, value in form.cleaned_data.items():
             if field_name == "rma_file":

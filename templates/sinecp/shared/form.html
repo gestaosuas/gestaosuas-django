@@ -84,7 +84,7 @@
             });
         </script>
         {% else %}
-        <form method="post" id="main-report-form" class="report-form-shell" style="width: 100%; margin: 0;">
+        <form method="post" id="main-report-form" class="report-form-shell" style="width: 100%; margin: 0;" onsubmit="return confirm('Confirma o envio dos dados deste mês? Depois de enviado, só um administrador pode reabrir para edição.')">
             {% csrf_token %}
 
             <div class="monitoring-header-container header-indigo">

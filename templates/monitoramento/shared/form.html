@@ -98,7 +98,7 @@
             });
         </script>
     {% else %}
-    <form method="post" class="report-form-shell">
+    <form method="post" class="report-form-shell" onsubmit="return confirm('Confirma o envio dos dados deste mês? Depois de enviado, só um administrador pode reabrir para edição.')">
         {% csrf_token %}
         {% if form.non_field_errors %}
             <div class="error-text">{{ form.non_field_errors }}</div>

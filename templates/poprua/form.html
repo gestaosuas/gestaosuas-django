@@ -8,7 +8,7 @@
     
     <main class="dashboard-main">
         <section class="dashboard-container-inner" style="padding-top: 10px;">
-            <form method="post" class="modern-form" id="poprua-form">
+            <form method="post" class="modern-form" id="poprua-form" onsubmit="return confirm('Confirma o envio dos dados deste mês? Depois de enviado, só um administrador pode reabrir para edição.')">
                 {% csrf_token %}
                 
                 <header class="dashboard-header-premium">

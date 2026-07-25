@@ -86,6 +86,11 @@ def period_label(year, month):
 
 
 class ProteacaoEspecialBaseMixin(DirectorateAccessMixin):
+    # Sub-área liberável por permissão ("Creas Protetivo"/"Creas Socioeducativo")
+    # — setada pelas views concretas que precisam do gate. Ver apps/accounts/views.py
+    # (UserPermissionsView.get_unit_options_map) e docs/dominio/03.
+    required_unit = None
+
     def get_directorate(self):
         d = Directorate.objects.filter(pk=self.kwargs["pk"]).first()
         if not d:
@@ -101,6 +106,14 @@ class ProteacaoEspecialBaseMixin(DirectorateAccessMixin):
     def get_month_number(self):
         m = self.request.GET.get("month")
         return int(m) if m and m != "all" else date.today().month
+
+    def check_required_unit(self):
+        """Se a view define required_unit, bloqueia quem nao tem essa sub-area
+        liberada. Retorna None se ok, ou um redirect se bloqueado."""
+        if self.required_unit and not self.require_unit_access(self.required_unit):
+            messages.error(self.request, "Você não tem acesso a esta área.")
+            return redirect(reverse("protecaoespecial:home", kwargs={"pk": self.get_directorate().pk}))
+        return None
 
 
 class ProtecaoEspecialHomeView(TvTemplateMixin, ProteacaoEspecialBaseMixin, DetailView):
@@ -257,6 +270,13 @@ class ProtecaoEspecialHomeView(TvTemplateMixin, ProteacaoEspecialBaseMixin, Deta
 class CreasProtetivoFormView(ProteacaoEspecialBaseMixin, FormView):
     template_name = "protecaoespecial/form.html"
     form_class = CreasProtetivoForm
+    required_unit = "Creas Protetivo"
+
+    def get(self, request, *args, **kwargs):
+        blocked = self.check_required_unit()
+        if blocked:
+            return blocked
+        return super().get(request, *args, **kwargs)
 
     def get_initial(self):
         initial = super().get_initial()
@@ -324,6 +344,9 @@ class CreasProtetivoFormView(ProteacaoEspecialBaseMixin, FormView):
         return ctx
 
     def post(self, request, *args, **kwargs):
+        blocked = self.check_required_unit()
+        if blocked:
+            return blocked
         if self._get_existing_report():
             messages.error(
                 request,
@@ -367,6 +390,13 @@ class CreasProtetivoFormView(ProteacaoEspecialBaseMixin, FormView):
 class CreasSocioeducativoFormView(ProteacaoEspecialBaseMixin, FormView):
     template_name = "protecaoespecial/form.html"
     form_class = CreasSocioeducativoForm
+    required_unit = "Creas Socioeducativo"
+
+    def get(self, request, *args, **kwargs):
+        blocked = self.check_required_unit()
+        if blocked:
+            return blocked
+        return super().get(request, *args, **kwargs)
 
     def get_initial(self):
         initial = super().get_initial()
@@ -398,6 +428,9 @@ class CreasSocioeducativoFormView(ProteacaoEspecialBaseMixin, FormView):
         return ctx
 
     def post(self, request, *args, **kwargs):
+        blocked = self.check_required_unit()
+        if blocked:
+            return blocked
         if self._get_existing_report():
             messages.error(
                 request,
@@ -441,6 +474,13 @@ class CreasSocioeducativoFormView(ProteacaoEspecialBaseMixin, FormView):
 class CreasProtetivoDataView(ExcelExportMixin, ProteacaoEspecialBaseMixin, TemplateView):
     template_name = "protecaoespecial/data.html"
     export_filename = "creas_protetivo_dados.xlsx"
+    required_unit = "Creas Protetivo"
+
+    def get(self, request, *args, **kwargs):
+        blocked = self.check_required_unit()
+        if blocked:
+            return blocked
+        return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -513,6 +553,13 @@ class CreasProtetivoDataView(ExcelExportMixin, ProteacaoEspecialBaseMixin, Templ
 class CreasSocioeducativoDataView(ExcelExportMixin, ProteacaoEspecialBaseMixin, TemplateView):
     template_name = "protecaoespecial/data.html"
     export_filename = "creas_socioeducativo_dados.xlsx"
+    required_unit = "Creas Socioeducativo"
+
+    def get(self, request, *args, **kwargs):
+        blocked = self.check_required_unit()
+        if blocked:
+            return blocked
+        return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
