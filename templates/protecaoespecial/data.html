@@ -2,6 +2,8 @@
 
 {% block title %}Dados {{ subcategory|title }} | {{ directorate.name }}{% endblock %}
 
+{% block body_class %}dashboard-fit-vh theme-indigo{% endblock %}
+
 {% block content %}
 <section class="simple-shell benefits-shell">
     <a class="back-link" href="{% url 'protecaoespecial:home' directorate.pk %}?year={{ selected_year }}">&larr; Voltar</a>

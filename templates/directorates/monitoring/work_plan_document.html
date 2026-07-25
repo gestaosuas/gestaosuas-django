@@ -2,6 +2,8 @@
 
 {% block title %}{{ document_title }} | {{ system_name }}{% endblock %}
 
+{% block body_class %}{{ theme_class|default:'theme-emerald' }}{% endblock %}
+
 {% block content %}
 <div class="plan-document-shell">
     <div class="plan-document-toolbar no-print">

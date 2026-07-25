@@ -58,6 +58,13 @@ body.theme-rose {
     --nav-text-grad-end: #db2777;
 }
 
+body.theme-pink {
+    --nav-grad-start: #ec4899;
+    --nav-grad-end: #6d28d9;
+    --nav-text-grad-start: #6d28d9;
+    --nav-text-grad-end: #ec4899;
+}
+
 a {
     color: inherit;
     text-decoration: none;

@@ -415,6 +415,25 @@ def is_outros_directorate(directorate):
     return "outros" in ascii_name
 
 
+def get_monitoramento_theme(directorate):
+    """Cor de tema (navbar/cabeçalho) para Subvenção/Emendas e Fundos/Outros —
+    mesma lógica usada em MonitoramentoHomeView, reaproveitada aqui pras telas
+    de OSC/Visita/Plano de Trabalho (apps/directorates) que também pertencem a
+    essas 3 diretorias. Retorna (theme_class, header_class, icon_color)."""
+    normalized = (getattr(directorate, "name", "") or "").lower()
+    ascii_name = strip_accents(normalized)
+
+    if "emendas" in ascii_name:
+        return "theme-amber", "header-amber", "#d97706"
+    if "fundos" in ascii_name:
+        return "theme-indigo", "header-indigo", "#4338ca"
+    if "subvencao" in ascii_name:
+        return "theme-emerald", "header-emerald", "#059669"
+    if "outros" in normalized:
+        return "theme-rose", "header-rose", "#db2777"
+    return "theme-emerald", "header-emerald", "#059669"
+
+
 def get_work_plan_by_id(directorate_id, plan_id):
     if not plan_id:
         return None
@@ -786,6 +805,7 @@ class OscListView(DirectorateScopedMixin, ListView):
         context["activity_types"] = list(types)
         profile = getattr(self.request.user, 'profile', None)
         context["can_delete"] = self.request.user.is_superuser or (profile and profile.role == 'admin')
+        context["theme_class"] = get_monitoramento_theme(directorate)[0]
         return context
 
 class VisitListView(DirectorateScopedMixin, ListView):
@@ -832,7 +852,9 @@ class VisitListView(DirectorateScopedMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["directorate"] = self.get_directorate()
+        directorate = self.get_directorate()
+        context["directorate"] = directorate
+        context["theme_class"] = get_monitoramento_theme(directorate)[0]
         for visit in context["visits"]:
             identificacao = visit.identificacao or {}
             visit.registered_by_name = (
@@ -922,6 +944,7 @@ class WorkPlanListView(DirectorateScopedMixin, ListView):
         context["selected_osc_id"] = self.request.GET.get("osc", "")
         profile = getattr(self.request.user, 'profile', None)
         context["can_delete"] = self.request.user.is_superuser or (profile and profile.role == 'admin')
+        context["theme_class"] = get_monitoramento_theme(directorate)[0]
         return context
 
 class WorkPlanObjectivesView(WorkPlanScopedMixin, View):
@@ -954,8 +977,9 @@ class WorkPlanUpdateView(WorkPlanScopedMixin, UpdateView):
         context["directorate"] = self.object.directorate
         context["selected_osc_id"] = str(self.object.osc_id)
         context["return_url"] = get_safe_next_url(self.request) or reverse("directorates:plan-list", kwargs={"pk": self.object.directorate.pk})
+        context["theme_class"] = get_monitoramento_theme(self.object.directorate)[0]
         return context
-    
+
     def get_success_url(self):
         next_url = get_safe_next_url(self.request)
         if next_url:
@@ -969,9 +993,11 @@ class WorkPlanCreateView(DirectorateScopedMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["directorate"] = self.get_directorate()
+        directorate = self.get_directorate()
+        context["directorate"] = directorate
         context["selected_osc_id"] = self.request.GET.get("osc", "")
         context["return_url"] = get_safe_next_url(self.request) or reverse("directorates:plan-list", kwargs={"pk": self.kwargs["pk"]})
+        context["theme_class"] = get_monitoramento_theme(directorate)[0]
         return context
 
     def form_valid(self, form):
@@ -1047,6 +1073,7 @@ class WorkPlanDocumentView(DirectorateScopedMixin, TemplateView):
 
         context = self.get_context_data(**kwargs)
         context.update(build_work_plan_document_context(plan))
+        context["theme_class"] = get_monitoramento_theme(self.get_directorate())[0]
         return render(request, self.template_name, context)
 
 class MonitoringReportListView(DirectorateScopedMixin, ListView):
@@ -1082,8 +1109,10 @@ class MonitoringReportListView(DirectorateScopedMixin, ListView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["directorate"] = self.get_directorate()
+        directorate = self.get_directorate()
+        context["directorate"] = directorate
         context["selected_bimester"] = get_persistent_bimester(self.request)
+        context["theme_class"] = get_monitoramento_theme(directorate)[0]
         return context
 
 class VisitReportView(VisitScopedMixin, DetailView):
@@ -1106,6 +1135,7 @@ class VisitReportView(VisitScopedMixin, DetailView):
         report_type = self.kwargs.get("report_type", "parecer_tecnico")
         context["report_type"] = report_type
         context["report_label"] = self.REPORT_LABELS.get(report_type, report_type.replace("_", " ").title())
+        context["theme_class"] = get_monitoramento_theme(self.object.directorate)[0]
         
         MONTH_NAMES = {
             1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril",
@@ -1572,6 +1602,7 @@ class OscCreateView(DirectorateScopedMixin, CreateView):
         directorate = self.get_directorate()
         context["directorate"] = directorate
         context["return_url"] = get_safe_next_url(self.request) or get_osc_list_redirect(directorate)
+        context["theme_class"] = get_monitoramento_theme(directorate)[0]
         return context
 
     def form_valid(self, form):
@@ -1597,6 +1628,7 @@ class OscUpdateView(OscScopedMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context["directorate"] = self.object.directorate
         context["return_url"] = get_safe_next_url(self.request) or get_osc_list_redirect(self.object.directorate)
+        context["theme_class"] = get_monitoramento_theme(self.object.directorate)[0]
         return context
 
     def get_success_url(self):
@@ -1639,6 +1671,7 @@ class VisitCreateView(DirectorateScopedMixin, TemplateView):
         context["is_outros_visit"] = is_outros_directorate(directorate)
         context["osc_plans"] = build_osc_plans_map(directorate.pk) if context["is_emendas_visit"] else {}
         context["return_url"] = get_safe_next_url(self.request) or get_visit_list_redirect(directorate)
+        context["theme_class"] = get_monitoramento_theme(directorate)[0]
         return context
 
     def post(self, request, *args, **kwargs):
@@ -1750,6 +1783,7 @@ class VisitInstrumentalView(VisitScopedMixin, UpdateView):
         context["directorate"] = self.object.directorate
         context["oscs"] = Osc.objects.filter(directorate_id=self.object.directorate.pk).order_by("name")
         context["is_new"] = False
+        context["theme_class"] = get_monitoramento_theme(self.object.directorate)[0]
         context["is_subvencao_visit"] = is_subvencao_directorate(self.object.directorate)
         context["is_emendas_visit"] = is_emendas_directorate(self.object.directorate)
         context["is_outros_visit"] = is_outros_directorate(self.object.directorate)

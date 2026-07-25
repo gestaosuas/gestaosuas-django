@@ -3,6 +3,8 @@
 
 {% block title %}{% if object %}Editar{% else %}Cadastrar{% endif %} OSC | {{ system_name }}{% endblock %}
 
+{% block body_class %}{{ theme_class|default:'theme-emerald' }}{% endblock %}
+
 {% block content %}
 <div class="osc-header">
     <div class="osc-header-inner">

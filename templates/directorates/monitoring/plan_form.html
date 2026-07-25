@@ -2,6 +2,8 @@
 
 {% block title %}{% if object %}Editar{% else %}Novo{% endif %} Plano de Trabalho | {{ system_name }}{% endblock %}
 
+{% block body_class %}{{ theme_class|default:'theme-emerald' }}{% endblock %}
+
 {% block content %}
 <div class="plan-editor-shell">
     <div class="plan-editor-hero no-print">

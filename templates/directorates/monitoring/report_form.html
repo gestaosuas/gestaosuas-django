@@ -3,6 +3,8 @@
 
 {% block title %}{{ report_label }} | {{ system_name }}{% endblock %}
 
+{% block body_class %}{{ theme_class|default:'theme-emerald' }}{% endblock %}
+
 {% block content %}
 <div class="monitoring-header-container no-print" style="padding-bottom: 24px; margin-bottom: 30px;">
     <div class="monitoring-header-content" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; background: linear-gradient(135deg, #1e3a8a, #3b82f6); padding: 24px; border-radius: 20px; color: white; box-shadow: 0 10px 25px rgba(30, 58, 138, 0.15);">

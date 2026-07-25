@@ -16,6 +16,7 @@ from apps.accounts.models import Profile, ProfileDirectorate
 from apps.core.export import ExcelExportMixin, build_workbook
 from apps.directorates.models import Directorate, FormDelegation, MonthlyReport, Osc, Visit, WorkPlan
 from apps.directorates.forms import OscForm
+from apps.directorates.views import get_monitoramento_theme
 from apps.core.utils import (
     MONTH_LABELS, MONTH_OPTIONS, build_sparkline,
     build_period_label, build_year_range_from_years, build_variation
@@ -187,26 +188,7 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
         is_subvencao_only = is_subvencao
         is_outros = "outros" in normalized
 
-        if "emendas" in ascii_name:
-            theme_class = "theme-amber"
-            header_class = "header-amber"
-            icon_color = "#d97706"
-        elif "fundos" in ascii_name:
-            theme_class = "theme-indigo"
-            header_class = "header-indigo"
-            icon_color = "#4338ca"
-        elif "subvencao" in ascii_name:
-            theme_class = "theme-emerald"
-            header_class = "header-emerald"
-            icon_color = "#059669"
-        elif "outros" in normalized:
-            theme_class = "theme-rose"
-            header_class = "header-rose"
-            icon_color = "#db2777"
-        else:
-            theme_class = "theme-emerald"
-            header_class = "header-emerald"
-            icon_color = "#059669"
+        theme_class, header_class, icon_color = get_monitoramento_theme(directorate)
 
         context.update({
             "subvencao_stats": subvencao_stats,
@@ -342,6 +324,7 @@ class MonitoramentoFormView(MonitoramentoBaseMixin, FormView):
             "is_locked": bool(existing_report),
             "is_admin_user": self.is_admin(),
             "month_options": MONTH_OPTIONS,
+            "theme_class": get_monitoramento_theme(directorate)[0],
         })
         return context
 
@@ -424,6 +407,7 @@ class MonitoramentoDataView(ExcelExportMixin, MonitoramentoBaseMixin, TemplateVi
             "can_delete": self.is_admin(),
             "back_url": reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + f"?year={selected_year}",
             "form_url": reverse("monitoramento:form", kwargs={"pk": directorate.pk}) + f"?year={selected_year}",
+            "theme_class": get_monitoramento_theme(directorate)[0],
         })
         return context
 
