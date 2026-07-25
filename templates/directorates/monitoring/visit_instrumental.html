@@ -4,8 +4,12 @@
 
 {% block title %}{% if is_new %}Nova Visita{% elif object.status == 'finalized' or object.status == 'completed' %}Visualizar{% else %}Editar{% endif %} Instrumental | {{ system_name }}{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'fonts/phosphor/regular/style.css' %}">
+<link rel="stylesheet" href="{% static 'fonts/phosphor/duotone/style.css' %}">
+{% endblock %}
+
 {% block content %}
-<script src="https://unpkg.com/@phosphor-icons/web"></script>
 <div class="monitoring-header-container no-print visit-hero">
     <div class="monitoring-header-content visit-hero-content">
         <div class="monitoring-title-area">

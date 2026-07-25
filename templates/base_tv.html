@@ -8,9 +8,9 @@
     <link rel="icon" href="{% static 'img/favicon.ico' %}" sizes="any">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon-32x32.png' %}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <script src="{% static 'js/vendor/lucide.min.js' %}"></script>
+    <script src="{% static 'js/vendor/chart.min.js' %}"></script>
+    <script src="{% static 'js/vendor/chartjs-plugin-datalabels.min.js' %}"></script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { height: 100vh; overflow: hidden; background: #e2e8f0; font-family: 'Inter', sans-serif; }
