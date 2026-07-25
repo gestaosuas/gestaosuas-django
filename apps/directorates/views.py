@@ -407,6 +407,14 @@ def is_emendas_directorate(directorate):
     return "emenda" in ascii_name or "fundo" in ascii_name
 
 
+def is_outros_directorate(directorate):
+    """"Outros" usa o mesmo modulo de OSC/Visita que Subvencao/Emendas e Fundos,
+    mas com instrumental de visita simplificado (sem Plano de Trabalho, Forma de
+    Acesso, Colaboradores/RH nem PSE) e só 2 abas no dashboard."""
+    ascii_name = strip_accents((getattr(directorate, "name", "") or "").lower())
+    return "outros" in ascii_name
+
+
 def get_work_plan_by_id(directorate_id, plan_id):
     if not plan_id:
         return None
@@ -474,6 +482,23 @@ def get_monitoring_back_url(directorate):
     if is_monitoring:
         return reverse("monitoramento:home", kwargs={"pk": directorate.pk})
     return reverse("directorates:visit-list", kwargs={"pk": directorate.pk})
+
+
+def get_visit_list_redirect(directorate):
+    """Para onde mandar o usuario apos criar/editar/finalizar/excluir uma visita:
+    a aba "Instrumental de Visita" do dashboard (Subvencao/Emendas e Fundos/Outros,
+    que tem sistema de abas) ou a lista avulsa de visitas (demais diretorias, que
+    nao usam o dashboard de monitoramento). Ver docs/dominio/04."""
+    if is_subvencao_directorate(directorate) or is_outros_directorate(directorate):
+        return reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=visits"
+    return reverse("directorates:visit-list", kwargs={"pk": directorate.pk})
+
+
+def get_osc_list_redirect(directorate):
+    """Mesma ideia de get_visit_list_redirect, mas para a aba 'Cadastrar OSC'."""
+    if is_subvencao_directorate(directorate) or is_outros_directorate(directorate):
+        return reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=oscs"
+    return reverse("directorates:osc-list", kwargs={"pk": directorate.pk})
 
 
 def get_safe_next_url(request):
@@ -858,7 +883,7 @@ class VisitDelegateView(VisitScopedMixin, View):
                 delegated_by=request.user.id
             )
             
-        return redirect(reverse("directorates:visit-list", kwargs={"pk": str(visit.directorate.pk)}))
+        return redirect(get_visit_list_redirect(visit.directorate))
 
 class WorkPlanListView(DirectorateScopedMixin, ListView):
     template_name = "directorates/monitoring/plan_list.html"
@@ -1071,7 +1096,7 @@ class VisitReportView(VisitScopedMixin, DetailView):
         return self.get_scoped_object()
 
     REPORT_LABELS = {
-        "parecer_tecnico": "Relatório do Monitoramento",
+        "parecer_tecnico": "Relatório de Visita",
         "parecer_conclusivo": "Parecer Conclusivo",
         "relatorio_final": "Relatório Final",
     }
@@ -1396,7 +1421,7 @@ class VisitReportView(VisitScopedMixin, DetailView):
         context["is_subvencao"] = is_subvencao
         context["report_data"] = report_data
         context["directorate"] = directorate
-        context["return_url"] = get_safe_next_url(self.request) or get_monitoring_back_url(directorate)
+        context["return_url"] = get_safe_next_url(self.request) or get_visit_list_redirect(directorate)
         return context
 
     def post(self, request, *args, **kwargs):
@@ -1544,7 +1569,9 @@ class OscCreateView(DirectorateScopedMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["directorate"] = self.get_directorate()
+        directorate = self.get_directorate()
+        context["directorate"] = directorate
+        context["return_url"] = get_safe_next_url(self.request) or get_osc_list_redirect(directorate)
         return context
 
     def form_valid(self, form):
@@ -1556,7 +1583,7 @@ class OscCreateView(DirectorateScopedMixin, CreateView):
         next_url = self.request.POST.get("next") or self.request.GET.get("next")
         if next_url and next_url.startswith("/"):
             return next_url
-        return reverse("directorates:osc-list", kwargs={"pk": self.kwargs["pk"]})
+        return get_osc_list_redirect(self.get_directorate())
 
 class OscUpdateView(OscScopedMixin, UpdateView):
     model = Osc
@@ -1569,10 +1596,14 @@ class OscUpdateView(OscScopedMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["directorate"] = self.object.directorate
+        context["return_url"] = get_safe_next_url(self.request) or get_osc_list_redirect(self.object.directorate)
         return context
 
     def get_success_url(self):
-        return reverse("directorates:osc-list", kwargs={"pk": self.object.directorate.pk})
+        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+        if next_url and next_url.startswith("/"):
+            return next_url
+        return get_osc_list_redirect(self.object.directorate)
 
 class OscDeleteView(OscScopedMixin, DeleteView):
     model = Osc
@@ -1591,7 +1622,7 @@ class OscDeleteView(OscScopedMixin, DeleteView):
         next_url = self.request.POST.get("next") or self.request.GET.get("next")
         if next_url and next_url.startswith("/"):
             return next_url
-        return reverse("directorates:osc-list", kwargs={"pk": self.object.directorate.pk})
+        return get_osc_list_redirect(self.object.directorate)
 
 class VisitCreateView(DirectorateScopedMixin, TemplateView):
     template_name = "directorates/monitoring/visit_instrumental.html"
@@ -1605,8 +1636,9 @@ class VisitCreateView(DirectorateScopedMixin, TemplateView):
         context["object"] = None
         context["is_subvencao_visit"] = is_subvencao_directorate(directorate)
         context["is_emendas_visit"] = is_emendas_directorate(directorate)
+        context["is_outros_visit"] = is_outros_directorate(directorate)
         context["osc_plans"] = build_osc_plans_map(directorate.pk) if context["is_emendas_visit"] else {}
-        context["return_url"] = get_safe_next_url(self.request) or get_monitoring_back_url(directorate)
+        context["return_url"] = get_safe_next_url(self.request) or get_visit_list_redirect(directorate)
         return context
 
     def post(self, request, *args, **kwargs):
@@ -1679,20 +1711,23 @@ class VisitCreateView(DirectorateScopedMixin, TemplateView):
         try:
             visit.save()
         except Exception:
+            logger.exception("Falha ao salvar Visit (pk=%s)", getattr(visit, "pk", None))
             messages.error(request, "Nao foi possivel salvar a visita. Tente novamente.")
             next_url = get_safe_next_url(request)
             create_url = reverse("directorates:visit-create", kwargs={"pk": directorate.pk})
             return redirect(f"{create_url}?next={next_url}" if next_url else create_url)
 
-        if visit.status == "completed":
+        if visit.status == "finalized":
             messages.success(request, "Visita finalizada com sucesso.")
-            return redirect("directorates:visit-instrumental", pk=visit.pk)
-        else:
-            messages.success(request, "Rascunho salvo com sucesso.")
+            # Sempre volta para a lista de visitas (nao para o "next" generico de
+            # voltar/cancelar da pagina) - e la que o botao "Relatorio de Visita"
+            # aparece habilitado para o proximo passo.
+            return redirect(get_visit_list_redirect(directorate))
+        messages.success(request, "Rascunho salvo com sucesso.")
         next_url = get_safe_next_url(request)
         if next_url:
             return redirect(next_url)
-        return redirect(get_monitoring_back_url(directorate))
+        return redirect(get_visit_list_redirect(directorate))
 
 class VisitInstrumentalView(VisitScopedMixin, UpdateView):
     model = Visit
@@ -1717,11 +1752,12 @@ class VisitInstrumentalView(VisitScopedMixin, UpdateView):
         context["is_new"] = False
         context["is_subvencao_visit"] = is_subvencao_directorate(self.object.directorate)
         context["is_emendas_visit"] = is_emendas_directorate(self.object.directorate)
+        context["is_outros_visit"] = is_outros_directorate(self.object.directorate)
         if context["is_emendas_visit"]:
             context["visit_osc_plans"] = WorkPlan.objects.filter(
                 osc_id=self.object.osc_id, directorate_id=self.object.directorate.pk
             ).order_by("-updated_at", "title")
-        context["return_url"] = get_safe_next_url(self.request) or get_monitoring_back_url(self.object.directorate)
+        context["return_url"] = get_safe_next_url(self.request) or get_visit_list_redirect(self.object.directorate)
         extra_visits = []
         identificacao = self.object.identificacao or {}
         i = 2
@@ -1815,24 +1851,26 @@ class VisitInstrumentalView(VisitScopedMixin, UpdateView):
         try:
             self.object.save()
         except Exception:
+            logger.exception("Falha ao salvar Visit (pk=%s)", getattr(self.object, "pk", None))
             messages.error(request, "Nao foi possivel salvar a visita. Tente novamente.")
             next_url = get_safe_next_url(request)
             edit_url = reverse("directorates:visit-instrumental", kwargs={"pk": self.object.pk})
             return redirect(f"{edit_url}?next={next_url}" if next_url else edit_url)
 
-        if self.object.status == "completed":
+        if self.object.status == "finalized":
             messages.success(request, "Visita finalizada com sucesso.")
-            if is_subvencao_directorate(self.object.directorate):
-                return redirect("directorates:visit-report", pk=self.object.pk, report_type="relatorio_final")
-        else:
-            messages.success(request, "Rascunho salvo com sucesso.")
+            # Sempre volta para a lista de visitas (nao para o "next" generico de
+            # voltar/cancelar da pagina) - e la que o botao "Relatorio de Visita"
+            # aparece habilitado para o proximo passo.
+            return redirect(get_visit_list_redirect(self.object.directorate))
+        messages.success(request, "Rascunho salvo com sucesso.")
         return redirect(self.get_success_url())
 
     def get_success_url(self):
         next_url = get_safe_next_url(self.request)
         if next_url:
             return next_url
-        return reverse("directorates:visit-list", kwargs={"pk": self.object.directorate.pk})
+        return get_visit_list_redirect(self.object.directorate)
 
 class VisitDeleteDocumentView(VisitScopedMixin, View):
     def post(self, request, pk):
@@ -1888,7 +1926,7 @@ class VisitRevertView(VisitScopedMixin, View):
         next_url = request.POST.get("next") or request.GET.get("next")
         if next_url and next_url.startswith("/"):
             return redirect(next_url)
-        return redirect(reverse("directorates:visit-list", kwargs={"pk": str(visit.directorate.pk)}))
+        return redirect(get_visit_list_redirect(visit.directorate))
 
 class RevertReportView(VisitScopedMixin, View):
     """Reverte o status de relatorio_final ou parecer_conclusivo para 'draft'."""
@@ -1924,4 +1962,4 @@ class VisitDeleteView(VisitScopedMixin, DeleteView):
         next_url = self.request.POST.get("next") or self.request.GET.get("next")
         if next_url and next_url.startswith("/"):
             return next_url
-        return reverse("directorates:visit-list", kwargs={"pk": self.object.directorate.pk})
+        return get_visit_list_redirect(self.object.directorate)

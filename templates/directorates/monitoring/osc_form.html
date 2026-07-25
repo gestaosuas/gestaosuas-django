@@ -7,7 +7,7 @@
 <div class="osc-header">
     <div class="osc-header-inner">
         <div class="osc-header-left">
-            <a href="{% url 'directorates:osc-list' directorate.pk %}" class="osc-back-btn">
+            <a href="{{ return_url }}" class="osc-back-btn">
                 <i data-lucide="arrow-left"></i> Voltar para Lista
             </a>
             <div class="osc-header-title">
@@ -21,6 +21,7 @@
 <div class="osc-form-container">
     <form method="post" id="oscForm">
         {% csrf_token %}
+        <input type="hidden" name="next" value="{{ return_url }}">
 
         {# ── Nome (full width) ── #}
         <div class="form-section">
@@ -90,7 +91,7 @@
 
         {# ── Buttons ── #}
         <div class="form-actions">
-            <a href="{% url 'directorates:osc-list' directorate.pk %}" class="btn-cancel">Cancelar</a>
+            <a href="{{ return_url }}" class="btn-cancel">Cancelar</a>
             <button type="submit" class="btn-save">
                 <i data-lucide="save"></i> {% if object %}Salvar Alterações{% else %}Finalizar Cadastro{% endif %}
             </button>

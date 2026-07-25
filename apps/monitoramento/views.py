@@ -147,6 +147,8 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
             assinaturas = visit.assinaturas or {}
             visit.tecnico1_display = title_name(assinaturas.get("tecnico1_nome", ""))
             visit.tecnico2_display = title_name(assinaturas.get("tecnico2_nome", ""))
+            relatorio = visit.parecer_tecnico or {}
+            visit.relatorio_status = relatorio.get("status") if isinstance(relatorio, dict) else None
 
         _total_visits = len(stats_visits)
         _finalized_visits = len([v for v in stats_visits if v.status in ["completed", "finalized"]])
@@ -159,6 +161,24 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
             "draftVisits": _draft_visits,
             "finalizationRate": _finalization_rate,
         }
+
+        # Visitas por mes no ano selecionado (independente do filtro de bimestre)
+        # para o grafico da tela inicial do dashboard.
+        year_visit_dates = directorate.visits.filter(visit_date__year=curr_year).values_list("visit_date", flat=True)
+        visits_by_month = [0] * 12
+        for visit_date in year_visit_dates:
+            if visit_date:
+                visits_by_month[visit_date.month - 1] += 1
+        context["visits_by_month_labels_json"] = json.dumps([label.title() for _num, label in MONTH_LABELS])
+        context["visits_by_month_data_json"] = json.dumps(visits_by_month)
+
+        # "Visitas" (donut) e "Relatorios de Visita" (barras) - mesmo escopo
+        # (bimestre/ano selecionados) dos demais cards da tela inicial.
+        context["visits_donut_data_json"] = json.dumps([_finalized_visits, _draft_visits])
+
+        _report_finalized = len([v for v in stats_visits if (v.relatorio_final or {}).get("status") == "finalized"])
+        _report_draft = max(_total_visits - _report_finalized, 0)
+        context["reports_bar_data_json"] = json.dumps([_report_finalized, _report_draft])
 
         # Theme detection
         normalized = directorate.name.lower()
@@ -195,6 +215,10 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
             "is_fundos": "fundos" in ascii_name,
             "is_subvencao_mode": is_subvencao and not is_outros,
             "is_outros_mode": is_outros,
+            # "Outros" usa o mesmo dashboard com abas de Subvencao/Emendas e Fundos,
+            # mas so com 2 das 4 abas (ver home.html/_tab_content.html) - sem Plano
+            # de Trabalho nem Relatorios e Pareceres.
+            "show_visit_tabs": is_subvencao_only or is_outros,
             "recent_visits": all_visits[:5],
             "recent_oscs": directorate.oscs.all()[:5],
             "theme_class": theme_class,
@@ -202,7 +226,7 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
             "icon_color": icon_color,
         })
 
-        if is_subvencao_only:
+        if is_subvencao_only or is_outros:
             oscs = directorate.oscs.all().order_by("name")
             activity_types = (
                 directorate.oscs.exclude(activity_type="")

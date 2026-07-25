@@ -196,6 +196,7 @@
                         <label class="premium-label">Horario Fim</label>
                         <input type="time" name="atendimento[horario_fim]" value="{{ object.atendimento.horario_fim|default:'' }}" class="form-input-premium" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
                     </div>
+                    {% if not is_outros_visit %}
                     <div class="visit-field">
                         <label class="premium-label">Total / Mes</label>
                         <input type="number" name="atendimento[total_mes]" value="{{ object.atendimento.total_mes|default:0 }}" class="form-input-premium attendance-total-month" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
@@ -204,8 +205,10 @@
                         <label class="premium-label">Subvencionados</label>
                         <input type="text" name="atendimento[subvencionados]" value="{% if object %}{% if object.osc.subsidized_count == -1 %}Conforme Demanda{% else %}{{ object.osc.subsidized_count|default:0 }}{% endif %}{% else %}0{% endif %}" class="form-input-premium is-readonly" id="attendanceSubsidizedInput" readonly>
                     </div>
+                    {% endif %}
                 </div>
 
+                {% if not is_outros_visit %}
                 <div class="attendance-present-card">
                     <div class="attendance-subtitle">Usuarios presentes no momento da visita</div>
                     <div class="attendance-present-grid">
@@ -242,10 +245,20 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
 
 
-                {% if is_subvencao_visit %}
+                {% if is_outros_visit %}
+                <div class="visit-field">
+                    <label class="premium-label">Discriminação do Serviço</label>
+                    <textarea name="atendimento[aplicacao_recurso]" rows="5" class="form-textarea-premium" placeholder="Descreva o servico prestado..." {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.aplicacao_recurso|default:'' }}</textarea>
+                </div>
+                <div class="visit-field">
+                    <label class="premium-label">Observações</label>
+                    <textarea name="atendimento[observacoes_atendimento]" rows="4" class="form-textarea-premium" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.observacoes_atendimento|default:'' }}</textarea>
+                </div>
+                {% elif is_subvencao_visit %}
                 <div class="visit-grid visit-grid-two">
                     <div class="visit-field">
                         <label class="premium-label">Tipos de atividades desenvolvidas</label>
@@ -275,7 +288,7 @@
                 </div>
                 {% endif %}
 
-                {% if not is_subvencao_visit %}
+                {% if not is_subvencao_visit and not is_outros_visit %}
                 <div class="visit-grid visit-grid-two">
                     <div class="visit-field">
                         <label class="premium-label">Observacoes</label>
@@ -290,7 +303,7 @@
             </div>
         </section>
 
-        {% if not is_subvencao_visit %}
+        {% if not is_subvencao_visit and not is_outros_visit %}
         <section class="visit-section-content">
             <div class="visit-section-header visit-section-header-compact">
                 <div>
@@ -362,6 +375,7 @@
         </section>
         {% endif %}
 
+        {% if not is_outros_visit %}
         <section class="visit-section-content">
             <div class="visit-section-header">
                 <div class="section-icon visit-section-icon-amber"><i class="ph-duotone ph-user-list"></i></div>
@@ -455,6 +469,7 @@
                 </div>
             </div>
         </section>
+        {% endif %}
 
         {% if is_subvencao_visit %}
         <div class="pse-toggle-wrap">
@@ -626,6 +641,7 @@
                         <input type="hidden" name="assinaturas[tecnico1]" id="val-tecnico1" value="{{ object.assinaturas.tecnico1|default:'' }}">
                     </div>
 
+                    {% if not is_outros_visit %}
                     <div class="signature-block">
                         <label class="premium-label">Tecnico Responsavel 2</label>
                         <input type="text" name="assinaturas[tecnico2_nome]" value="{{ object.assinaturas.tecnico2_nome|default:'' }}" placeholder="Nome completo" class="form-input-premium signature-name-input" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
@@ -637,6 +653,7 @@
                         {% endif %}
                         <input type="hidden" name="assinaturas[tecnico2]" id="val-tecnico2" value="{{ object.assinaturas.tecnico2|default:'' }}">
                     </div>
+                    {% endif %}
 
                     <div class="signature-block">
                         <label class="premium-label">Representante da OSC</label>
@@ -1163,6 +1180,7 @@
 
     function renderRhRows() {
         var tbody = document.querySelector("#rhTable tbody");
+        if (!tbody) return; // secao IV (Colaboradores/RH) nao existe pra "Outros"
         tbody.innerHTML = "";
 
         rhData.forEach(function(row, index) {
@@ -1432,7 +1450,7 @@
         button.disabled = true;
         button.innerHTML = "<i data-lucide='loader-circle'></i> Finalizando...";
         lucide.createIcons();
-        submitVisit("completed");
+        submitVisit("finalized");
     }
 
     // --- Múltiplas visitas ---

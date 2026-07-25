@@ -111,10 +111,14 @@ ETAPA 3: RELATÓRIO FINAL + PARECER CONCLUSIVO
 | Etapa | Campos preenchidos |
 |-------|-------------------|
 | Nova Visita | `osc`, `visit_date`, `visit_time`, `status`, `identificacao`, `atendimento`, `forma_acesso`, `rh_data`, `observacoes`, `recomendacoes`, `assinaturas`, `notificacoes` |
-| Relatório de Visita | Herda `work_plan.objeto/objetivos/metas/atividades` + preenche `documents` |
+| Relatório de Visita | `parecer_tecnico` (JSONB) — herda `work_plan.objeto/objetivos/metas/atividades` + preenche `documents` |
 | Relatório Final | `relatorio_final` (JSONB) |
 | Parecer Conclusivo | `parecer_conclusivo` (JSONB) |
-| Parecer Técnico | `parecer_tecnico` (JSONB) |
+
+**Correção importante (2026-07-25)**: o campo `parecer_tecnico` **é** o "Relatório de Visita" da Etapa 2 — não é um 4º relatório separado. A rota `directorates:visit-report` com `report_type='parecer_tecnico'` sempre foi usada com o rótulo "Relatório de Visita" em todos os links/botões do app (`visit_list.html`, `_tab_content.html`), mas a `VisitReportView.REPORT_LABELS` (código) tinha o rótulo desalinhado ("Relatório do Monitoramento"), e o redirect ao finalizar a Nova Visita apontava erroneamente para `relatorio_final` (Etapa 3) em vez de `parecer_tecnico` (Etapa 2). Nomenclatura correta e definitiva dos 3 campos JSONB de relatório:
+- `parecer_tecnico` → **Relatório de Visita** (Etapa 2)
+- `relatorio_final` → **Relatório Final** (Etapa 3a)
+- `parecer_conclusivo` → **Parecer Conclusivo** (Etapa 3b)
 
 ### A.6 Permissões de Visita por Perfil (CONFIRMADO pelo usuário em 2026-07-21)
 
@@ -165,6 +169,76 @@ As views usam mixins de escopo local definidos em `views.py`: `DirectorateScoped
 O `directorate.form_definition` (JSONB) define quais campos aparecem no `MonitoramentoFormView` e no dashboard. A estrutura suporta `sections` com `fields` do tipo `number`, cada um com `name`, `label`, `icon`, `color`.
 
 **Regra confirmada**: Esta configuração é gerenciada por desenvolvedores. O admin do sistema não edita isso em runtime. Mudanças nos campos são feitas via código/deploy, a pedido do usuário. Ninguém acessa o banco diretamente para alterar.
+
+### A.9-B Dashboard de abas (Subvenção/Emendas/Outros) e diretoria "Outros" simplificada
+
+**Regra confirmada (2026-07-24/25)**: A diretoria "Outros" usa o mesmo dashboard de abas (AJAX) de Subvenção/Emendas e Fundos, mas com escopo reduzido — só cadastro de OSC e instrumental de visita, sem Plano de Trabalho nem Relatórios/Pareceres.
+
+Helpers em `apps/directorates/views.py`:
+```python
+def is_subvencao_directorate(directorate): ...  # "subvencao" no nome
+def is_emendas_directorate(directorate): ...    # "emendas" ou "fundos" no nome
+def is_outros_directorate(directorate): ...     # "outros" no nome
+```
+
+Em `apps/monitoramento/views.py` (`MonitoramentoHomeView.get_context_data()`):
+- `is_subvencao_only = is_subvencao_directorate(directorate) or is_emendas_directorate(directorate)`
+- `is_outros = is_outros_directorate(directorate)`
+- `context["show_visit_tabs"] = is_subvencao_only or is_outros` → controla se o template renderiza o sistema de abas (`monitoramento/home.html` + partial `monitoramento/_tab_content.html`) em vez do dashboard genérico de `GenericMonitoringReport`
+- `context["is_outros_mode"] = is_outros` → controla quantas abas aparecem
+- **Cuidado já cometido uma vez**: o bloco que popula `context["oscs"]`, `context["dashboard_visits"]`, etc. precisa do mesmo `if is_subvencao_only or is_outros:` — se só o template for atualizado para mostrar abas mas o Python continuar checando `is_subvencao_only` sozinho, a página de Outros renderiza as abas mas com 0 OSCs/0 visitas (bug real encontrado via teste Playwright nesta sessão).
+
+**Abas por tipo de diretoria**:
+| Aba | Subvenção / Emendas e Fundos | Outros |
+|---|---|---|
+| Cadastrar OSC | Sim | Sim |
+| Instrumental de Visita | Sim | Sim |
+| Plano de Trabalho | Sim | **Não** |
+| Relatórios e Pareceres | Sim | **Não** |
+
+**Navegação AJAX das abas**: `MonitoramentoHomeView.get_template_names()` verifica o header `X-Requested-With` — se a requisição veio do clique numa aba (`fetch` com esse header), retorna só o partial `monitoramento/_tab_content.html`; senão retorna `monitoramento/home.html` completo (que inclui o partial via `{% include %}` dentro de `#tabContentRegion`). Isso evita reload de página inteira ao trocar de aba. A função JS `initTabInteractions()` (ícones Lucide, gráficos Chart.js, handlers de modal/busca) precisa ser chamada de novo após cada troca de aba via AJAX, já que o conteúdo é substituído via `innerHTML`.
+
+**Formulário "Nova Visita" simplificado para Outros** (`templates/directorates/monitoring/visit_instrumental.html`, confirmado por print do usuário em 2026-07-24): a view passa `context["is_outros_visit"] = is_outros_directorate(directorate)` (em `VisitCreateView` e `VisitInstrumentalView`), e o template usa esse flag pra esconder, só para Outros:
+- Campos "Total/Mês" e "Subvencionados" e o card inteiro "Usuários presentes" (seção Atendimento)
+- Seção III (Forma de Acesso do Usuário)
+- Seção IV (Colaboradores/RH) — inclui a tabela `#rhTable`, que não existe no DOM pra Outros; `renderRhRows()` tem guarda `if (!tbody) return;` pra não quebrar o JS de inicialização
+- Seção V (Observações e Recomendações) na forma antiga — Outros usa em vez disso um único campo "Observações" simplificado
+- Assinatura "Técnico Responsável 2" (só resta Técnico 1 + Responsável pela OSC)
+
+Restam pra Outros: Identificação (OSC + data + turno), Atendimento (tipo horário, horário início/fim, "Discriminação do Serviço" = `atendimento[aplicacao_recurso]`, "Observações" = `atendimento[observacoes_atendimento]`), Fotos/Evidências, Assinaturas (Técnico 1 + Responsável).
+
+**Gap conhecido, baixa prioridade**: a seção oculta `#reportPrintView` (só usada na impressão) ainda renderiza incondicionalmente os cabeçalhos "Identificação"/"Atendimento"/"Forma de Acesso do Usuário"/"Observações e Recomendações" mesmo para Outros — não afeta o formulário interativo, só a versão impressa.
+
+### A.9-C Coluna "Documentos" com 3 estados (aba Instrumental de Visita)
+
+**Regra confirmada (2026-07-24)**: na tabela de visitas dentro da aba "Instrumental de Visita" (`_tab_content.html`), o botão da coluna "Documentos" mostra 3 estados em vez de um binário liberado/bloqueado, baseado em `visit.relatorio_status` (computado em `MonitoramentoHomeView` a partir de `visit.parecer_tecnico.get("status")`, mesmo padrão já usado em `VisitListView`):
+
+| Estado | Condição | Cor | Ícone/Texto |
+|---|---|---|---|
+| Preencher | visita finalizada, `parecer_tecnico` ainda não existe/rascunho não iniciado | Azul (`is-doc-pending`) | "Preencher" |
+| Rascunho | `parecer_tecnico.status == "draft"` | Laranja (`is-doc-draft`) | "Rascunho" |
+| Finalizado | `parecer_tecnico.status == "finalized"` | Verde (`is-doc-finalized`) | "Finalizado" |
+| — | visita ainda não finalizada (`status` != `finalized`) | — | "Liberado ao finalizar" (sem link) |
+
+### A.9-D Redirecionamento pós-ação (criar/editar/excluir/finalizar)
+
+**Regra confirmada (2026-07-24/25)**: como existem 2 UIs distintas de listagem — a aba dentro do dashboard de Subvenção/Emendas/Outros (`monitoramento:home` + `?tab=`) e a página avulsa `directorates:visit-list`/`osc-list` usada pelas demais diretorias — todo redirect pós-ação usa um helper central em vez de sempre apontar pra `visit-list`/`osc-list`:
+
+```python
+def get_visit_list_redirect(directorate):
+    if is_subvencao_directorate(directorate) or is_outros_directorate(directorate):
+        return reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=visits"
+    return reverse("directorates:visit-list", kwargs={"pk": directorate.pk})
+
+def get_osc_list_redirect(directorate):
+    if is_subvencao_directorate(directorate) or is_outros_directorate(directorate):
+        return reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=oscs"
+    return reverse("directorates:osc-list", kwargs={"pk": directorate.pk})
+```
+
+Usado como fallback em `get_success_url()`/`return_url` de `VisitInstrumentalView`, `VisitCreateView`, `VisitDelegateView`, `VisitRevertView`, `VisitDeleteView`, `VisitReportView`, `OscCreateView`, `OscUpdateView`, `OscDeleteView` — sempre respeitando um `next` explícito primeiro (query string ou campo hidden do form), e só caindo nesse helper quando não há `next`. Ao finalizar a "Nova Visita", o redirect força ir para a lista de visitas (nunca direto pra dentro de um relatório) — decisão confirmada pelo usuário em 2026-07-24.
+
+**Bug já corrigido nesta linha (2026-07-25)**: `OscUpdateView.get_success_url()` não checava `next` nenhuma vez (sempre ia pra `osc-list`), e o link "Editar OSC"/formulário de criação inline dentro da aba não passavam `?next=`/campo hidden `next` — editar ou criar uma OSC a partir da aba de Subvenção/Emendas/Outros jogava o usuário de volta pra página avulsa antiga. Corrigido: `OscUpdateView` agora checa `next` como as demais, e `osc_form.html` (a página completa de criar/editar OSC) ganhou `context["return_url"]` (mesmo padrão de `visit_instrumental.html`) usado no link "Voltar para Lista", no botão "Cancelar" e num campo hidden `next` no próprio `<form>`.
 
 ### A.9 Estrutura do WorkPlan
 
@@ -402,3 +476,9 @@ E a visita é válida e funcional
 | 2026-07-21 | C.1 STATUS_CHOICES divergente identificado | Model usa [draft, scheduled, completed]; fluxo real usa [draft, finalized] |
 | 2026-07-21 | Resposta Q11 confirmada | form_definition gerenciado por devs, não editável em runtime pelo usuário |
 | 2026-07-24 | B.1 corrigido: "outros" → rosa (não azul) | Texto desatualizado — código (`apps/monitoramento/views.py`) já usava tema rosa desde o commit 17ca164 ("rose theme for Outros"), doc não tinha sido atualizado. Achado durante verificação geral de alinhamento entre `.md`s |
+| 2026-07-25 | Bug corrigido: `Visit.STATUS_CHOICES` não tinha `finalized`; JS de "Finalizar Visita" mandava `status=completed`, que o banco sempre rejeitava (`visits_status_check` só aceita `draft`/`finalized`) | Toda tentativa de finalizar uma visita falhava silenciosamente (exceção capturada sem log). Corrigido: JS manda `finalized`, `STATUS_CHOICES` alinhado ao banco, exceção agora loga o traceback real |
+| 2026-07-25 | Campos de relatório renomeados/esclarecidos na tabela da A.5: `parecer_tecnico` é a **Etapa 2 (Relatório de Visita)**, não um 4º relatório à parte | `VisitReportView.REPORT_LABELS` tinha o rótulo desalinhado ("Relatório do Monitoramento") mesmo com todos os links do app já usando "Relatório de Visita" para essa mesma rota — confirmado pelo usuário |
+| 2026-07-25 | Redirect ao finalizar a Nova Visita corrigido | Antes ia direto para `relatorio_final` (Etapa 3, errado); depois foi corrigido pra ir direto pro `parecer_tecnico` (Etapa 2); **versão final confirmada pelo usuário**: deve voltar para a lista de visitas (`visit-list`), onde o botão "Relatório de Visita" aparece habilitado — sem redirecionamento forçado para dentro de nenhum formulário |
+| 2026-07-25 | Duas listagens de visita unificadas via redirect, não deletadas | Usuário pediu inicialmente pra unir as 2 tabelas de listagem de visita (avulsa vs. aba) numa só nova tela; depois recuou (`"tudo bem, não precisa deletar, só corrigir os redirecionamentos"`) — escopo final: manter as 2 telas existentes, só garantir que toda ação (criar/editar/excluir/finalizar visita e OSC) redireciona pra tela certa via `get_visit_list_redirect`/`get_osc_list_redirect` (seção A.9-D). Coluna "Documentos" da aba também ganhou os 3 estados (Preencher/Rascunho/Finalizado) que a tela avulsa já tinha (seção A.9-C) |
+| 2026-07-25 | Diretoria "Outros" ganhou dashboard de abas (2 abas) + formulário de Nova Visita simplificado | Pedido do usuário com print de referência: Outros só precisa de "Cadastrar OSC" e "Instrumental de Visita" (sem Plano de Trabalho/Relatórios e Pareceres, que não se aplicam), e a Nova Visita de Outros usa um subconjunto de campos bem menor que Subvenção/Emendas (ver seção A.9-B) |
+| 2026-07-25 | Bug de redirect de OSC (create/update/delete) corrigido para respeitar `next`/aba, mesma classe do bug já corrigido pra visitas | `OscUpdateView.get_success_url()` nunca checava `next`; link "Editar OSC" na aba não passava `?next=`. Testado via Playwright em Subvenção e Outros: criar/editar/excluir OSC agora sempre volta pra aba correta (ver seção A.9-D) |

@@ -1,4 +1,4 @@
-            {% if is_subvencao_only %}
+            {% if show_visit_tabs %}
             <!-- SVG Defs for Gradients -->
             <svg width="0" height="0" style="position:absolute;">
               <defs>
@@ -102,7 +102,7 @@
                                     {% endif %}
                                 </td>
                                 <td class="inline-actions">
-                                    <a href="{% url 'directorates:osc-update' osc.pk %}" title="Editar OSC">
+                                    <a href="{% url 'directorates:osc-update' osc.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Doscs%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" title="Editar OSC">
                                         <i data-lucide="pencil"></i>
                                     </a>
                                     {% if can_delete %}
@@ -282,10 +282,22 @@
                                 </td>
                                 <td>
                                     {% if visit.status == 'completed' or visit.status == 'finalized' %}
-                                    <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}" class="inline-doc-btn">
-                                        <i data-lucide="file-text"></i>
-                                        Relatório de Visita
-                                    </a>
+                                        {% if visit.relatorio_status == 'finalized' %}
+                                        <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-doc-btn is-doc-finalized" title="Relatório de Visita finalizado">
+                                            <i data-lucide="check-circle-2"></i>
+                                            Finalizado
+                                        </a>
+                                        {% elif visit.relatorio_status == 'draft' %}
+                                        <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-doc-btn is-doc-draft" title="Continuar rascunho do Relatório de Visita">
+                                            <i data-lucide="file-edit"></i>
+                                            Rascunho
+                                        </a>
+                                        {% else %}
+                                        <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-doc-btn is-doc-pending" title="Preencher Relatório de Visita">
+                                            <i data-lucide="file-plus"></i>
+                                            Preencher
+                                        </a>
+                                        {% endif %}
                                     {% else %}
                                     <span class="inline-muted">Liberado ao finalizar</span>
                                     {% endif %}
@@ -621,85 +633,80 @@
                 </div>
             </section>
             {% else %}
-            <div class="glass-kpi-grid kpi-grid-4">
-                <!-- KPI 1: Total de OSCs -->
-                <article class="glass-kpi-card kpi-card-blue">
-                    <div class="gkpi-top">
-                        <div class="gkpi-icon-wrap blue"><i data-lucide="building-2"></i></div>
-                        <span class="gkpi-badge badge-blue">Cadastradas</span>
+            <div class="overview-kpi-strip">
+                <div class="overview-kpi-mini">
+                    <div class="okpi-icon okpi-blue"><i data-lucide="building-2"></i></div>
+                    <div class="okpi-text">
+                        <strong>{{ subvencao_stats.totalOSCs }}</strong>
+                        <span>OSCs cadastradas</span>
                     </div>
-                    <div class="gkpi-body">
-                        <p class="gkpi-label">Total de OSCs</p>
-                        <strong class="gkpi-value">{{ subvencao_stats.totalOSCs }}</strong>
+                </div>
+                <div class="overview-kpi-mini">
+                    <div class="okpi-icon okpi-amber"><i data-lucide="clipboard-list"></i></div>
+                    <div class="okpi-text">
+                        <strong>{{ subvencao_stats.totalVisits }}</strong>
+                        <span>Visitas no bimestre</span>
                     </div>
-                    <div class="gkpi-footer">
-                        <div class="gkpi-progress-track">
-                            <div class="gkpi-progress-fill" style="background: #3b82f6; width: 100%;"></div>
-                        </div>
-                        <span class="gkpi-footer-label">no bimestre</span>
+                </div>
+                <div class="overview-kpi-mini">
+                    <div class="okpi-icon okpi-emerald"><i data-lucide="shield-check"></i></div>
+                    <div class="okpi-text">
+                        <strong>{{ subvencao_stats.finalizedVisits }}</strong>
+                        <span>Visitas finalizadas</span>
                     </div>
-                </article>
+                </div>
+                <div class="overview-kpi-mini">
+                    <div class="okpi-icon okpi-purple"><i data-lucide="percent"></i></div>
+                    <div class="okpi-text">
+                        <strong>{{ subvencao_stats.finalizationRate }}%</strong>
+                        <span>Taxa de finalização</span>
+                    </div>
+                </div>
+            </div>
 
-                <!-- KPI 2: Visitas no Bimestre -->
-                <article class="glass-kpi-card kpi-card-amber">
-                    <div class="gkpi-top">
-                        <div class="gkpi-icon-wrap orange"><i data-lucide="clipboard-list"></i></div>
-                        <span class="gkpi-badge badge-amber">{{ subvencao_stats.draftVisits }} em andamento</span>
-                    </div>
-                    <div class="gkpi-body">
-                        <p class="gkpi-label">Visitas no Bimestre</p>
-                        <strong class="gkpi-value">{{ subvencao_stats.totalVisits }}</strong>
-                    </div>
-                    <div class="gkpi-footer">
-                        <div class="gkpi-progress-track">
-                            <div class="gkpi-progress-fill" id="kpi-visits-bar" style="background: #f59e0b; width: {{ subvencao_stats.finalizationRate }}%;"></div>
+            <div class="overview-chart-grid">
+                <div class="overview-chart-card">
+                    <div class="overview-chart-header">
+                        <div>
+                            <p class="inline-eyebrow" style="margin:0;">Visitas por mês</p>
+                            <h2 style="margin:2px 0 0;">{{ selected_year }}</h2>
                         </div>
-                        <span class="gkpi-footer-label">{{ subvencao_stats.finalizationRate }}% concluídas</span>
                     </div>
-                </article>
+                    <div class="overview-chart-canvas-wrap">
+                        <canvas id="visitsByMonthChart"
+                            data-labels="{{ visits_by_month_labels_json }}"
+                            data-values="{{ visits_by_month_data_json }}"
+                            data-color="{{ icon_color|default:'#059669' }}"></canvas>
+                    </div>
+                </div>
 
-                <!-- KPI 3: Visitas Finalizadas -->
-                <article class="glass-kpi-card kpi-card-emerald">
-                    <div class="gkpi-top">
-                        <div class="gkpi-icon-wrap green"><i data-lucide="shield-check"></i></div>
-                        <span class="gkpi-badge badge-emerald">Concluídas</span>
-                    </div>
-                    <div class="gkpi-body">
-                        <p class="gkpi-label">Visitas Finalizadas</p>
-                        <strong class="gkpi-value">{{ subvencao_stats.finalizedVisits }}</strong>
-                    </div>
-                    <div class="gkpi-footer">
-                        <div class="gkpi-progress-track">
-                            <div class="gkpi-progress-fill" style="background: #10b981; width: {{ subvencao_stats.finalizationRate }}%;"></div>
+                <div class="overview-chart-card">
+                    <div class="overview-chart-header">
+                        <div>
+                            <p class="inline-eyebrow" style="margin:0;">Visitas</p>
+                            <h2 style="margin:2px 0 0;">{{ subvencao_stats.finalizedVisits }} finalizadas</h2>
                         </div>
-                        <span class="gkpi-footer-label">de {{ subvencao_stats.totalVisits }} visitas</span>
                     </div>
-                </article>
+                    <div class="overview-chart-canvas-wrap">
+                        <canvas id="visitsDonutChart"
+                            data-values="{{ visits_donut_data_json }}"
+                            data-color="{{ icon_color|default:'#059669' }}"></canvas>
+                    </div>
+                </div>
 
-                <!-- KPI 4: Taxa de Finalização -->
-                <article class="glass-kpi-card kpi-card-rate">
-                    <div class="gkpi-top">
-                        <div class="gkpi-icon-wrap purple"><i data-lucide="percent"></i></div>
-                        {% if subvencao_stats.finalizationRate == 100 %}
-                            <span class="gkpi-badge badge-success">Meta atingida</span>
-                        {% elif subvencao_stats.finalizationRate >= 70 %}
-                            <span class="gkpi-badge badge-emerald">No caminho certo</span>
-                        {% else %}
-                            <span class="gkpi-badge badge-amber">Em progresso</span>
-                        {% endif %}
+                <div class="overview-chart-card">
+                    <div class="overview-chart-header">
+                        <div>
+                            <p class="inline-eyebrow" style="margin:0;">Relatórios de Visita</p>
+                            <h2 style="margin:2px 0 0;">Finalizados x Rascunhos</h2>
+                        </div>
                     </div>
-                    <div class="gkpi-body">
-                        <p class="gkpi-label">Taxa de Finalização</p>
-                        <strong class="gkpi-value" style="color: {% if subvencao_stats.finalizationRate == 100 %}#059669{% elif subvencao_stats.finalizationRate >= 70 %}#0284c7{% else %}#d97706{% endif %};">{{ subvencao_stats.finalizationRate }}%</strong>
+                    <div class="overview-chart-canvas-wrap">
+                        <canvas id="reportsBarChart"
+                            data-values="{{ reports_bar_data_json }}"
+                            data-color="{{ icon_color|default:'#059669' }}"></canvas>
                     </div>
-                    <div class="gkpi-donut-wrap">
-                        <svg class="gkpi-donut-svg" viewBox="0 0 36 36">
-                            <path class="gkpi-donut-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                            <path class="gkpi-donut-fill" stroke-dasharray="{{ subvencao_stats.finalizationRate }}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                style="stroke: {% if subvencao_stats.finalizationRate == 100 %}#10b981{% elif subvencao_stats.finalizationRate >= 70 %}#3b82f6{% else %}#f59e0b{% endif %};" />
-                        </svg>
-                    </div>
-                </article>
+                </div>
             </div>
             {% endif %}
 

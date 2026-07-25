@@ -150,7 +150,11 @@ class WorkPlan(TimeStampedUUIDModel):
 
 
 class Visit(TimeStampedUUIDModel):
-    STATUS_CHOICES = [("draft", "Rascunho"), ("scheduled", "Agendada"), ("completed", "Concluida")]
+    # O banco so aceita 'draft'/'finalized' (constraint visits_status_check) - ver
+    # docs/dominio/04-visitas-subvencao-emendas-fundos.md C.1. 'scheduled'/'completed'
+    # nunca foram valores validos para save(), mantidos so em checagens de leitura
+    # (templates/views) por seguranca com dados legados.
+    STATUS_CHOICES = [("draft", "Rascunho"), ("finalized", "Finalizada")]
     osc = models.ForeignKey(Osc, on_delete=models.CASCADE, related_name="visits")
     work_plan = models.ForeignKey(WorkPlan, on_delete=models.SET_NULL, null=True, blank=True, related_name="visits")
     directorate = models.ForeignKey(Directorate, on_delete=models.CASCADE, related_name="visits")
