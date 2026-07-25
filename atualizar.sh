@@ -59,7 +59,7 @@ elif mkdir -p "$GDRIVE_DIR" 2>/dev/null && cp "$BACKUP_DIR/$DUMP_FILE" "$GDRIVE_
     # Mantém apenas os 10 backups mais recentes no Drive (mesma retenção do local).
     GDRIVE_COUNT=$(ls -1 "$GDRIVE_DIR"/*.dump 2>/dev/null | wc -l)
     if [ "$GDRIVE_COUNT" -gt 10 ]; then
-        ls -1t "$GDRIVE_DIR"/*.dump | tail -n +11 | xargs rm -f
+        ls -1t "$GDRIVE_DIR"/*.dump | tail -n +11 | while read -r f; do rm -f "$f"; done
     fi
 else
     echo "      AVISO: não foi possível copiar para o Google Drive (mount em $GDRIVE_DIR disponível?)."
