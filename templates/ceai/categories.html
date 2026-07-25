@@ -18,7 +18,7 @@
             <p class="section-description">Agrupe suas oficinas por categorias temáticas.</p>
         </div>
         <div class="header-actions">
-            <button class="btn-primary" onclick="openModal('add-category')">
+            <button class="btn-primary" onclick="openCategoryModal()">
                 <i data-lucide="plus"></i>
                 Nova Categoria
             </button>
@@ -57,8 +57,8 @@
                         <td>{{ category.created_at|date:"d/m/Y" }}</td>
                         <td>
                             <div class="row-actions">
-                                <button class="btn-icon" title="Editar"><i data-lucide="edit-2"></i></button>
-                                <button class="btn-icon danger" title="Excluir"><i data-lucide="trash-2"></i></button>
+                                <button class="btn-icon" title="Editar" onclick="openCategoryModal('{{ category.id }}', '{{ category.name|escapejs }}')"><i data-lucide="edit-2"></i></button>
+                                <button class="btn-icon danger" title="Excluir" onclick="deleteCategory('{{ category.id }}')"><i data-lucide="trash-2"></i></button>
                             </div>
                         </td>
                     </tr>
@@ -129,6 +129,108 @@
         display: flex;
         gap: 8px;
     }
+
+    .btn-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-icon:hover { border-color: #3b82f6; color: #3b82f6; background: #eff6ff; }
+    .btn-icon.danger:hover { border-color: #ef4444; color: #ef4444; background: #fef2f2; }
+    .btn-icon i { width: 16px; height: 16px; }
+
+    .btn-primary {
+        background: #2563eb;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+    }
+
+    /* MODAL (Nova/Editar Categoria) */
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 24px; }
+    .modal-overlay.is-active { display: flex; }
+    .modal-content { background: white; width: min(420px, 100%); max-height: 85vh; border-radius: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; }
+    .modal-header { padding: 20px 24px; background: #f8fafc; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; border-bottom: 1px solid #e2e8f0; }
+    .modal-header h2 { font-size: 16px; font-weight: 800; color: #1e3a8a; }
+    .btn-close-modal { background: none; border: none; cursor: pointer; color: #94a3b8; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+    .btn-close-modal:hover { background: #e2e8f0; color: #1e293b; }
+    .modal-body { padding: 20px 24px; overflow-y: auto; }
+    .modal-form { display: flex; flex-direction: column; gap: 14px; }
+    .form-group label { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 6px; }
+    .form-group input { padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; font-size: 14px; }
 </style>
+
+<div id="modalCategory" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalCategoryTitle">Nova Categoria</h2>
+            <button class="btn-close-modal" onclick="closeModal('modalCategory')"><i data-lucide="x"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="formCategory" class="modal-form">
+                {% csrf_token %}
+                <input type="hidden" id="catId">
+                <div class="form-group">
+                    <label>Nome da Categoria</label>
+                    <input type="text" id="catName" placeholder="Ex: Esportes, Artesanato..." required>
+                </div>
+                <button type="submit" class="btn-primary" style="justify-content:center;">SALVAR</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openModal(id) { document.getElementById(id).classList.add('is-active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('is-active'); }
+
+function openCategoryModal(id, name) {
+    document.getElementById('modalCategoryTitle').innerText = id ? 'Editar Categoria' : 'Nova Categoria';
+    document.getElementById('catId').value = id || '';
+    document.getElementById('catName').value = name || '';
+    openModal('modalCategory');
+}
+
+document.getElementById('formCategory').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('catId').value;
+    const name = document.getElementById('catName').value;
+    await fetch('{% url "ceai:api_categories" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify({ id, name, unit: '{{ unit|escapejs }}' })
+    });
+    location.reload();
+});
+
+async function deleteCategory(id) {
+    if (!confirm('Excluir esta categoria?')) return;
+    const res = await fetch(`{% url "ceai:api_categories" %}?id=${id}`, {
+        method: 'DELETE',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    });
+    if (res.ok) {
+        location.reload();
+    } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Não foi possível excluir esta categoria.');
+    }
+}
+</script>
 </div>
 {% endblock %}

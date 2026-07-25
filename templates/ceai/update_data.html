@@ -3,7 +3,7 @@
 
 {% block title %}Atualizar Dados - {{ unit }}{% endblock %}
 
-{% block body_class %}dashboard-fit-vh theme-emerald{% endblock %}
+{% block body_class %}theme-emerald{% endblock %}
 
 {% block content %}
 <div class="app-shell">
@@ -112,13 +112,18 @@
         </div>
     </div>
 
-    <form method="post" class="report-form-container" onsubmit="return confirm('Confirma o envio dos dados deste mês? Depois de enviado, só um administrador pode reabrir para edição.')">
+    <form method="post" class="report-form-container" id="ceaiWizardForm" onsubmit="return confirm('Confirma o envio dos dados deste mês? Depois de enviado, só um administrador pode reabrir para edição.')">
         {% csrf_token %}
         <input type="hidden" name="month" value="{{ month }}">
         <input type="hidden" name="year" value="{{ year }}">
 
+        <div class="wizard-progress">
+            <div class="wizard-progress-bar"><div class="wizard-progress-fill" id="wizardProgressFill"></div></div>
+            <div class="wizard-progress-label" id="wizardProgressLabel"></div>
+        </div>
+
         {% for section in form_def.sections %}
-        <div class="form-section-card">
+        <div class="form-section-card wizard-step" data-step-title="{{ section.title }}">
             <div class="section-header">
                 <div class="section-accent"></div>
                 <h2>{{ section.title }}</h2>
@@ -137,19 +142,16 @@
         </div>
         {% endfor %}
 
-        {% if oficinas %}
-        <div class="form-section-card">
+        {% for group in oficinas %}
+        <div class="form-section-card wizard-step" data-step-title="Oficinas — {{ group.category }}">
             <div class="section-header">
                 <div class="section-accent purple"></div>
-                <h2>Oficinas e Atividades</h2>
+                <h2>Oficinas — {{ group.category }}</h2>
             </div>
-            <div class="oficinas-list">
-                {% for ofi in oficinas %}
+            <div class="oficinas-grid-form">
+                {% for ofi in group.items %}
                 <div class="oficina-item">
-                    <div class="oficina-info">
-                        <span class="oficina-name">{{ ofi.label }}</span>
-                        <span class="oficina-cat">{{ ofi.category }}</span>
-                    </div>
+                    <span class="oficina-name">{{ ofi.label }}</span>
                     <div class="oficina-fields">
                         <div class="field-mini">
                             <label>Vagas Totais</label>
@@ -164,14 +166,22 @@
                 {% endfor %}
             </div>
         </div>
-        {% endif %}
+        {% endfor %}
 
-        <div class="form-actions">
+        <div class="form-actions wizard-nav">
             <a href="{% url 'ceai:dashboard' %}" class="btn-cancel">Cancelar</a>
-            <button type="submit" class="btn-save">
-                <i data-lucide="check-circle-2"></i>
-                Salvar Alterações
-            </button>
+            <div class="wizard-nav-right">
+                <button type="button" id="wizardPrevBtn" class="btn-wizard-prev">
+                    <i data-lucide="arrow-left"></i> Voltar
+                </button>
+                <button type="button" id="wizardNextBtn" class="btn-wizard-next">
+                    Avançar <i data-lucide="arrow-right"></i>
+                </button>
+                <button type="submit" id="wizardSaveBtn" class="btn-save">
+                    <i data-lucide="check-circle-2"></i>
+                    Salvar Alterações
+                </button>
+            </div>
         </div>
     </form>
     {% endif %}
@@ -343,44 +353,62 @@
 
     .section-accent.purple { background: #a855f7; }
 
-    .oficinas-list {
+    .oficina-category-group {
+        margin-bottom: 28px;
+    }
+
+    .oficina-category-group:last-child {
+        margin-bottom: 0;
+    }
+
+    .oficina-category-title {
+        font-size: 12px;
+        font-weight: 800;
+        color: #7c3aed;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 14px;
         display: flex;
-        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .oficina-category-title::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: #f1f5f9;
+    }
+
+    .oficinas-grid-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
         gap: 16px;
     }
 
     .oficina-item {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
+        flex-direction: column;
+        gap: 12px;
         padding: 16px;
         background: #f8fafc;
         border-radius: 12px;
         border: 1px solid #e2e8f0;
     }
 
-    .oficina-info {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
     .oficina-name {
-        font-size: 15px;
+        font-size: 14px;
         font-weight: 700;
         color: #1e3a8a;
     }
 
-    .oficina-cat {
-        font-size: 11px;
-        font-weight: 800;
-        color: #3b82f6;
-        text-transform: uppercase;
-    }
-
     .oficina-fields {
         display: flex;
-        gap: 20px;
+        gap: 12px;
+    }
+
+    .oficina-fields .field-mini {
+        flex: 1;
     }
 
     .field-mini {
@@ -397,7 +425,7 @@
     }
 
     .form-control-mini {
-        width: 100px;
+        width: 100%;
         height: 36px;
         padding: 0 10px;
         border-radius: 8px;
@@ -455,6 +483,82 @@
     .pill-select-light select:hover {
         background: #f1f5f9;
     }
+
+    /* WIZARD (formulario por sessao) */
+    .wizard-progress {
+        margin-bottom: 24px;
+    }
+    .wizard-progress-bar {
+        height: 8px;
+        background: #e2e8f0;
+        border-radius: 99px;
+        overflow: hidden;
+    }
+    .wizard-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #3b82f6, #10b981);
+        border-radius: 99px;
+        transition: width 0.3s ease;
+        width: 0%;
+    }
+    .wizard-progress-label {
+        margin-top: 8px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #475569;
+    }
+    .wizard-step {
+        display: none;
+    }
+    .wizard-step.is-active {
+        display: block;
+        animation: wizard-fade-in 0.25s ease;
+    }
+    @keyframes wizard-fade-in {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .wizard-nav {
+        justify-content: space-between;
+    }
+    .wizard-nav-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .btn-wizard-prev, .btn-wizard-next {
+        height: 52px;
+        padding: 0 24px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+    .btn-wizard-prev {
+        background: #f8fafc;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+    }
+    .btn-wizard-prev:hover {
+        background: #f1f5f9;
+    }
+    .btn-wizard-next {
+        background: #2563eb;
+        color: #fff;
+        border: none;
+        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+    }
+    .btn-wizard-next:hover {
+        background: #1d4ed8;
+    }
+    .btn-wizard-prev i, .btn-wizard-next i {
+        width: 16px;
+        height: 16px;
+    }
 </style>
 
 <script>
@@ -479,8 +583,54 @@
         inputs.forEach(input => {
             if (input) input.addEventListener("input", updateTotals);
         });
-        
+
         updateTotals();
+    });
+
+    // WIZARD: uma sessao por vez (Movimentacao, depois uma categoria de
+    // oficina por passo), com barra de progresso e Voltar/Avancar.
+    document.addEventListener("DOMContentLoaded", function () {
+        var form = document.getElementById("ceaiWizardForm");
+        if (!form) return;
+        var steps = Array.prototype.slice.call(form.querySelectorAll(".wizard-step"));
+        if (!steps.length) return;
+
+        var prevBtn = document.getElementById("wizardPrevBtn");
+        var nextBtn = document.getElementById("wizardNextBtn");
+        var saveBtn = document.getElementById("wizardSaveBtn");
+        var fill = document.getElementById("wizardProgressFill");
+        var label = document.getElementById("wizardProgressLabel");
+        var current = 0;
+
+        function render() {
+            steps.forEach(function (step, i) {
+                step.classList.toggle("is-active", i === current);
+            });
+            var isFirst = current === 0;
+            var isLast = current === steps.length - 1;
+            prevBtn.style.visibility = isFirst ? "hidden" : "visible";
+            nextBtn.style.display = isLast ? "none" : "flex";
+            saveBtn.style.display = isLast ? "flex" : "none";
+            var pct = Math.round(((current + 1) / steps.length) * 100);
+            fill.style.width = pct + "%";
+            label.textContent = "Passo " + (current + 1) + " de " + steps.length + ": " + steps[current].dataset.stepTitle;
+            form.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        nextBtn.addEventListener("click", function () {
+            if (current < steps.length - 1) {
+                current++;
+                render();
+            }
+        });
+        prevBtn.addEventListener("click", function () {
+            if (current > 0) {
+                current--;
+                render();
+            }
+        });
+
+        render();
     });
 </script>
 </div>

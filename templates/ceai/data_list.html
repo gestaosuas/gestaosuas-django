@@ -3,7 +3,7 @@
 
 {% block title %}CEAI - Indicadores Detalhados{% endblock %}
 
-{% block body_class %}dashboard-fit-vh theme-emerald{% endblock %}
+{% block body_class %}theme-emerald{% endblock %}
 
 {% block content %}
 <div class="app-shell">
@@ -32,15 +32,31 @@
                                 <option value="Condomínio do Idoso" {% if unit_filter == 'Condomínio do Idoso' %}selected{% endif %}>Condomínio do Idoso</option>
                             </select>
                         </label>
-                        <label class="pill-select">
+                        <div class="pill-select multi-select-pill" id="categoryFilterWrap">
                             <span>Categoria</span>
-                            <select name="category" onchange="this.form.submit()">
-                                <option value="all" {% if category_filter == 'all' %}selected{% endif %}>Todas as Categorias</option>
+                            <button type="button" class="multi-select-trigger" id="categoryFilterTrigger">
+                                <span id="categoryFilterLabel">
+                                    {% if category_filters %}{{ category_filters|length }} selecionada{{ category_filters|length|pluralize }}{% else %}Todas as Categorias{% endif %}
+                                </span>
+                                <i data-lucide="chevron-down"></i>
+                            </button>
+                            <div class="multi-select-panel" id="categoryFilterPanel">
+                                <label class="multi-select-option">
+                                    <input type="checkbox" id="categoryAllCheckbox" {% if not category_filters %}checked{% endif %}>
+                                    <span>Todas as Categorias</span>
+                                </label>
+                                <div class="multi-select-divider"></div>
                                 {% for cat in all_categories %}
-                                <option value="{{ cat }}" {% if category_filter == cat %}selected{% endif %}>{{ cat }}</option>
+                                <label class="multi-select-option">
+                                    <input type="checkbox" name="category" value="{{ cat }}" class="category-option-checkbox" {% if cat in category_filters %}checked{% endif %}>
+                                    <span>{{ cat }}</span>
+                                </label>
                                 {% endfor %}
-                            </select>
-                        </label>
+                                <div class="multi-select-actions">
+                                    <button type="submit" class="btn-apply-filter">Aplicar</button>
+                                </div>
+                            </div>
+                        </div>
                         <label class="pill-select">
                             <span>Ano</span>
                             <select name="year" onchange="this.form.submit()">
@@ -51,7 +67,7 @@
                         </label>
                     </form>
                     {% if can_delete %}
-                    <a href="?{% for k, v in request.GET.items %}{% if k != 'export' %}{{ k }}={{ v }}&{% endif %}{% endfor %}export=xlsx" class="btn-excel" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#16a34a;color:#fff;border-radius:10px;font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap;">
+                    <a href="{% querystring export='xlsx' %}" class="btn-excel" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#16a34a;color:#fff;border-radius:10px;font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap;">
                         <i data-lucide="file-spreadsheet" style="width:14px;height:14px;"></i> Exportar Excel
                     </a>
                     {% endif %}
@@ -200,6 +216,7 @@
 }
 .header-left-group { display: flex; align-items: center; gap: 4px; }
 .header-left-group h1 { margin: 0; line-height: 1; }
+.header-right-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
 .btn-back { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; background: #f1f5f9; color: #64748b; text-decoration: none; }
 .unit-block-premium { margin-bottom: 64px; }
 .unit-title-divider { border-bottom: 2px solid #3b82f6; margin-bottom: 24px; padding-bottom: 8px; }
@@ -232,6 +249,41 @@
     .matrix-table th, .matrix-table td { padding: 8px 4px; font-size: 11px; }
 }
 
+/* Dropdown de categorias em multipla escolha */
+.multi-select-pill { position: relative; }
+.multi-select-trigger {
+    display: flex; align-items: center; gap: 6px;
+    background: transparent; border: none; cursor: pointer;
+    font-size: 14px; font-weight: 700; color: #1e293b;
+    padding: 6px 10px; border-radius: 8px;
+}
+.multi-select-trigger:hover { background: #f1f5f9; }
+.multi-select-trigger i { width: 14px; height: 14px; color: #94a3b8; }
+.multi-select-panel {
+    display: none;
+    position: absolute; top: calc(100% + 8px); left: 0;
+    min-width: 260px; max-height: 320px; overflow-y: auto;
+    background: white; border: 1px solid #e2e8f0; border-radius: 14px;
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    padding: 8px; z-index: 50;
+}
+.multi-select-panel.is-open { display: block; }
+.multi-select-option {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 600; color: #334155;
+}
+.multi-select-option:hover { background: #f8fafc; }
+.multi-select-option input { width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer; flex-shrink: 0; }
+.multi-select-divider { height: 1px; background: #f1f5f9; margin: 6px 4px; }
+.multi-select-actions { padding: 8px 4px 2px; border-top: 1px solid #f1f5f9; margin-top: 6px; }
+.btn-apply-filter {
+    width: 100%; padding: 10px; border: none; border-radius: 8px;
+    background: #2563eb; color: white; font-size: 12px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer;
+}
+.btn-apply-filter:hover { background: #1d4ed8; }
+
 .editable-cell:focus {
     outline: 2px solid #3b82f6;
     background: #fff !important;
@@ -250,6 +302,54 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     if (window.lucide) { lucide.createIcons(); }
+
+    // Dropdown de categorias em multipla escolha
+    (function () {
+        var trigger = document.getElementById('categoryFilterTrigger');
+        var panel = document.getElementById('categoryFilterPanel');
+        if (!trigger || !panel) return;
+        var allCheckbox = document.getElementById('categoryAllCheckbox');
+        var label = document.getElementById('categoryFilterLabel');
+        var catCheckboxes = Array.prototype.slice.call(document.querySelectorAll('.category-option-checkbox'));
+
+        function updateLabel() {
+            var checked = catCheckboxes.filter(function (c) { return c.checked; });
+            if (checked.length === 0) {
+                label.textContent = 'Todas as Categorias';
+            } else if (checked.length === 1) {
+                label.textContent = checked[0].value;
+            } else {
+                label.textContent = checked.length + ' categorias selecionadas';
+            }
+        }
+
+        trigger.addEventListener('click', function (e) {
+            e.stopPropagation();
+            panel.classList.toggle('is-open');
+        });
+        document.addEventListener('click', function (e) {
+            if (panel.classList.contains('is-open') && !panel.contains(e.target) && e.target !== trigger) {
+                panel.classList.remove('is-open');
+            }
+        });
+
+        allCheckbox.addEventListener('change', function () {
+            if (this.checked) {
+                catCheckboxes.forEach(function (cb) { cb.checked = false; });
+            }
+            updateLabel();
+        });
+        catCheckboxes.forEach(function (cb) {
+            cb.addEventListener('change', function () {
+                if (this.checked) {
+                    allCheckbox.checked = false;
+                } else if (!catCheckboxes.some(function (c) { return c.checked; })) {
+                    allCheckbox.checked = true;
+                }
+                updateLabel();
+            });
+        });
+    })();
 
     document.querySelectorAll('.delete-month-btn').forEach(btn => {
         btn.addEventListener('click', function () {

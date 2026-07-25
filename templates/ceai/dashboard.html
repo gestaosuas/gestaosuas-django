@@ -247,7 +247,7 @@
             <h2 id="modalCategoryTitle">Gerenciar Categorias</h2>
             <button class="btn-close-modal" onclick="closeModal('modalCategory')"><i data-lucide="x"></i></button>
         </div>
-        <div class="modal-body">
+        <div class="modal-form-area">
             <form id="formCategory" class="modal-form">
                 <input type="hidden" id="catId">
                 <input type="hidden" id="catUnit">
@@ -259,6 +259,8 @@
                     </div>
                 </div>
             </form>
+        </div>
+        <div class="modal-scroll-area">
             <div class="list-container">
                 <h3>Categorias Registradas</h3>
                 <ul id="listCategories" class="item-list"></ul>
@@ -273,7 +275,7 @@
             <h2 id="modalOficinaTitle">Gerenciar Oficinas</h2>
             <button class="btn-close-modal" onclick="closeModal('modalOficina')"><i data-lucide="x"></i></button>
         </div>
-        <div class="modal-body">
+        <div class="modal-form-area">
             <form id="formOficina" class="modal-form">
                 <input type="hidden" id="ofiId">
                 <input type="hidden" id="ofiUnit">
@@ -287,6 +289,8 @@
                 </div>
                 <button type="submit" class="btn-primary">SALVAR OFICINA</button>
             </form>
+        </div>
+        <div class="modal-scroll-area">
             <div class="list-container">
                 <h3>Oficinas Registradas</h3>
                 <div id="listOficinas" class="item-grid"></div>
@@ -617,27 +621,39 @@ async function deleteOficina(id) {
 .monitoring-chart-wrap canvas, .pie-chart-container canvas { height: 100% !important; max-height: none !important; }
 
 /* MODALS */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 2000; }
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 24px; }
 .modal-overlay.is-active { display: flex; }
-.modal-content { background: white; width: 450px; border-radius: 24px; overflow: hidden; box-shadow: 0 25px 50px rgba(0,0,0,0.1); }
-.modal-header { padding: 20px; background: #f8fafc; display: flex; justify-content: space-between; align-items: center; }
+.modal-content {
+    background: white; width: min(880px, 100%); max-height: 85vh; border-radius: 24px;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.1);
+    display: flex; flex-direction: column; overflow: hidden;
+}
+.modal-header { padding: 20px 24px; background: #f8fafc; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; border-bottom: 1px solid #e2e8f0; }
 .modal-header h2 { font-size: 16px; font-weight: 800; color: #1e3a8a; }
-.btn-close-modal { background: none; border: none; cursor: pointer; color: #94a3b8; }
-.modal-body { padding: 20px; }
+.btn-close-modal { background: none; border: none; cursor: pointer; color: #94a3b8; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.btn-close-modal:hover { background: #e2e8f0; color: #1e293b; }
+.modal-form-area { padding: 20px 24px; flex-shrink: 0; border-bottom: 1px solid #f1f5f9; }
+.modal-scroll-area { padding: 20px 24px; overflow-y: auto; flex: 1; min-height: 0; }
 .modal-form { display: flex; flex-direction: column; gap: 12px; }
 .form-group label { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; }
-.form-group input, .form-group select { padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
+.form-group input, .form-group select { padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; }
 .btn-primary { background: #3b82f6; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 800; cursor: pointer; }
-.list-container { margin-top: 20px; }
 .list-container h3 { font-size: 12px; font-weight: 800; margin-bottom: 12px; color: #64748b; }
-.item-list { list-style: none; padding: 0; }
-.item-list li { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #f1f5f9; }
-.item-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8fafc; border-radius: 10px; margin-bottom: 8px; }
-.item-actions { display: flex; gap: 4px; }
+.item-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.item-list li { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #f8fafc; border-radius: 10px; border: 1px solid #f1f5f9; }
+.item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.item-row { display: flex; flex-direction: column; align-items: stretch; gap: 10px; padding: 14px; background: #f8fafc; border-radius: 12px; border: 1px solid #f1f5f9; }
+.item-row .item-info { display: flex; flex-direction: column; gap: 6px; }
+.item-actions { display: flex; gap: 4px; justify-content: flex-end; }
 .btn-action { width: 28px; height: 28px; border-radius: 6px; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .btn-action.edit { background: #eff6ff; color: #3b82f6; }
 .btn-action.delete { background: #fef2f2; color: #ef4444; }
-.tag { font-size: 10px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; color: #64748b; }
+.tag { font-size: 10px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; color: #64748b; align-self: flex-start; }
+
+@media (max-width: 640px) {
+    .modal-overlay { padding: 12px; }
+    .modal-content { max-height: 92vh; }
+}
 
 @media (max-width: 1100px) { .dashboard-split-layout, .charts-row-inner { grid-template-columns: 1fr; } }
 </style>

@@ -204,25 +204,36 @@ class CeaiUpdateDataView(CeaiBaseMixin, RoleRequiredMixin, View):
         form_def = CEAI_FORM_DEFINITION
         if unit == "Condomínio do Idoso":
             form_def = CONDOMINIO_IDOSO_FORM_DEFINITION
-            context_oficinas = []
+            oficina_groups = []
         else:
-            # For territorial units, fetch registered offices
-            oficinas = CeaiOficina.objects.filter(unit=unit).order_by("activity_name")
-            context_oficinas = []
+            # Para as unidades territoriais, agrupa as oficinas por categoria
+            # (mesma categoria do cadastro) pra virar uma secao por categoria
+            # no formulario, em vez de uma lista vertical unica gigante.
+            oficinas = CeaiOficina.objects.filter(unit=unit).select_related("category").order_by("category__name", "activity_name")
+            groups_by_name = {}
+            group_order = []
             for ofi in oficinas:
-                context_oficinas.append({
+                cat_name = ofi.category.name if ofi.category else "Sem Categoria"
+                if cat_name not in groups_by_name:
+                    groups_by_name[cat_name] = []
+                    group_order.append(cat_name)
+                groups_by_name[cat_name].append({
                     "id": f"ofi_{ofi.id}",
                     "label": ofi.activity_name,
-                    "category": ofi.category.name if ofi.category else "Sem Categoria",
                     "initial_vagas": initial_data.get(f"ofi_{ofi.id}_vagas", ofi.total_vacancies),
                     "initial_ocupacao": initial_data.get(f"ofi_{ofi.id}_ocupacao", ofi.vacancies)
                 })
-            
+            # "Sem Categoria" sempre por ultimo, se existir.
+            if "Sem Categoria" in group_order:
+                group_order.remove("Sem Categoria")
+                group_order.append("Sem Categoria")
+            oficina_groups = [{"category": name, "items": groups_by_name[name]} for name in group_order]
+
         return render(request, "ceai/update_data.html", {
             "unit": unit,
             "directorate": directorate,
             "form_def": form_def,
-            "oficinas": context_oficinas,
+            "oficinas": oficina_groups,
             "initial_data": initial_data,
             "month": month,
             "year": year,
@@ -481,7 +492,7 @@ class CeaiDataListView(ExcelExportMixin, CeaiBaseMixin, RoleRequiredMixin, Templ
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         unit_filter = self.request.GET.get("unit", "all")
-        category_filter = self.request.GET.get("category", "all")
+        category_filters = [c for c in self.request.GET.getlist("category") if c and c != "all"]
         year = int(self.request.GET.get("year", timezone.now().year))
         directorate = Directorate.objects.filter(name__icontains="CEAI").first()
         
@@ -546,8 +557,8 @@ class CeaiDataListView(ExcelExportMixin, CeaiBaseMixin, RoleRequiredMixin, Templ
 
             # Workshops Matrix for this unit
             oficinas = CeaiOficina.objects.filter(unit=u_name).select_related("category").order_by("activity_name")
-            if category_filter != "all":
-                oficinas = oficinas.filter(category__name=category_filter)
+            if category_filters:
+                oficinas = oficinas.filter(category__name__in=category_filters)
 
             for ofi in oficinas:
                 avail_row = {"label": ofi.activity_name, "category": ofi.category.name if ofi.category else "-", "key": f"ofi_{ofi.id}_vagas", "months": [{"val": 0, "sub_id": None, "month": i+1, "year": year} for i in range(12)]}
@@ -573,7 +584,7 @@ class CeaiDataListView(ExcelExportMixin, CeaiBaseMixin, RoleRequiredMixin, Templ
 
         context["units_data"] = units_data
         context["unit_filter"] = unit_filter
-        context["category_filter"] = category_filter
+        context["category_filters"] = category_filters
         context["selected_year"] = year
         context["directorate"] = directorate
         context["month_headers"] = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
