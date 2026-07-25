@@ -1,0 +1,833 @@
+            {% if is_subvencao_only %}
+            <!-- SVG Defs for Gradients -->
+            <svg width="0" height="0" style="position:absolute;">
+              <defs>
+                <linearGradient id="spark-gradient" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#34d399" stop-opacity="0.3"/>
+                  <stop offset="100%" stop-color="#34d399" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+            </svg>
+
+            {% comment %}
+            <div class="glass-action-cards">
+                <a href="{% url 'directorates:osc-list' directorate.pk %}" class="glass-card glass-blue">
+                    <div class="glass-bg-pattern"></div>
+                    <div class="glass-icon"><i data-lucide="building-2"></i></div>
+                    <span class="glass-label">Cadastrar OSC</span>
+                </a>
+                <a href="{% url 'directorates:visit-list' directorate.pk %}" class="glass-card glass-orange">
+                    <div class="glass-bg-pattern"></div>
+                    <div class="glass-icon"><i data-lucide="clipboard-list"></i></div>
+                    <span class="glass-label">Instrumental de Visita</span>
+                </a>
+                <a href="{% url 'directorates:plan-list' directorate.pk %}" class="glass-card glass-violet">
+                    <div class="glass-bg-pattern"></div>
+                    <div class="glass-icon"><i data-lucide="folder-cog"></i></div>
+                    <span class="glass-label">Plano de Trabalho</span>
+                </a>
+                <a href="{% url 'directorates:report-list' directorate.pk %}" class="glass-card glass-green">
+                    <div class="glass-bg-pattern"></div>
+                    <div class="glass-icon"><i data-lucide="file-check-2"></i></div>
+                    <span class="glass-label">Relatórios e Pareceres</span>
+                </a>
+            </div>
+
+            {% endcomment %}
+            {% if dashboard_tab == 'oscs' %}
+            <section class="subvention-inline-panel" id="subventionOscPanel">
+                <div class="inline-panel-header">
+                    <div>
+                        <p class="inline-eyebrow">Cadastro de OSCs</p>
+                        <h2>Organizações da Sociedade Civil</h2>
+                        <span>{{ oscs|length }} OSCs cadastradas nesta diretoria</span>
+                    </div>
+                    <button type="button" class="inline-primary-btn" data-open-osc-modal>
+                        <i data-lucide="plus"></i>
+                        Nova OSC
+                    </button>
+                </div>
+
+                <div class="inline-filter-row">
+                    <div class="inline-search">
+                        <i data-lucide="search"></i>
+                        <input type="text" id="inline-osc-search" placeholder="Buscar OSC pelo nome..." autocomplete="off">
+                    </div>
+                    <select id="inline-osc-type-filter" class="inline-filter-select">
+                        <option value="">Todas as atividades</option>
+                        {% for type in activity_types %}
+                        <option value="{{ type }}">{{ type }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="inline-table-card">
+                    <table class="inline-osc-table" id="inline-osc-table">
+                        <thead>
+                            <tr>
+                                <th>OSC</th>
+                                <th>Tipo de Atividade</th>
+                                <th>Endereço</th>
+                                <th>Telefone</th>
+                                <th>Subvencionados</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for osc in oscs %}
+                            <tr class="inline-osc-row" data-activity="{{ osc.activity_type|default:'' }}">
+                                <td>
+                                    <strong>{{ osc.name }}</strong>
+                                    {% if osc.objeto %}
+                                    <small>{{ osc.objeto|truncatechars:72 }}</small>
+                                    {% endif %}
+                                </td>
+                                <td><span class="inline-tag">{{ osc.activity_type|default:"-"|truncatechars:34 }}</span></td>
+                                <td>
+                                    <span>
+                                        {% if osc.address %}
+                                            {{ osc.address }}{% if osc.number %}, {{ osc.number }}{% endif %}
+                                            {% if osc.neighborhood %} - {{ osc.neighborhood }}{% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td><span>{{ osc.phone|default:"-" }}</span></td>
+                                <td>
+                                    {% if osc.subsidized_count == -1 %}
+                                    <span class="inline-demand-badge">Conforme demanda</span>
+                                    {% else %}
+                                    <strong class="inline-number">{{ osc.subsidized_count }}</strong>
+                                    {% endif %}
+                                </td>
+                                <td class="inline-actions">
+                                    <a href="{% url 'directorates:osc-update' osc.pk %}" title="Editar OSC">
+                                        <i data-lucide="pencil"></i>
+                                    </a>
+                                    {% if can_delete %}
+                                    <form action="{% url 'directorates:osc-delete' osc.pk %}" method="post" onsubmit="return confirm('Excluir OSC {{ osc.name }}?')">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{% url 'monitoramento:home' directorate.pk %}?tab=oscs&bimestre={{ selected_bimester }}&year={{ selected_year }}">
+                                        <button type="submit" title="Excluir OSC">
+                                            <i data-lucide="trash-2"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="inline-empty-cell">
+                                    <i data-lucide="building-x"></i>
+                                    <p>Nenhuma OSC cadastrada ainda.</p>
+                                    <button type="button" class="inline-primary-btn" data-open-osc-modal>
+                                        <i data-lucide="plus"></i>
+                                        Cadastrar primeira OSC
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <div class="inline-modal-backdrop" id="oscModal" aria-hidden="true">
+                <div class="inline-modal-card" role="dialog" aria-modal="true" aria-labelledby="oscModalTitle">
+                    <div class="inline-modal-header">
+                        <div>
+                            <p class="inline-eyebrow">Nova OSC</p>
+                            <h2 id="oscModalTitle">Cadastrar Organização</h2>
+                        </div>
+                        <button type="button" class="inline-modal-close" data-close-osc-modal aria-label="Fechar">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+
+                    <form method="post" action="{% url 'directorates:osc-create' directorate.pk %}" class="inline-osc-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{% url 'monitoramento:home' directorate.pk %}?tab=oscs&bimestre={{ selected_bimester }}&year={{ selected_year }}">
+
+                        <label>
+                            <span>Nome da Instituição</span>
+                            <input type="text" name="name" required>
+                        </label>
+
+                        <label>
+                            <span>Tipo de Atividade</span>
+                            <select name="activity_type" required>
+                                <option value="">Selecione o tipo de atividade</option>
+                                {% for value, label in osc_form.fields.activity_type.widget.choices %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+
+                        <div class="inline-form-grid">
+                            <label>
+                                <span>CEP</span>
+                                <input type="text" name="cep" id="inline_id_cep" required>
+                            </label>
+                            <label>
+                                <span>Telefone</span>
+                                <input type="text" name="phone">
+                            </label>
+                        </div>
+
+                        <div class="inline-form-grid wide-left">
+                            <label>
+                                <span>Rua / Logradouro</span>
+                                <input type="text" name="address" id="inline_id_address" required>
+                            </label>
+                            <label>
+                                <span>Número</span>
+                                <input type="text" name="number" required>
+                            </label>
+                        </div>
+
+                        <div class="inline-form-grid">
+                            <label>
+                                <span>Bairro</span>
+                                <input type="text" name="neighborhood" id="inline_id_neighborhood" required>
+                            </label>
+                            <div class="inline-subs-field">
+                                <span>Subvencionados</span>
+                                <label class="inline-radio">
+                                    <input type="radio" name="subsidized_type" value="number" checked>
+                                    Número
+                                </label>
+                                <label class="inline-radio">
+                                    <input type="radio" name="subsidized_type" value="demand">
+                                    Conforme demanda
+                                </label>
+                                <input type="number" name="subsidized_count" id="inline_subsidized_count" value="0">
+                            </div>
+                        </div>
+
+                        <div class="inline-modal-actions">
+                            <button type="button" class="inline-secondary-btn" data-close-osc-modal>Cancelar</button>
+                            <button type="submit" class="inline-primary-btn">
+                                <i data-lucide="save"></i>
+                                Salvar OSC
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% elif dashboard_tab == 'visits' %}
+            <section class="subvention-inline-panel" id="subventionVisitPanel">
+                <div class="inline-panel-header">
+                    <div>
+                        <p class="inline-eyebrow">Instrumental de Visita</p>
+                        <h2>Últimas Visitas Realizadas</h2>
+                        <span>{{ dashboard_visits|length }} visitas no período selecionado</span>
+                    </div>
+                    <a href="{% url 'directorates:visit-create' directorate.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-primary-btn inline-link-btn">
+                        <i data-lucide="plus"></i>
+                        Nova Visita
+                    </a>
+                </div>
+
+                <div class="inline-filter-row">
+                    <div class="inline-search">
+                        <i data-lucide="search"></i>
+                        <input type="text" id="inline-visit-search" placeholder="Filtrar por OSC..." autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="inline-table-card inline-visits-scroll">
+                    <table class="inline-visit-table" id="inline-visit-table">
+                        <thead>
+                            <tr>
+                                <th>Data e OSC</th>
+                                <th>Técnicos</th>
+                                <th>Status</th>
+                                <th>Registrado por</th>
+                                <th>Documentos</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for visit in dashboard_visits %}
+                            <tr class="inline-visit-row">
+                                <td>
+                                    <strong class="inline-visit-osc">{{ visit.osc.name }}</strong>
+                                    <small>{{ visit.visit_date|date:"d/m/Y" }} · salvo às {{ visit.visit_time|time:"H:i" }}</small>
+                                </td>
+                                <td>
+                                    <span class="inline-techs">
+                                        {% if visit.assinaturas.tecnico1_nome %}
+                                            {{ visit.tecnico1_display }}
+                                        {% endif %}
+                                        {% if visit.assinaturas.tecnico2_nome %}
+                                            {% if visit.assinaturas.tecnico1_nome %}<br>{% endif %}{{ visit.tecnico2_display }}
+                                        {% endif %}
+                                        {% if not visit.assinaturas.tecnico1_nome and not visit.assinaturas.tecnico2_nome %}
+                                            Não informado
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="inline-status-badge {% if visit.status == 'completed' or visit.status == 'finalized' %}is-finalized{% else %}is-draft{% endif %}">
+                                        <i data-lucide="{% if visit.status == 'completed' or visit.status == 'finalized' %}check-circle-2{% else %}clock-3{% endif %}"></i>
+                                        {% if visit.status == 'completed' or visit.status == 'finalized' %}Finalizado{% else %}Rascunho{% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="inline-registered">
+                                        <span>{{ visit.registered_by_name|first|default:"?" }}</span>
+                                        {{ visit.registered_by_name|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if visit.status == 'completed' or visit.status == 'finalized' %}
+                                    <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}" class="inline-doc-btn">
+                                        <i data-lucide="file-text"></i>
+                                        Relatório de Visita
+                                    </a>
+                                    {% else %}
+                                    <span class="inline-muted">Liberado ao finalizar</span>
+                                    {% endif %}
+                                </td>
+                                <td class="inline-actions inline-visit-actions">
+                                    {% if visit.status == 'completed' or visit.status == 'finalized' %}
+                                    <a href="{% url 'directorates:visit-instrumental' visit.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-view-action" title="Visualizar">
+                                        <i data-lucide="eye"></i>
+                                    </a>
+                                    <form action="{% url 'directorates:visit-revert' visit.pk %}" method="post" onsubmit="return confirm('Deseja reverter para rascunho?')">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{% url 'monitoramento:home' directorate.pk %}?tab=visits&bimestre={{ selected_bimester }}&year={{ selected_year }}">
+                                        <button type="submit" class="inline-revert-action" title="Reverter para rascunho">
+                                            <i data-lucide="undo-2"></i>
+                                        </button>
+                                    </form>
+                                    {% else %}
+                                    <a href="{% url 'directorates:visit-instrumental' visit.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-edit-action" title="Editar">
+                                        <i data-lucide="square-pen"></i>
+                                    </a>
+                                    {% endif %}
+
+                                    {% if can_delete %}
+                                    <form action="{% url 'directorates:visit-delete' visit.pk %}" method="post" onsubmit="return confirm('Tem certeza que deseja excluir esta visita?')">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{% url 'monitoramento:home' directorate.pk %}?tab=visits&bimestre={{ selected_bimester }}&year={{ selected_year }}">
+                                        <button type="submit" class="inline-delete-action" title="Excluir">
+                                            <i data-lucide="trash-2"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="inline-empty-cell">
+                                    <i data-lucide="clipboard-x"></i>
+                                    <p>Nenhuma visita registrada neste período.</p>
+                                    <a href="{% url 'directorates:visit-create' directorate.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-primary-btn inline-link-btn">
+                                        <i data-lucide="plus"></i>
+                                        Criar primeira visita
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            {% elif dashboard_tab == 'plans' %}
+            <section class="subvention-inline-panel" id="subventionPlanPanel">
+                <div class="inline-panel-header">
+                    <div>
+                        <p class="inline-eyebrow">Plano de Trabalho</p>
+                        <h2>Planos por OSC</h2>
+                        <span>{{ dashboard_plan_oscs|length }} OSCs disponíveis nesta diretoria</span>
+                    </div>
+                    <div class="inline-search inline-plan-search">
+                        <i data-lucide="search"></i>
+                        <input type="text" id="inline-plan-search" placeholder="Buscar OSC..." autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="inline-plan-grid-scroll">
+                    <div class="inline-plan-grid" id="inline-plan-grid">
+                        {% for osc in dashboard_plan_oscs %}
+                        <article class="inline-plan-card" data-osc-name="{{ osc.name|lower }}">
+                            <div class="inline-plan-card-head">
+                                <h3>{{ osc.name }}</h3>
+                            </div>
+
+                            <div class="inline-plan-card-body">
+                                {% if is_emendas or is_fundos %}
+                                    {% for plan in osc.work_plans.all %}
+                                    <div class="inline-plan-file inline-plan-file-row">
+                                        <div class="inline-plan-file-icon">
+                                            <i data-lucide="file-pen-line"></i>
+                                        </div>
+                                        <div class="inline-plan-file-copy">
+                                            <strong>{{ plan.title }}</strong>
+                                            <span>{{ plan.created_at|date:"d/m/Y"|default:"Sem data" }}</span>
+                                        </div>
+                                        <div class="inline-plan-row-actions">
+                                            <button type="button" class="inline-plan-icon-btn" title="Visualizar plano" onclick="openInlinePlanPreview('{{ osc.pk }}', '{{ plan.pk }}')">
+                                                <i data-lucide="eye"></i>
+                                            </button>
+                                            <button type="button" class="inline-plan-icon-btn is-accent" title="Objeto e descrição dos objetivos"
+                                                data-action="{% url 'directorates:plan-objectives' plan.pk %}"
+                                                data-plan-title="{{ plan.title }}"
+                                                data-objeto="{{ plan.objeto }}"
+                                                data-objetivos="{{ plan.objetivos }}"
+                                                data-metas="{{ plan.metas }}"
+                                                data-atividades="{{ plan.atividades }}"
+                                                onclick="openPlanObjectives(this)">
+                                                <i data-lucide="list-checks"></i>
+                                            </button>
+                                            <a href="{% url 'directorates:plan-update' plan.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dplans%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-plan-icon-btn" title="Editar plano">
+                                                <i data-lucide="pencil"></i>
+                                            </a>
+                                            {% if can_delete %}
+                                            <form action="{% url 'directorates:plan-delete' plan.pk %}" method="post" onsubmit="return confirm('Excluir plano {{ plan.title }}?')">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="next" value="{% url 'monitoramento:home' directorate.pk %}?tab=plans&bimestre={{ selected_bimester }}&year={{ selected_year }}">
+                                                <button type="submit" class="inline-plan-icon-btn is-danger" title="Excluir plano">
+                                                    <i data-lucide="trash-2"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% empty %}
+                                    <p class="inline-plan-empty">Nenhum plano criado.</p>
+                                    {% endfor %}
+                                {% else %}
+                                {% with latest_plan=osc.work_plans.all|first %}
+                                    {% if latest_plan %}
+                                    <div class="inline-plan-file">
+                                        <div class="inline-plan-file-icon">
+                                            <i data-lucide="file-pen-line"></i>
+                                        </div>
+                                        <div>
+                                            <strong>{{ latest_plan.title }}</strong>
+                                            <span>{{ latest_plan.created_at|date:"d/m/Y"|default:"Sem data" }}</span>
+                                        </div>
+                                    </div>
+                                    {% else %}
+                                    <p class="inline-plan-empty">Nenhum plano criado.</p>
+                                    {% endif %}
+                                {% endwith %}
+                                {% endif %}
+                            </div>
+
+                            <div class="inline-plan-actions">
+                                <a href="{% url 'directorates:plan-create' directorate.pk %}?osc={{ osc.pk }}&next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dplans%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-plan-new-btn">
+                                    <i data-lucide="plus"></i>
+                                    Novo Plano
+                                </a>
+                                {% if not is_emendas and not is_fundos %}
+                                {% with latest_plan=osc.work_plans.all|first %}
+                                    {% if latest_plan %}
+                                    <button type="button" class="inline-plan-icon-btn" title="Visualizar plano" onclick="openInlinePlanPreview('{{ osc.pk }}')">
+                                        <i data-lucide="eye"></i>
+                                    </button>
+                                    <a href="{% url 'directorates:plan-update' latest_plan.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dplans%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-plan-icon-btn" title="Editar plano">
+                                        <i data-lucide="pencil"></i>
+                                    </a>
+                                    {% if can_delete %}
+                                    <form action="{% url 'directorates:plan-delete' latest_plan.pk %}" method="post" onsubmit="return confirm('Excluir plano {{ latest_plan.title }}?')">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{% url 'monitoramento:home' directorate.pk %}?tab=plans&bimestre={{ selected_bimester }}&year={{ selected_year }}">
+                                        <button type="submit" class="inline-plan-icon-btn is-danger" title="Excluir plano">
+                                            <i data-lucide="trash-2"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    {% endif %}
+                                {% endwith %}
+                                {% endif %}
+                            </div>
+                        </article>
+                        {% empty %}
+                        <div class="inline-empty-cell">
+                            <i data-lucide="building-x"></i>
+                            <p>Nenhuma OSC cadastrada para criar planos.</p>
+                            <a href="?tab=oscs&bimestre={{ selected_bimester }}&year={{ selected_year }}" class="inline-primary-btn inline-link-btn">
+                                <i data-lucide="plus"></i>
+                                Cadastrar OSC
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+
+            <div id="inlinePlanPreviewModal" class="plan-preview-modal" style="display:none;">
+                <div class="plan-preview-dialog">
+                    <div class="plan-preview-modal-header">
+                        <div>
+                            <span class="plan-preview-modal-eyebrow">Plano de trabalho</span>
+                            <h3 id="inlinePlanPreviewTitle">Visualização do documento</h3>
+                        </div>
+                        <button type="button" class="plan-preview-close" onclick="closeInlinePlanPreview()" aria-label="Fechar visualização">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <div id="inlinePlanPreviewBody" class="plan-preview-modal-body"></div>
+                    <div class="plan-preview-modal-actions">
+                        <button type="button" class="plan-action-btn" onclick="closeInlinePlanPreview()">Fechar</button>
+                        <a href="#" target="_blank" rel="noopener noreferrer" id="inlinePlanPreviewOpenLink" class="plan-primary-btn">Abrir em nova guia</a>
+                    </div>
+                </div>
+            </div>
+
+            {% if is_emendas or is_fundos %}
+            {% include "directorates/monitoring/partials/plan_objectives_modal.html" %}
+            <style>
+                .inline-plan-file-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 10px 12px;
+                    border-radius: 12px;
+                    border: 1px solid rgba(148, 163, 184, 0.3);
+                    background: rgba(255, 255, 255, 0.6);
+                }
+
+                .inline-plan-file-row + .inline-plan-file-row {
+                    margin-top: 8px;
+                }
+
+                .inline-plan-file-copy {
+                    min-width: 0;
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                }
+
+                .inline-plan-file-copy strong {
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .inline-plan-row-actions {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    flex-shrink: 0;
+                }
+
+                .inline-plan-icon-btn.is-accent {
+                    border-color: #bfdbfe;
+                    background: #eff6ff;
+                    color: #2563eb;
+                }
+
+                .inline-plan-icon-btn.is-accent:hover {
+                    border-color: #2563eb;
+                    background: #dbeafe;
+                }
+            </style>
+            {% endif %}
+            {% elif dashboard_tab == 'reports' %}
+            <section class="subvention-inline-panel" id="subventionReportPanel">
+                <div class="inline-panel-header" style="display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 12px;">
+                    <p class="inline-eyebrow" style="margin: 0; white-space: nowrap;">Relatórios e Pareceres</p>
+                    
+                    <div class="inline-search" style="max-width: 400px; flex: 1;">
+                        <i data-lucide="search"></i>
+                        <input type="text" id="inline-report-search" placeholder="Buscar relatório por OSC..." autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="inline-table-card" style="margin-top: 16px; padding: 20px; background: rgba(255,255,255,0.4);">
+                    <div class="report-cards-grid" id="inline-report-grid">
+                    {% for visit in dashboard_visits %}
+                    {% if visit.status == 'finalized' or visit.status == 'completed' %}
+                    <div class="report-card" data-osc="{{ visit.osc.name|lower }}">
+                        <div class="report-card-header">
+                            <div class="report-card-icon">
+                                <i data-lucide="file-check-2"></i>
+                            </div>
+                            <div class="report-card-status">
+                                <span class="badge-finalized-sm">Finalizado</span>
+                            </div>
+                        </div>
+                        <div class="report-card-body">
+                            <h3 class="report-osc-name" title="{{ visit.osc.name }}">{{ visit.osc.name }}</h3>
+                            <div class="report-date-row">
+                                <i data-lucide="calendar"></i>
+                                <span>{{ visit.visit_date|date:"d/m/Y" }}</span>
+                            </div>
+                            {% if visit.assinaturas.tecnico1_nome %}
+                            <div class="report-tech-row">
+                                <i data-lucide="user"></i>
+                                <span>{{ visit.assinaturas.tecnico1_nome }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="report-card-actions">
+                            <a href="{% url 'directorates:visit-report' visit.pk 'relatorio_final' %}" class="report-action-btn {% if visit.relatorio_final.status == 'finalized' %}btn-green{% elif visit.relatorio_final.status == 'draft' %}btn-amber{% else %}btn-neutral{% endif %}">
+                                <i data-lucide="file-check"></i> Relatório Final
+                                {% if visit.relatorio_final.status == 'finalized' %}<span class="btn-badge">✓</span>{% elif visit.relatorio_final.status == 'draft' %}<span class="btn-badge-draft">Rascunho</span>{% endif %}
+                            </a>
+                            <a href="{% url 'directorates:visit-report' visit.pk 'parecer_conclusivo' %}" class="report-action-btn {% if visit.parecer_conclusivo.status == 'finalized' %}btn-green{% elif visit.parecer_conclusivo.status == 'draft' %}btn-amber{% else %}btn-neutral{% endif %}">
+                                <i data-lucide="check-circle-2"></i> Parecer Conclusivo
+                                {% if visit.parecer_conclusivo.status == 'finalized' %}<span class="btn-badge">✓</span>{% elif visit.parecer_conclusivo.status == 'draft' %}<span class="btn-badge-draft">Rascunho</span>{% endif %}
+                            </a>
+                            <a href="{% url 'directorates:visit-instrumental' visit.pk %}" class="report-action-btn btn-slate-light">
+                                <i data-lucide="clipboard-list"></i> Instrumental
+                            </a>
+                            {# Notificações (PDF) ── #}
+                            <div class="notif-section">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                    <span class="notif-label"><i data-lucide="paperclip"></i> Notificações (PDF)</span>
+                                    <div>
+                                        <input type="file" id="notif-input-{{ visit.pk }}" style="display: none;" accept=".pdf" onchange="uploadNotification('{{ visit.pk }}')">
+                                        <button type="button" class="btn-attach-pdf" onclick="document.getElementById('notif-input-{{ visit.pk }}').click()">
+                                            <i data-lucide="upload-cloud" style="width: 12px; height: 12px;"></i> Anexar PDF
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="notif-items-list" id="notif-list-{{ visit.pk }}">
+                                    {% if visit.notificacoes %}
+                                        {% for notif in visit.notificacoes %}
+                                        <div class="notif-item">
+                                            <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; flex: 1;">
+                                                <i data-lucide="file-text" style="color:#ef4444; width: 13px; height: 13px; flex-shrink: 0;"></i>
+                                                <a href="{{ notif.url }}" target="_blank" class="notif-name" title="{{ notif.name }}">{{ notif.name }}</a>
+                                            </div>
+                                            <div style="display: flex; gap: 4px; flex-shrink: 0;">
+                                                <a href="{{ notif.url }}" target="_blank" class="btn-notif-action" title="Visualizar"><i data-lucide="external-link"></i></a>
+                                                <button type="button" class="btn-notif-action btn-notif-delete" onclick="removeNotification('{{ visit.pk }}', {{ forloop.index0 }})" title="Excluir"><i data-lucide="trash-2"></i></button>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <p class="notif-empty-text">Nenhuma notificação anexada.</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+                <div id="inline-report-empty" style="display:none;" class="inline-empty-cell">
+                    <i data-lucide="file-x"></i>
+                    <p>Nenhum relatório encontrado para essa busca.</p>
+                </div>
+            </section>
+            {% else %}
+            <div class="glass-kpi-grid kpi-grid-4">
+                <!-- KPI 1: Total de OSCs -->
+                <article class="glass-kpi-card kpi-card-blue">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap blue"><i data-lucide="building-2"></i></div>
+                        <span class="gkpi-badge badge-blue">Cadastradas</span>
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Total de OSCs</p>
+                        <strong class="gkpi-value">{{ subvencao_stats.totalOSCs }}</strong>
+                    </div>
+                    <div class="gkpi-footer">
+                        <div class="gkpi-progress-track">
+                            <div class="gkpi-progress-fill" style="background: #3b82f6; width: 100%;"></div>
+                        </div>
+                        <span class="gkpi-footer-label">no bimestre</span>
+                    </div>
+                </article>
+
+                <!-- KPI 2: Visitas no Bimestre -->
+                <article class="glass-kpi-card kpi-card-amber">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap orange"><i data-lucide="clipboard-list"></i></div>
+                        <span class="gkpi-badge badge-amber">{{ subvencao_stats.draftVisits }} em andamento</span>
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Visitas no Bimestre</p>
+                        <strong class="gkpi-value">{{ subvencao_stats.totalVisits }}</strong>
+                    </div>
+                    <div class="gkpi-footer">
+                        <div class="gkpi-progress-track">
+                            <div class="gkpi-progress-fill" id="kpi-visits-bar" style="background: #f59e0b; width: {{ subvencao_stats.finalizationRate }}%;"></div>
+                        </div>
+                        <span class="gkpi-footer-label">{{ subvencao_stats.finalizationRate }}% concluídas</span>
+                    </div>
+                </article>
+
+                <!-- KPI 3: Visitas Finalizadas -->
+                <article class="glass-kpi-card kpi-card-emerald">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap green"><i data-lucide="shield-check"></i></div>
+                        <span class="gkpi-badge badge-emerald">Concluídas</span>
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Visitas Finalizadas</p>
+                        <strong class="gkpi-value">{{ subvencao_stats.finalizedVisits }}</strong>
+                    </div>
+                    <div class="gkpi-footer">
+                        <div class="gkpi-progress-track">
+                            <div class="gkpi-progress-fill" style="background: #10b981; width: {{ subvencao_stats.finalizationRate }}%;"></div>
+                        </div>
+                        <span class="gkpi-footer-label">de {{ subvencao_stats.totalVisits }} visitas</span>
+                    </div>
+                </article>
+
+                <!-- KPI 4: Taxa de Finalização -->
+                <article class="glass-kpi-card kpi-card-rate">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap purple"><i data-lucide="percent"></i></div>
+                        {% if subvencao_stats.finalizationRate == 100 %}
+                            <span class="gkpi-badge badge-success">Meta atingida</span>
+                        {% elif subvencao_stats.finalizationRate >= 70 %}
+                            <span class="gkpi-badge badge-emerald">No caminho certo</span>
+                        {% else %}
+                            <span class="gkpi-badge badge-amber">Em progresso</span>
+                        {% endif %}
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Taxa de Finalização</p>
+                        <strong class="gkpi-value" style="color: {% if subvencao_stats.finalizationRate == 100 %}#059669{% elif subvencao_stats.finalizationRate >= 70 %}#0284c7{% else %}#d97706{% endif %};">{{ subvencao_stats.finalizationRate }}%</strong>
+                    </div>
+                    <div class="gkpi-donut-wrap">
+                        <svg class="gkpi-donut-svg" viewBox="0 0 36 36">
+                            <path class="gkpi-donut-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <path class="gkpi-donut-fill" stroke-dasharray="{{ subvencao_stats.finalizationRate }}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                style="stroke: {% if subvencao_stats.finalizationRate == 100 %}#10b981{% elif subvencao_stats.finalizationRate >= 70 %}#3b82f6{% else %}#f59e0b{% endif %};" />
+                        </svg>
+                    </div>
+                </article>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <!-- KPI cards para Emendas, Fundos e Outros -->
+            <div class="glass-kpi-grid kpi-grid-4 {% if is_emendas %}kpi-theme-amber{% elif is_fundos %}kpi-theme-indigo{% else %}kpi-theme-blue{% endif %}">
+                <article class="glass-kpi-card kpi-card-blue">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap blue"><i data-lucide="building-2"></i></div>
+                        <span class="gkpi-badge badge-blue">Cadastradas</span>
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Total de OSCs</p>
+                        <strong class="gkpi-value">{{ subvencao_stats.totalOSCs }}</strong>
+                    </div>
+                    <div class="gkpi-footer">
+                        <div class="gkpi-progress-track"><div class="gkpi-progress-fill" style="background: #3b82f6; width: 100%;"></div></div>
+                        <span class="gkpi-footer-label">no bimestre</span>
+                    </div>
+                </article>
+                <article class="glass-kpi-card kpi-card-amber">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap orange"><i data-lucide="clipboard-list"></i></div>
+                        <span class="gkpi-badge badge-amber">{{ subvencao_stats.draftVisits }} em andamento</span>
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Visitas no Bimestre</p>
+                        <strong class="gkpi-value">{{ subvencao_stats.totalVisits }}</strong>
+                    </div>
+                    <div class="gkpi-footer">
+                        <div class="gkpi-progress-track"><div class="gkpi-progress-fill" style="background: #f59e0b; width: {{ subvencao_stats.finalizationRate }}%;"></div></div>
+                        <span class="gkpi-footer-label">{{ subvencao_stats.finalizationRate }}% concluídas</span>
+                    </div>
+                </article>
+                <article class="glass-kpi-card kpi-card-emerald">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap green"><i data-lucide="shield-check"></i></div>
+                        <span class="gkpi-badge badge-emerald">Concluídas</span>
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Visitas Finalizadas</p>
+                        <strong class="gkpi-value">{{ subvencao_stats.finalizedVisits }}</strong>
+                    </div>
+                    <div class="gkpi-footer">
+                        <div class="gkpi-progress-track"><div class="gkpi-progress-fill" style="background: #10b981; width: {{ subvencao_stats.finalizationRate }}%;"></div></div>
+                        <span class="gkpi-footer-label">de {{ subvencao_stats.totalVisits }} visitas</span>
+                    </div>
+                </article>
+                <article class="glass-kpi-card kpi-card-rate">
+                    <div class="gkpi-top">
+                        <div class="gkpi-icon-wrap purple"><i data-lucide="percent"></i></div>
+                        {% if subvencao_stats.finalizationRate == 100 %}
+                            <span class="gkpi-badge badge-success">Meta atingida</span>
+                        {% elif subvencao_stats.finalizationRate >= 70 %}
+                            <span class="gkpi-badge badge-emerald">No caminho certo</span>
+                        {% else %}
+                            <span class="gkpi-badge badge-amber">Em progresso</span>
+                        {% endif %}
+                    </div>
+                    <div class="gkpi-body">
+                        <p class="gkpi-label">Taxa de Finalização</p>
+                        <strong class="gkpi-value" style="color: {% if subvencao_stats.finalizationRate == 100 %}#059669{% elif subvencao_stats.finalizationRate >= 70 %}#0284c7{% else %}#d97706{% endif %};">{{ subvencao_stats.finalizationRate }}%</strong>
+                    </div>
+                    <div class="gkpi-donut-wrap">
+                        <svg class="gkpi-donut-svg" viewBox="0 0 36 36">
+                            <path class="gkpi-donut-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <path class="gkpi-donut-fill" stroke-dasharray="{{ subvencao_stats.finalizationRate }}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                style="stroke: {% if subvencao_stats.finalizationRate == 100 %}#10b981{% elif subvencao_stats.finalizationRate >= 70 %}#3b82f6{% else %}#f59e0b{% endif %};" />
+                        </svg>
+                    </div>
+                </article>
+            </div>
+
+            <!-- Original Design para Outros, Fundos e Emendas -->
+            <div class="mon-action-cards">
+                <a href="{% url 'directorates:osc-list' directorate.pk %}" class="mon-action-card">
+                    <div class="mac-icon mac-icon-blue"><i data-lucide="building-2"></i></div>
+                    <span>Cadastrar OSC</span>
+                </a>
+                <a href="{% url 'directorates:visit-list' directorate.pk %}" class="mon-action-card">
+                    <div class="mac-icon mac-icon-orange"><i data-lucide="clipboard-list"></i></div>
+                    <span>Instrumental de Visita</span>
+                </a>
+                <a href="{% url 'directorates:plan-list' directorate.pk %}" class="mon-action-card">
+                    <div class="mac-icon mac-icon-violet"><i data-lucide="folder-open"></i></div>
+                    <span>Plano de Trabalho</span>
+                </a>
+                <a href="{% url 'directorates:report-list' directorate.pk %}" class="mon-action-card">
+                    <div class="mac-icon mac-icon-green"><i data-lucide="file-check-2"></i></div>
+                    <span>Relatórios e Pareceres</span>
+                </a>
+            </div>
+
+            {% if cards %}
+            <div class="monitoring-kpi-grid">
+                {% for card in cards %}
+                <article class="monitoring-kpi-card kpi-blue">
+                    <div class="kpi-icon-wrap"><i data-lucide="bar-chart-3"></i></div>
+                    <div class="kpi-body">
+                        <p>{{ card.label }}</p>
+                        <strong>{{ card.value }}</strong>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="monitoring-kpi-grid">
+                <article class="monitoring-kpi-card kpi-blue">
+                    <div class="kpi-icon-wrap"><i data-lucide="building-2"></i></div>
+                    <div class="kpi-body">
+                        <p>Total de OSCs</p>
+                        <strong>{{ subvencao_stats.totalOSCs }}</strong>
+                    </div>
+                </article>
+                <article class="monitoring-kpi-card kpi-indigo">
+                    <div class="kpi-icon-wrap"><i data-lucide="clipboard-list"></i></div>
+                    <div class="kpi-body">
+                        <p>Visitas no Bimestre</p>
+                        <strong>{{ subvencao_stats.totalVisits }}</strong>
+                    </div>
+                </article>
+                <article class="monitoring-kpi-card kpi-emerald">
+                    <div class="kpi-icon-wrap"><i data-lucide="check-circle-2"></i></div>
+                    <div class="kpi-body">
+                        <p>Visitas Finalizadas</p>
+                        <strong>{{ subvencao_stats.finalizedVisits }}</strong>
+                    </div>
+                </article>
+            </div>
+            {% endif %}

@@ -82,6 +82,15 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
     def get_object(self, queryset=None):
         return self.get_directorate()
 
+    def get_template_names(self):
+        # Troca de aba via JS busca só o fragmento (ver tabContentRegion em
+        # home.html) em vez da página inteira - evita recarregar navbar/
+        # cabecalho/cards a cada clique. Fallback (sem X-Requested-With,
+        # ex. acesso direto por URL/bookmark) sempre renderiza a pagina cheia.
+        if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return ["monitoramento/_tab_content.html"]
+        return [self.template_name]
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         directorate = self.object
