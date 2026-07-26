@@ -24,22 +24,27 @@ def get_user_allowed_units(user, directorate):
     if not profile:
         return []
 
-    # Diretoria primária → acesso total a todas as unidades
-    if profile.primary_directorate_id and str(profile.primary_directorate_id) == str(directorate.pk):
-        return None
-
     link = ProfileDirectorate.objects.filter(
         profile=profile,
         directorate_id=directorate.pk,
     ).first()
 
-    if not link:
-        return []
+    if link:
+        if link.allowed_units is None:
+            return None
+        return link.allowed_units or []
 
-    if link.allowed_units is None:
+    # Sem vínculo explícito em ProfileDirectorate (grade de permissões nunca
+    # configurada pra essa diretoria): se for a diretoria primária (lotação)
+    # do usuário, mantém acesso total — nunca houve restrição de unidade
+    # definida. Precisa vir DEPOIS do check de `link` acima: quando o admin
+    # marca a diretoria primária E restringe unidades na grade (caso comum —
+    # ex. agente lotado no CRAS com só 2 unidades marcadas), o vínculo
+    # explícito manda, não esse fallback.
+    if profile.primary_directorate_id and str(profile.primary_directorate_id) == str(directorate.pk):
         return None
 
-    return link.allowed_units or []
+    return []
 
 
 def user_has_directorate_access(user, directorate):
