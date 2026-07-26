@@ -145,6 +145,14 @@ Se o nome de uma Directorate no banco estiver corrompido (encoding errado), o co
 - `ModelBackend` (Django nativo) — único backend ativo
 - Roles de usuário: `admin`, `diretor`, `agente`, `user` (em `Profile.role`, tabela `profiles`)
 
+### 5. Tema por diretoria e layout "fit-to-viewport" (`static/css/app.css`)
+
+**Cor da navbar/cabeçalho por diretoria**: cada diretoria tem uma cor fixa (`theme-emerald` CRAS/CEAI, `theme-indigo` NAICA/Proteção Especial/SINE-CP, `theme-blue` Benefícios/Pop Rua, `theme-amber` CREAS Idoso/PCD, `theme-pink` Casa da Mulher; Subvenção/Emendas/Outros usam cor dinâmica via `theme_class` no contexto — ver `get_monitoramento_theme()` em `apps/directorates/views.py`). A cor só é aplicada se o template define `{% block body_class %}...theme-X{% endblock %}` — como cada página de um app (home, form, dados, relatório mensal, histórico) é um arquivo `.html` separado que sobrescreve esse block individualmente, é fácil esquecer de definir em uma página nova e ela cair no azul de fallback do CSS (`--nav-grad-start: #366cb0`, coincidentemente igual ao `theme-blue`, o que mascara o esquecimento nas diretorias que já são azuis). **Ao criar uma página nova para uma diretoria já existente, sempre copiar o `{% block body_class %}` do `home.html`/`dashboard.html` daquele mesmo app.**
+
+**`body.dashboard-fit-vh`**: classe que trava a página em exatamente `100vh` com `overflow: hidden !important` — pensada só para dashboards fixos tipo TV (o próprio `dashboard.html` de cada app, com KPIs/gráficos que devem caber numa tela só, sem rolar). **Nunca usar essa classe em páginas de conteúdo variável** (listagens, relatórios, formulários longos) — se o conteúdo real for mais alto que a tela, ele fica cortado e **não há nenhuma barra de rolagem para alcançá-lo** (bug real encontrado em 2026-07-25 no CEAI: `ceai/dados/` com "Todas as Unidades" tinha ~15000px de conteúdo, mas só os primeiros 900px apareciam, sem nenhuma forma de rolar até as outras unidades). Antes de copiar `dashboard-fit-vh theme-X` de outra página do mesmo app, perguntar: "essa página cabe garantidamente numa tela, sempre, para qualquer quantidade de dados?" — se a resposta for não, usar só `theme-X`.
+
+**`.dashboard-container` precisa de `width: 100%` explícito** (além do `max-width` que já tinha) — sem isso, dentro do layout flex de `.app-shell`, o elemento encolhe pro tamanho mínimo do conteúdo em vez de esticar, e qualquer CSS Grid com `repeat(auto-fill, minmax(...))` dentro dele colapsa silenciosamente pra 1 coluna só (mesmo bug, achado e corrigido em 2026-07-25 — já corrigido na classe global, não deve mais acontecer, mas vale saber se aparecer de novo em outro contexto flex).
+
 ---
 
 ## Mapa de Apps
@@ -409,6 +417,8 @@ A partir de 2026-07-21, os formulários de violação do CREAS foram estratifica
 | 6 | `beneficios_reports.user_id` é setado para `None` no `form_valid()` em vez de `request.user.pk` (diferente do padrão de todas as outras diretorias) | Quem preencheu benefícios não é rastreável | Média |
 
 Achados e corrigidos na mesma sessão (2026-07-13): rota `quick-edit` do NAICA/CRAS inacessível (ordem de URL), `IntegrityError` ao criar relatório novo via quick-edit do CREAS Idoso/PCD (`updated_at` faltando no `get_or_create`), 500 para admin em diretoria inexistente (query desprotegida em 6 List/CreateViews), drift de nullability em `naica_reports.user_id`, `ValidationError` não capturada em `DirectorateSlugConverter.to_url()`, tipo de coluna incompatível em `creas_pop_rua_reports.created_by` (agora `uuid` com FK), e toast de sucesso+erro simultâneo em `UserPermissionsView`. Ver `git log` para detalhes — não repetidos aqui pois já não são débito técnico atual.
+
+Achados e corrigidos em 2026-07-25: navbar não seguia a cor da diretoria fora da página inicial de cada app (faltava `{% block body_class %}` nos templates de form/dados/relatório — ver seção "Arquitetura" item 5), `theme-pink` (Casa da Mulher) nunca tinha sido definido em `app.css`, e no CEAI especificamente: modais de Categorias/Oficinas sem altura máxima/rolagem (ficavam maiores que a tela e sem botão de fechar alcançável), `.dashboard-container` sem `width:100%` colapsando grids de colunas pra 1 coluna só, e `dashboard-fit-vh` aplicado por engano em páginas de conteúdo variável (`ceai/dados/` e `ceai/.../oficinas/`, cortando a maior parte do conteúdo sem nenhuma rolagem possível — ver seção "Arquitetura" item 5). Formulário "Atualizar Dados" do CEAI também virou um wizard por sessão (Movimentação → uma categoria de oficina por passo) e o filtro de categoria em `ceai/dados/` virou multi-seleção (dropdown com checkboxes).
 
 ---
 
