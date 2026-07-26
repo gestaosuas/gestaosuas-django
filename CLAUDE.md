@@ -57,6 +57,8 @@ Além disso, como o compose faz merge por concatenação de listas, o serviço `
 
 ### VPS Produção
 
+**Sempre use a skill `vps-deploy` (`.claude/skills/vps-deploy/SKILL.md`) para qualquer deploy** ("atualizar a vps", "dar deploy", "subir pra produção") — ela tem o padrão seguro de execução via SSH (saída sempre em arquivo, nunca no console — evita repetir o incidente de container órfão já sofrido nesta sessão) e o checklist de verificação pós-deploy. Não improvise um script SSH novo do zero quando essa skill já existe.
+
 - IP Tailscale: `100.76.30.36` (NAS CasaOS, não é uma VPS tradicional — `$HOME` do usuário SSH é `/DATA`, pertence a `root`, sem escrita direta)
 - Projeto Django em: `/DATA/AppData/Gestaosuas-django` (repo git próprio na VPS).
 - **Repositório GitHub**: remote `origin` = `https://github.com/gestaosuas/gestaosuas-django.git`, tanto no checkout local quanto na VPS (trocados nesta sessão, 2026-07-13 — as credenciais git não têm permissão de push em `rdssystems/Gestaosuas-django`, só nesse repo `gestaosuas/gestaosuas-django`, que estava vazio e agora tem o histórico completo dos dois lados).
@@ -94,6 +96,8 @@ Além disso, como o compose faz merge por concatenação de listas, o serviço `
 ---
 
 ## Testes
+
+**Sempre use a skill `django-tests` (`.claude/skills/django-tests/SKILL.md`) antes de rodar a suíte ou escrever testes novos** — cobre os gotchas abaixo em detalhe (multi-app na mesma chamada dá erro, colisão de slug em `Directorate` de teste com nome temático, campos `NOT NULL` reais vs. o que o model sugere) e o procedimento pra descobrir se uma falha é pré-existente antes de tentar corrigi-la.
 
 Antes desta sessão não havia nenhum teste real no projeto (só o boilerplate padrão em `apps/ceai/tests.py`).
 
