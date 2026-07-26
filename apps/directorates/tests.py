@@ -577,6 +577,28 @@ class VisitFlowTests(DirectoratesTestBase):
         visit = Visit.objects.filter(osc=osc, directorate=self.directorate).latest("created_at")
         self.assertEqual(visit.status, "draft")
         self.assertEqual(visit.identificacao.get("registered_by_username"), user.get_username())
+        self.assertEqual(visit.user_id, user.pk)
+
+    def test_visit_create_view_owner_can_access_own_visit_afterwards(self):
+        """Regressao 2026-07-25: VisitCreateView nao setava user_id, entao o
+        agente que acabou de criar a visita ficava bloqueado (403) ao tentar
+        abrir o proprio instrumental logo em seguida - VisitAccessMixin exige
+        dono/delegado. Reportado pelo usuario em producao/dev apos o deploy."""
+        osc = self.make_osc()
+        user = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(user)
+        create_url = reverse("directorates:visit-create", kwargs={"pk": self.directorate.pk})
+        self.client.post(
+            create_url,
+            {
+                "osc": str(osc.pk),
+                "status": "draft",
+                "identificacao[visit_date_1]": date.today().isoformat(),
+            },
+        )
+        visit = Visit.objects.filter(osc=osc, directorate=self.directorate).latest("created_at")
+        response = self.client.get(reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}))
+        self.assertEqual(response.status_code, 200)
 
     def test_visit_create_view_without_osc_shows_error_and_redirects_back(self):
         user = make_user(role="agente", primary_directorate=self.directorate)

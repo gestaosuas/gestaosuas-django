@@ -95,61 +95,76 @@ class MonitoramentoBaseMixinAccessTests(TestCase):
         self.assertEqual(response.url, reverse("core:landing"))
 
 
-class MonitoramentoHomeRedirectTests(TestCase):
-    """MonitoramentoHomeView.get() (2026-07-25): diretor/agente nao veem mais
-    o dashboard de abas de Subvencao/Emendas e Fundos/Outros - vao direto pra
-    lista de Instrumental de Visitas. Admin continua vendo o dashboard normal.
-    Diretoria generica (sem "subvencao"/"emenda"/"fundo"/"outros" no nome) nao
-    e afetada."""
+class MonitoramentoHomeTabRestrictionTests(TestCase):
+    """MonitoramentoHomeView.get_context_data() (2026-07-25, corrigido no
+    mesmo dia): diretor/agente continuam no MESMO dashboard de abas de
+    Subvencao/Emendas e Fundos/Outros (nao sao mais redirecionados pra fora,
+    pra `directorates:visit-list` - o usuario pediu pra desfazer isso) - so a
+    aba (`dashboard_tab`) e restrita via allowlist: so `visits`/`reports` (so
+    `visits` em Outros). Admin continua vendo qualquer aba, com default
+    `overview`. Diretoria generica nao e afetada (nao usa esse sistema de
+    abas)."""
 
     def setUp(self):
         self.password = "senha12345"
 
-    def test_diretor_redirected_for_subvencao(self):
-        # Sufixo unico pra nao colidir com o slug de uma Directorate real
-        # "Subvenção" ja existente no banco (testes rodam contra o banco de
-        # dev real - ver CLAUDE.md secao Testes).
+    def test_diretor_lands_on_visits_tab_for_subvencao_by_default(self):
         directorate = make_directorate(name=f"Subvenção Teste {uuid.uuid4().hex[:8]}")
         user, profile = make_user(
             password=self.password, role=Profile.ROLE_DIRECTOR, primary_directorate=directorate,
         )
         self.client.login(username=user.username, password=self.password)
         response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}))
-        self.assertRedirects(
-            response, reverse("directorates:visit-list", kwargs={"pk": directorate.pk}),
-            fetch_redirect_response=False,
-        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["dashboard_tab"], "visits")
+        self.assertFalse(response.context["is_admin_user"])
 
-    def test_agente_redirected_for_emendas_e_fundos(self):
+    def test_agente_cannot_reach_oscs_tab_via_querystring(self):
         directorate = make_directorate(name=f"Emendas e Fundos Teste {uuid.uuid4().hex[:8]}")
         user, profile = make_user(
             password=self.password, role="agente", primary_directorate=directorate,
         )
         self.client.login(username=user.username, password=self.password)
-        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}))
-        self.assertRedirects(
-            response, reverse("directorates:visit-list", kwargs={"pk": directorate.pk}),
-            fetch_redirect_response=False,
-        )
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=oscs")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["dashboard_tab"], "visits")
 
-    def test_agente_redirected_for_outros(self):
+    def test_agente_can_reach_reports_tab_for_emendas_e_fundos(self):
+        directorate = make_directorate(name=f"Emendas e Fundos Teste {uuid.uuid4().hex[:8]}")
+        user, profile = make_user(
+            password=self.password, role="agente", primary_directorate=directorate,
+        )
+        self.client.login(username=user.username, password=self.password)
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=reports")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["dashboard_tab"], "reports")
+
+    def test_agente_cannot_reach_reports_tab_for_outros(self):
         directorate = make_directorate(name=f"Outros Teste {uuid.uuid4().hex[:8]}")
         user, profile = make_user(
             password=self.password, role="agente", primary_directorate=directorate,
         )
         self.client.login(username=user.username, password=self.password)
-        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}))
-        self.assertRedirects(
-            response, reverse("directorates:visit-list", kwargs={"pk": directorate.pk}),
-            fetch_redirect_response=False,
-        )
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=reports")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["dashboard_tab"], "visits")
 
-    def test_admin_not_redirected_for_subvencao(self):
+    def test_admin_defaults_to_overview_for_subvencao(self):
         directorate = make_directorate(name=f"Subvenção Teste {uuid.uuid4().hex[:8]}")
         user, profile = make_user(password=self.password, role=Profile.ROLE_ADMIN)
         self.client.login(username=user.username, password=self.password)
         response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}))
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["dashboard_tab"], "overview")
+        self.assertTrue(response.context["is_admin_user"])
+
+    def test_admin_can_reach_oscs_tab(self):
+        directorate = make_directorate(name=f"Subvenção Teste {uuid.uuid4().hex[:8]}")
+        user, profile = make_user(password=self.password, role=Profile.ROLE_ADMIN)
+        self.client.login(username=user.username, password=self.password)
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=oscs")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["dashboard_tab"], "oscs")
 
     def test_diretor_not_redirected_for_generic_directorate(self):
         directorate = make_directorate()

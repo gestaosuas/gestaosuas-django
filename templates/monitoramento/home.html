@@ -53,19 +53,23 @@
 
                     {% if show_visit_tabs %}
                     <nav class="subvention-top-tabs" aria-label="Navegacao da subvencao">
+                        {% if is_admin_user %}
                         <a href="?tab=oscs&bimestre={{ selected_bimester }}&year={{ selected_year }}" class="subvention-top-tab {% if dashboard_tab == 'oscs' %}is-active{% endif %}">
                             <i data-lucide="building-2"></i>
                             <span>Cadastrar OSC</span>
                         </a>
+                        {% endif %}
                         <a href="?tab=visits&bimestre={{ selected_bimester }}&year={{ selected_year }}" class="subvention-top-tab {% if dashboard_tab == 'visits' %}is-active{% endif %}">
                             <i data-lucide="clipboard-list"></i>
                             <span>Instrumental de Visita</span>
                         </a>
                         {% if not is_outros_mode %}
+                        {% if is_admin_user %}
                         <a href="?tab=plans&bimestre={{ selected_bimester }}&year={{ selected_year }}" class="subvention-top-tab {% if dashboard_tab == 'plans' %}is-active{% endif %}">
                             <i data-lucide="folder-cog"></i>
                             <span>Plano de Trabalho</span>
                         </a>
+                        {% endif %}
                         <a href="?tab=reports&bimestre={{ selected_bimester }}&year={{ selected_year }}" class="subvention-top-tab {% if dashboard_tab == 'reports' %}is-active{% endif %}">
                             <i data-lucide="file-check-2"></i>
                             <span>Relatórios e Pareceres</span>

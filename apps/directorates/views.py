@@ -1732,6 +1732,7 @@ class VisitCreateView(DirectorateScopedMixin, TemplateView):
             visit_date=data.get("identificacao[visit_date_1]", "") or datetime.now(),
             visit_time="09:00",
             status=data.get("status", "draft"),
+            user_id=request.user.pk,
         )
 
         identificacao = {}

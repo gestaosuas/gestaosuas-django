@@ -16,7 +16,7 @@ from apps.accounts.models import Profile, ProfileDirectorate
 from apps.core.export import ExcelExportMixin, build_workbook
 from apps.directorates.models import Directorate, FormDelegation, MonthlyReport, Osc, Visit, WorkPlan
 from apps.directorates.forms import OscForm
-from apps.directorates.views import get_monitoramento_theme, is_subvencao_directorate, is_outros_directorate
+from apps.directorates.views import get_monitoramento_theme
 from apps.core.utils import (
     MONTH_LABELS, MONTH_OPTIONS, build_sparkline,
     build_period_label, build_year_range_from_years, build_variation
@@ -83,20 +83,6 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
     def get_object(self, queryset=None):
         return self.get_directorate()
 
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        directorate = self.object
-        if is_subvencao_directorate(directorate) or is_outros_directorate(directorate):
-            profile = getattr(request.user, "profile", None)
-            is_admin = request.user.is_superuser or (profile and profile.role == "admin")
-            if not is_admin:
-                # Diretor/agente nao veem mais o dashboard de abas dessas 3
-                # diretorias - vao direto pra lista de Instrumental de Visitas
-                # (docs/dominio/04-... A.6, confirmado 2026-07-25).
-                return redirect("directorates:visit-list", pk=directorate.pk)
-        context = self.get_context_data(object=self.object)
-        return self.render_to_response(context)
-
     def get_template_names(self):
         # Troca de aba via JS busca só o fragmento (ver tabContentRegion em
         # home.html) em vez da página inteira - evita recarregar navbar/
@@ -121,7 +107,10 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
         context["years_range"] = build_year_range_from_years([], selected_year)
         context["bimester_options"] = BIMESTER_OPTIONS
         context["bimester_label"] = ""
-        context["dashboard_tab"] = self.request.GET.get("tab", "overview")
+
+        profile = getattr(self.request.user, "profile", None)
+        is_admin = self.request.user.is_superuser or (profile and profile.role == "admin")
+        context["is_admin_user"] = is_admin
 
         # Bimester calculation
         curr_year = int(selected_year)
@@ -140,8 +129,7 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
 
         stats_visits = list(visits_qs)
         dashboard_visits_qs = visits_qs.select_related("osc", "directorate").order_by("-visit_date", "-created_at")
-        profile = getattr(self.request.user, "profile", None)
-        if not (self.request.user.is_superuser or (profile and profile.role == "admin")):
+        if not is_admin:
             if profile and profile.role == "diretor":
                 is_primary = str(profile.primary_directorate_id) == str(directorate.pk)
                 is_linked = ProfileDirectorate.objects.filter(profile=profile, directorate=directorate).exists()
@@ -201,6 +189,18 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
         is_subvencao = "subvencao" in ascii_name or "emendas" in ascii_name or "fundos" in ascii_name
         is_subvencao_only = is_subvencao
         is_outros = "outros" in normalized
+
+        # Diretor/agente so enxergam as abas "Instrumental de Visita" e
+        # "Relatorios e Pareceres" (nenhuma delas em Outros, que nao tem essa
+        # aba) - "Cadastrar OSC", "Plano de Trabalho" e a tela "overview" de
+        # KPIs ficam so pro admin (docs/dominio/04-... A.6, confirmado
+        # 2026-07-25). Allowlist, nao blocklist: qualquer ?tab= fora do
+        # permitido (incluindo o default "overview") cai em "visits".
+        allowed_tabs = {"visits"} if is_outros else {"visits", "reports"}
+        requested_tab = self.request.GET.get("tab", "overview" if is_admin else "visits")
+        if not is_admin and requested_tab not in allowed_tabs:
+            requested_tab = "visits"
+        context["dashboard_tab"] = requested_tab
 
         theme_class, header_class, icon_color = get_monitoramento_theme(directorate)
 
