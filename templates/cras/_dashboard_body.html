@@ -1,0 +1,331 @@
+{% load static %}
+<div class="cras-kpi-row">
+    {% for card in cards %}
+    <article class="metric-card-modern cras-kpi-card">
+        <div class="metric-top">
+            <div class="icon-circle" style="--accent-color:{{ card.color }};background:{{ card.color }}15;">
+                <i data-lucide="{{ card.icon }}"></i>
+            </div>
+            {% if card.variation %}
+            <span class="variation {{ card.variation.direction }}">
+                <i data-lucide="{{ card.variation.icon }}"></i>
+                {{ card.variation.text }}
+            </span>
+            {% endif %}
+        </div>
+        <p class="metric-context">{{ card.label }}</p>
+        <strong>{{ card.value }}{{ card.suffix }}</strong>
+    </article>
+    {% endfor %}
+</div>
+
+<div class="charts-stack">
+        <div class="charts-row-inner">
+            <article class="chart-panel">
+                <div class="chart-header">
+                    <div>
+                        <h2>Cadastros e Atualização Cadastral</h2>
+                        <p class="chart-subtitle">Comparativo mensal • {{ period_label }}</p>
+                    </div>
+                </div>
+                <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                    <canvas id="cadRecChart"></canvas>
+                </div>
+            </article>
+
+            <article class="chart-panel">
+                <div class="chart-header">
+                    <div>
+                        <h2>Famílias Inseridas e Desligadas - PAIF</h2>
+                        <p class="chart-subtitle">Movimentacao mensal • {{ period_label }}</p>
+                    </div>
+                </div>
+                <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                    <canvas id="admDeslChart"></canvas>
+                </div>
+            </article>
+        </div>
+
+        <div class="charts-row-inner">
+            <article class="chart-panel">
+                <div class="chart-header">
+                    <div>
+                        <h2>Evolucao de Atendimentos</h2>
+                        <p class="chart-subtitle">Atendimentos realizados • {{ period_label }}</p>
+                    </div>
+                </div>
+                <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                    <canvas id="atendChart"></canvas>
+                </div>
+            </article>
+
+            <article class="chart-panel">
+                <div class="chart-header">
+                    <div>
+                        <h2>Familias em Acompanhamento (PAIF)</h2>
+                        <p class="chart-subtitle">Total atual de familias • {{ period_label }}</p>
+                    </div>
+                </div>
+                <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                    <canvas id="paifChart"></canvas>
+                </div>
+            </article>
+        </div>
+    </div>
+
+{{ line_chart_cadastros|json_script:"cad-data" }}
+{{ line_chart_recadastros|json_script:"rec-data" }}
+{{ line_chart_admitidas|json_script:"adm-data" }}
+{{ line_chart_desligadas|json_script:"desl-data" }}
+{{ line_chart_atendimentos|json_script:"aten-data" }}
+{{ line_chart_atual|json_script:"atual-data" }}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    if (window.Chart && window.ChartDataLabels) {
+        Chart.register(ChartDataLabels);
+    }
+
+    const monthTicks = {
+        color: '#8ca0bf', font: { size: 10, weight: '700' },
+        autoSkip: false, maxRotation: 0, minRotation: 0, padding: 8,
+    };
+    const axisTicks = {
+        color: '#8ca0bf', font: { size: 10, weight: '700' }, padding: 6,
+    };
+
+    const commonLine = {
+        maintainAspectRatio: false,
+        layout: { padding: { top: 24, right: 16, bottom: 8, left: 8 } },
+        plugins: {
+            legend: { display: false },
+            tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.92)', titleColor: '#f8fafc', bodyColor: '#e2e8f0', padding: 12 },
+            datalabels: {
+                color: function(ctx) { return ctx.dataset.borderColor; },
+                anchor: 'end', align: 'top', offset: 4, clamp: true, clip: false,
+                font: { size: 10, weight: '800' },
+                formatter: function(v) { return v > 0 ? v : ''; }
+            }
+        },
+        scales: {
+            x: { grid: { display: false, drawBorder: false }, ticks: monthTicks, border: { display: false } },
+            y: { beginAtZero: true, grid: { color: 'rgba(148, 163, 184, 0.14)', drawBorder: false }, ticks: axisTicks, border: { display: false } },
+        }
+    };
+
+    function makeLine(id, dataId, color) {
+        const data = JSON.parse(document.getElementById(dataId).textContent);
+        new Chart(document.getElementById(id), {
+            type: 'line',
+            data: {
+                labels: data.map(function(p) { return p.label; }),
+                datasets: [{
+                    data: data.map(function(p) { return p.value; }),
+                    borderColor: color,
+                    backgroundColor: color + '0D',
+                    fill: true, tension: 0.4, borderWidth: 3,
+                    pointRadius: 4, pointBackgroundColor: color,
+                }]
+            },
+            options: commonLine
+        });
+    }
+
+    function makeDualLine(id, data1Id, data2Id, color1, color2, label1, label2) {
+        const d1 = JSON.parse(document.getElementById(data1Id).textContent);
+        const d2 = JSON.parse(document.getElementById(data2Id).textContent);
+        new Chart(document.getElementById(id), {
+            type: 'line',
+            data: {
+                labels: d1.map(function(p) { return p.label; }),
+                datasets: [
+                    { data: d1.map(function(p) { return p.value; }), label: label1, borderColor: color1, backgroundColor: color1 + '0D', fill: true, tension: 0.4, borderWidth: 3, pointRadius: 4, pointBackgroundColor: color1 },
+                    { data: d2.map(function(p) { return p.value; }), label: label2, borderColor: color2, backgroundColor: color2 + '0D', fill: true, tension: 0.4, borderWidth: 3, pointRadius: 4, pointBackgroundColor: color2 },
+                ]
+            },
+            options: {
+                ...commonLine,
+                plugins: { ...commonLine.plugins, legend: { position: 'bottom', labels: { font: { weight: '700', size: 10 }, usePointStyle: true, padding: 14 } } }
+            }
+        });
+    }
+
+    makeDualLine('cadRecChart', 'cad-data', 'rec-data', '#3b82f6', '#f59e0b', 'Cadastros', 'Atualização Cadastral');
+    makeDualLine('admDeslChart', 'adm-data', 'desl-data', '#10b981', '#ef4444', 'Inseridas', 'Desligadas');
+    makeLine('atendChart', 'aten-data', '#0ea5e9');
+    makeLine('paifChart', 'atual-data', '#8b5cf6');
+});
+</script>
+
+<style>
+.cras-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+}
+
+.charts-stack {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.charts-row-inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.chart-panel {
+    padding: 12px 16px !important;
+    min-height: 200px !important;
+}
+
+.chart-panel .chart-header {
+    margin-bottom: 8px !important;
+}
+
+.chart-panel .chart-header h2 {
+    font-size: 13px !important;
+}
+
+.chart-subtitle {
+    font-size: 10px !important;
+}
+
+.monitoring-chart-wrap {
+    flex: 1;
+    min-height: 120px;
+}
+
+@media (max-width: 1200px) {
+    .cras-kpi-row {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+@media (max-width: 768px) {
+    .cras-kpi-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .charts-row-inner {
+        grid-template-columns: 1fr;
+    }
+}
+.metric-card-modern {
+    padding: 10px 16px;
+    border-radius: 14px;
+    background: white;
+    border: 1px solid rgba(0,0,0,0.03);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.01);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.metric-card-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+}
+.metric-card-modern .metric-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.metric-card-modern .icon-circle {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8fafc;
+    color: var(--accent-color, #3b82f6);
+}
+.metric-card-modern .icon-circle i { width: 14px; height: 14px; }
+.metric-card-modern strong {
+    display: block;
+    font-size: 28px;
+    line-height: 1;
+    margin: 2px 0 0;
+    font-weight: 800;
+    color: #1e293b;
+}
+.metric-card-modern .metric-context {
+    font-size: 9px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+.variation {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 6px;
+    border-radius: 14px;
+    font-size: 10px;
+    font-weight: 800;
+}
+.variation.positive { background: #ecfdf5; color: #10b981; }
+.variation.negative { background: #fef2f2; color: #ef4444; }
+.variation i { width: 11px; height: 11px; }
+
+.charts-stack { display: flex; flex-direction: column; gap: 16px; }
+.charts-row-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.chart-panel { background: white; padding: 16px 20px; border-radius: 20px; border: 1px solid #f1f5f9; display: flex; flex-direction: column; overflow: hidden; transition: transform 0.2s ease, box-shadow 0.2s ease; flex: 1; min-height: 0; }
+.chart-panel:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.06); }
+.chart-panel .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.chart-panel .chart-header h2 { margin: 0; font-size: 15px; font-weight: 800; color: #1e3a8a; }
+.chart-subtitle { font-size: 11px; color: #94a3b8; margin: 2px 0 0; }
+.monitoring-chart-wrap { position: relative; flex: 1; min-height: 0; }
+.monitoring-chart-wrap-line { flex: 1; min-height: 0; position: relative; }
+.monitoring-chart-wrap canvas { height: 100% !important; max-height: none !important; }
+
+@media (max-width: 1100px) {
+    .dashboard-split-layout, .charts-row-inner { grid-template-columns: 1fr; }
+    .chart-panel { height: auto; min-height: 250px; }
+}
+
+/* ── KPI row compact overrides ── */
+.cras-kpi-card {
+    padding: 8px 10px !important;
+    border-radius: 12px !important;
+    min-width: 0;
+}
+.cras-kpi-card strong {
+    font-size: 18px !important;
+}
+.cras-kpi-card .icon-circle {
+    width: 20px !important;
+    height: 20px !important;
+}
+.cras-kpi-card .icon-circle i {
+    width: 11px !important;
+    height: 11px !important;
+}
+.cras-kpi-card .metric-top {
+    margin-bottom: 2px !important;
+}
+.cras-kpi-card .metric-context {
+    font-size: 7px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cras-kpi-card .variation {
+    font-size: 8px !important;
+    padding: 2px 4px !important;
+    gap: 1px !important;
+}
+.cras-kpi-card .variation i {
+    width: 9px !important;
+    height: 9px !important;
+}
+</style>

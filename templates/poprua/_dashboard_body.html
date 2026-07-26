@@ -1,0 +1,204 @@
+{% load static %}
+<div class="dashboard-split-layout">
+    <aside class="metrics-stack">
+        {% for card in cards %}
+        <article class="metric-card-modern">
+            <div class="metric-top">
+                <div class="icon-circle" style="--accent-color:{{ card.color }};background:{{ card.color }}15;">
+                    <i data-lucide="{{ card.icon }}"></i>
+                </div>
+                {% if card.variation %}
+                <span class="variation {{ card.variation.direction }}">
+                    <i data-lucide="{{ card.variation.icon }}"></i>
+                    {{ card.variation.text }}
+                </span>
+                {% endif %}
+            </div>
+            <p class="metric-context">{{ card.label }}</p>
+            <strong>{{ card.value }}</strong>
+        </article>
+        {% endfor %}
+    </aside>
+
+    <div class="charts-stack" style="overflow-y: auto; flex: 1; min-height: 0;">
+        <div class="charts-row-inner" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <article class="chart-panel" style="min-height: 260px;">
+            <div class="chart-header">
+                <div>
+                    <h2>Evolução dos Atendimentos</h2>
+                    <p class="chart-subtitle">Centro Ref · Abordagem · Migração</p>
+                </div>
+            </div>
+            <div class="monitoring-chart-wrap">
+                <canvas id="atendimentosChart"></canvas>
+            </div>
+        </article>
+
+        <article class="chart-panel" style="min-height: 260px;">
+            <div class="chart-header">
+                <div>
+                    <h2>Usuários de Drogas</h2>
+                    <p class="chart-subtitle">Centro de Referência vs Abordagem Social</p>
+                </div>
+            </div>
+            <div class="monitoring-chart-wrap" style="display: flex; align-items: center; justify-content: center;">
+                <div style="width: 180px; height: 180px;">
+                    <canvas id="drogasChart"></canvas>
+                </div>
+            </div>
+        </article>
+
+        <article class="chart-panel" style="min-height: 260px;">
+            <div class="chart-header">
+                <div>
+                    <h2>Passagens - Núcleo Migrante</h2>
+                    <p class="chart-subtitle">Deferidas vs Indeferidas</p>
+                </div>
+            </div>
+            <div class="monitoring-chart-wrap">
+                <canvas id="passagensChart"></canvas>
+            </div>
+        </article>
+
+        <article class="chart-panel" style="min-height: 260px;">
+            <div class="chart-header">
+                <div>
+                    <h2>Encaminhamentos</h2>
+                    <p class="chart-subtitle">Mercado · CAPS · Saúde · Consultório</p>
+                </div>
+            </div>
+            <div class="monitoring-chart-wrap">
+                <canvas id="encaminhamentosChart"></canvas>
+            </div>
+        </article>
+    </div>
+    </div>
+</div>
+
+{{ chart_labels|json_script:"poprua-chart-labels" }}
+{{ chart_centro|json_script:"poprua-chart-centro" }}
+{{ chart_abordagem|json_script:"poprua-chart-abordagem" }}
+{{ chart_migracao|json_script:"poprua-chart-migracao" }}
+{{ drogas_labels|json_script:"poprua-drogas-labels" }}
+{{ drogas_data|json_script:"poprua-drogas-data" }}
+{{ passagens_deferidas|json_script:"poprua-passagens-def" }}
+{{ passagens_indeferidas|json_script:"poprua-passagens-indef" }}
+{{ enc_mercado|json_script:"poprua-enc-mercado" }}
+{{ enc_caps|json_script:"poprua-enc-caps" }}
+{{ enc_saude|json_script:"poprua-enc-saude" }}
+{{ enc_consultorio|json_script:"poprua-enc-consult" }}
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        Chart.register(ChartDataLabels);
+
+        const chartLabels = JSON.parse(document.getElementById('poprua-chart-labels').textContent);
+        const chartCentro = JSON.parse(document.getElementById('poprua-chart-centro').textContent);
+        const chartAbordagem = JSON.parse(document.getElementById('poprua-chart-abordagem').textContent);
+        const chartMigracao = JSON.parse(document.getElementById('poprua-chart-migracao').textContent);
+        const drogasLabels = JSON.parse(document.getElementById('poprua-drogas-labels').textContent);
+        const drogasData = JSON.parse(document.getElementById('poprua-drogas-data').textContent);
+        const passDef = JSON.parse(document.getElementById('poprua-passagens-def').textContent);
+        const passIndef = JSON.parse(document.getElementById('poprua-passagens-indef').textContent);
+        const encMercado = JSON.parse(document.getElementById('poprua-enc-mercado').textContent);
+        const encCaps = JSON.parse(document.getElementById('poprua-enc-caps').textContent);
+        const encSaude = JSON.parse(document.getElementById('poprua-enc-saude').textContent);
+        const encConsult = JSON.parse(document.getElementById('poprua-enc-consult').textContent);
+
+        // 1. Line Chart - Evolução Atendimentos
+        new Chart(document.getElementById('atendimentosChart'), {
+            type: 'line',
+            data: {
+                labels: chartLabels,
+                datasets: [
+                    { label: 'Centro de Referência', data: chartCentro, borderColor: '#3b82f6', backgroundColor: '#3b82f61a', borderWidth: 3, fill: true, tension: 0.4, pointRadius: 3 },
+                    { label: 'Abordagem Social', data: chartAbordagem, borderColor: '#f59e0b', backgroundColor: '#f59e0b1a', borderWidth: 3, fill: true, tension: 0.4, pointRadius: 3 },
+                    { label: 'Migração', data: chartMigracao, borderColor: '#10b981', backgroundColor: '#10b9811a', borderWidth: 3, fill: true, tension: 0.4, pointRadius: 3 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { usePointStyle: true, font: { weight: '700', size: 11 }, padding: 16 } },
+                    datalabels: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#e2e8f033' }, ticks: { font: { weight: '700', size: 10 } } },
+                    x: { grid: { display: false }, ticks: { font: { weight: '700', size: 10 } } }
+                }
+            }
+        });
+
+        // 2. Doughnut - Usuários de Drogas
+        new Chart(document.getElementById('drogasChart'), {
+            type: 'doughnut',
+            data: {
+                labels: drogasLabels,
+                datasets: [{ data: drogasData, backgroundColor: ['#3b82f6', '#f59e0b'], borderWidth: 0, hoverOffset: 8 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: true, cutout: '55%',
+                plugins: {
+                    legend: { position: 'bottom', labels: { usePointStyle: true, padding: 12, font: { size: 11, weight: '700' } } },
+                    datalabels: { color: '#fff', font: { weight: '800', size: 11 }, display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0, formatter: (v) => v > 0 ? v : '' }
+                }
+            }
+        });
+
+        // 3. Bar - Passagens
+        new Chart(document.getElementById('passagensChart'), {
+            type: 'bar',
+            data: {
+                labels: chartLabels,
+                datasets: [
+                    { label: 'Deferidas', data: passDef, backgroundColor: '#10b981', borderRadius: 6 },
+                    { label: 'Indeferidas', data: passIndef, backgroundColor: '#f59e0b', borderRadius: 6 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { usePointStyle: true, font: { weight: '700', size: 11 }, padding: 16 } },
+                    datalabels: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#e2e8f033' }, ticks: { font: { weight: '700', size: 10 } } },
+                    x: { grid: { display: false }, ticks: { font: { weight: '700', size: 10 } } }
+                }
+            }
+        });
+
+        // 4. Bar - Encaminhamentos
+        new Chart(document.getElementById('encaminhamentosChart'), {
+            type: 'bar',
+            data: {
+                labels: chartLabels,
+                datasets: [
+                    { label: 'Mercado Trabalho', data: encMercado, backgroundColor: '#3b82f6', borderRadius: 4 },
+                    { label: 'CAPS / Saúde Mental', data: encCaps, backgroundColor: '#8b5cf6', borderRadius: 4 },
+                    { label: 'Saúde Pública', data: encSaude, backgroundColor: '#ec4899', borderRadius: 4 },
+                    { label: 'Consultório na Rua', data: encConsult, backgroundColor: '#f59e0b', borderRadius: 4 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { usePointStyle: true, font: { weight: '700', size: 10 }, padding: 12 } },
+                    datalabels: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#e2e8f033' }, ticks: { font: { weight: '700', size: 10 } } },
+                    x: { grid: { display: false }, ticks: { font: { weight: '700', size: 10 } } }
+                }
+            }
+        });
+
+        lucide.createIcons();
+    });
+</script>
+
+<style>
+@media (max-width: 1200px) {
+    .charts-row-inner { grid-template-columns: 1fr !important; }
+}
+</style>

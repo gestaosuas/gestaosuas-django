@@ -1,0 +1,222 @@
+{% load static %}
+<div class="dashboard-split-layout">
+    <aside class="metrics-stack">
+        <article class="metric-card-modern">
+            <div class="metric-top">
+                <div class="icon-circle" style="--accent-color:#3b82f6;background:#3b82f615;">
+                    <i data-lucide="user-plus"></i>
+                </div>
+            </div>
+            <p class="metric-context">Admitidos Masc.</p>
+            <strong>{{ summary.admitidos_masc }}</strong>
+        </article>
+
+        <article class="metric-card-modern">
+            <div class="metric-top">
+                <div class="icon-circle" style="--accent-color:#f472b6;background:#f472b615;">
+                    <i data-lucide="user-plus"></i>
+                </div>
+            </div>
+            <p class="metric-context">Admitidos Fem.</p>
+            <strong>{{ summary.admitidos_fem }}</strong>
+        </article>
+
+        <article class="metric-card-modern">
+            <div class="metric-top">
+                <div class="icon-circle" style="--accent-color:#8b5cf6;background:#8b5cf615;">
+                    <i data-lucide="users"></i>
+                </div>
+            </div>
+            <p class="metric-context">Total Idosos</p>
+            <strong>{{ summary.total_idosos }}</strong>
+        </article>
+
+        <article class="metric-card-modern highlight-success">
+            <div class="metric-top">
+                <div class="icon-circle" style="--accent-color:#10b981;background:#10b98115;">
+                    <i data-lucide="check-circle"></i>
+                </div>
+            </div>
+            <p class="metric-context">Atendidos Mês</p>
+            <strong>{{ summary.atendidos_mes }}</strong>
+        </article>
+
+        <article class="metric-card-modern highlight-danger">
+            <div class="metric-top">
+                <div class="icon-circle" style="--accent-color:#ef4444;background:#ef444415;">
+                    <i data-lucide="user-minus"></i>
+                </div>
+            </div>
+            <p class="metric-context">Desligados</p>
+            <strong>{{ summary.desligados }}</strong>
+        </article>
+    </aside>
+
+    <div class="charts-stack">
+        <div class="charts-row-inner">
+            <article class="chart-panel">
+                <div class="chart-header">
+                    <div>
+                        <h2>Admissões x Desligamentos</h2>
+                        <p class="chart-subtitle">Comparativo mensal • {{ selected_year }}</p>
+                    </div>
+                </div>
+                <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                    <canvas id="admDeslChart"></canvas>
+                </div>
+            </article>
+            <article class="chart-panel">
+                <div class="chart-header">
+                    <div>
+                        <h2>Evolução de Atendidos</h2>
+                        <p class="chart-subtitle">Total mensal no período • {{ selected_year }}</p>
+                    </div>
+                </div>
+                <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                    <canvas id="atendChart"></canvas>
+                </div>
+            </article>
+        </div>
+        <div class="charts-row-inner">
+            <article class="chart-panel">
+                <div class="chart-header">
+                    <div>
+                        <h2>Total de Idosos Registrados</h2>
+                        <p class="chart-subtitle">Variação da base cadastral • {{ selected_year }}</p>
+                    </div>
+                </div>
+                <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                    <canvas id="totalIdososChart"></canvas>
+                </div>
+            </article>
+            <article class="chart-panel">
+                <div class="chart-header">
+                    <div>
+                        <h2>Distribuição de Atendimentos</h2>
+                        <p class="chart-subtitle">Por Unidade Territorial</p>
+                    </div>
+                </div>
+                <div class="monitoring-chart-wrap pie-chart-container">
+                    <canvas id="atendPieChart"></canvas>
+                </div>
+            </article>
+        </div>
+    </div>
+</div>
+
+{{ line_chart_admissoes|json_script:"adm-data" }}
+{{ line_chart_desligamentos|json_script:"desl-data" }}
+{{ line_chart_atendimentos|json_script:"aten-data" }}
+{{ line_chart_total_idosos|json_script:"total-data" }}
+{{ pie_chart_atendimentos|json_script:"pie-atend-data" }}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    if (window.Chart && window.ChartDataLabels) {
+        Chart.register(ChartDataLabels);
+    }
+
+    const monthTicks = { color: '#8ca0bf', font: { size: 10, weight: '700' }, autoSkip: false, maxRotation: 0, padding: 8 };
+    const axisTicks = { color: '#8ca0bf', font: { size: 10, weight: '700' }, padding: 6 };
+
+    const commonLine = {
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            datalabels: { color: (ctx) => ctx.dataset.borderColor, anchor: 'end', align: 'top', offset: 4, font: { size: 10, weight: '800' }, formatter: (v) => v > 0 ? v : '' }
+        },
+        scales: {
+            x: { grid: { display: false }, ticks: monthTicks },
+            y: { beginAtZero: true, grid: { color: 'rgba(148, 163, 184, 0.1)' }, ticks: axisTicks }
+        }
+    };
+
+    function makeLine(id, dataId, color) {
+        const el = document.getElementById(dataId);
+        if (!el) return;
+        const data = JSON.parse(el.textContent);
+        new Chart(document.getElementById(id), {
+            type: 'line',
+            data: {
+                labels: data.map(p => p.label),
+                datasets: [{ data: data.map(p => p.value), borderColor: color, backgroundColor: color + '0D', fill: true, tension: 0.4, borderWidth: 3, pointRadius: 4, pointBackgroundColor: color }]
+            },
+            options: commonLine
+        });
+    }
+
+    function makeDualLine(id, data1Id, data2Id, color1, color2, label1, label2) {
+        const d1el = document.getElementById(data1Id);
+        const d2el = document.getElementById(data2Id);
+        if (!d1el || !d2el) return;
+        const d1 = JSON.parse(d1el.textContent);
+        const d2 = JSON.parse(d2el.textContent);
+        new Chart(document.getElementById(id), {
+            type: 'line',
+            data: {
+                labels: d1.map(p => p.label),
+                datasets: [
+                    { data: d1.map(p => p.value), label: label1, borderColor: color1, backgroundColor: color1 + '0D', fill: true, tension: 0.4, borderWidth: 3, pointRadius: 4, pointBackgroundColor: color1 },
+                    { data: d2.map(p => p.value), label: label2, borderColor: color2, backgroundColor: color2 + '0D', fill: true, tension: 0.4, borderWidth: 3, pointRadius: 4, pointBackgroundColor: color2 }
+                ]
+            },
+            options: { ...commonLine, plugins: { ...commonLine.plugins, legend: { display: true, position: 'bottom', labels: { font: { weight: '700', size: 10 }, usePointStyle: true, padding: 14 } } } }
+        });
+    }
+
+    makeDualLine('admDeslChart', 'adm-data', 'desl-data', '#10b981', '#ef4444', 'Admitidos', 'Desligados');
+    makeLine('atendChart', 'aten-data', '#3b82f6');
+    makeLine('totalIdososChart', 'total-data', '#8b5cf6');
+
+    // PIE CHART
+    const ctxPie = document.getElementById('atendPieChart').getContext('2d');
+    const pieData = JSON.parse(document.getElementById('pie-atend-data').textContent);
+    new Chart(ctxPie, {
+        type: 'doughnut',
+        data: {
+            labels: pieData.map(d => d.label),
+            datasets: [{
+                data: pieData.map(d => d.value),
+                backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'],
+                borderWidth: 0, hoverOffset: 15
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, cutout: '70%',
+            plugins: {
+                legend: { position: 'bottom', labels: { usePointStyle: true, padding: 15, font: { size: 11, weight: '700' } } },
+                datalabels: { color: '#fff', font: { weight: 'bold', size: 10 }, formatter: (v, ctx) => {
+                    let sum = 0; let arr = ctx.chart.data.datasets[0].data; arr.map(d => sum += d);
+                    return sum > 0 ? (v*100 / sum).toFixed(0)+"%" : '';
+                }}
+            }
+        },
+        plugins: [ChartDataLabels]
+    });
+});
+</script>
+
+<style>
+/* DASHBOARD LAYOUT */
+.dashboard-split-layout { display: grid; grid-template-columns: 240px 1fr; gap: 24px; }
+.metrics-stack { display: flex; flex-direction: column; gap: 12px; }
+.metric-card-modern { padding: 16px; border-radius: 14px; background: white; border: 1px solid rgba(0,0,0,0.03); transition: all 0.2s; }
+.metric-card-modern:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.06); }
+.icon-circle { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.metric-context { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin: 8px 0 4px; }
+.metric-card-modern strong { font-size: 28px; font-weight: 800; color: #1e293b; }
+.highlight-success { border-left: 4px solid #10b981; }
+.highlight-danger { border-left: 4px solid #ef4444; }
+
+.charts-stack { display: flex; flex-direction: column; gap: 16px; }
+.charts-row-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.chart-panel { background: white; padding: 20px; border-radius: 20px; border: 1px solid #f1f5f9; display: flex; flex-direction: column; }
+.chart-panel h2 { margin: 0; font-size: 15px; font-weight: 800; color: #1e3a8a; }
+.chart-subtitle { font-size: 11px; color: #94a3b8; margin: 2px 0 12px; }
+.monitoring-chart-wrap { position: relative; flex: 1; min-height: 0; }
+.monitoring-chart-wrap-line { flex: 1; min-height: 0; position: relative; }
+.pie-chart-container { flex: 1; min-height: 0; position: relative; }
+.monitoring-chart-wrap canvas, .pie-chart-container canvas { height: 100% !important; max-height: none !important; }
+
+@media (max-width: 1100px) { .dashboard-split-layout, .charts-row-inner { grid-template-columns: 1fr; } }
+</style>

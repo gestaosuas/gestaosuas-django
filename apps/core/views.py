@@ -39,8 +39,6 @@ class SystemSettingsView(LoginRequiredMixin, TemplateView):
         return redirect("core:settings")
 
 
-EXCLUDE_NAMES = ["Subvenção", "Subvencao", "Emendas", "Outros"]
-
 def _tv_build_urls():
     """Build list of [url, label] for all TV-eligible directorates."""
     from datetime import date
@@ -50,8 +48,6 @@ def _tv_build_urls():
     for d in Directorate.objects.order_by("name"):
         n = d.name.lower()
         pk = str(d.pk)
-        if any(e in n for e in EXCLUDE_NAMES):
-            continue
         if "sine" in n or "qual" in n or "profissional" in n:
             urls.append([f"/sine-cp/painel/?tab=sine&year={year}&tv=1&slide={idx}", f"SINE — {d.name}"]); idx += 1
             urls.append([f"/sine-cp/painel/?tab=cp&year={year}&tv=1&slide={idx}", f"Qualificação — {d.name}"]); idx += 1
@@ -67,10 +63,16 @@ def _tv_build_urls():
             urls.append([f"/ceai/?year={year}&tv=1&slide={idx}", d.name]); idx += 1
         elif "pop" in n or "rua" in n:
             urls.append([f"/poprua/?year={year}&tv=1&slide={idx}", d.name]); idx += 1
-        elif "protec" in n:
+        elif "prote" in n:
+            # "prote" (nao "protec") de proposito - "Proteção Especial" no
+            # banco vem com encoding corrompido ("Prote��o"), entao
+            # "protec" nunca batia e essa diretoria sumia do carrossel
+            # silenciosamente (bug pre-existente, achado e corrigido aqui).
             urls.append([f"/protecao-especial/{pk}/?year={year}&tv=1&slide={idx}", d.name]); idx += 1
         elif "casa" in n or "mulher" in n:
             urls.append([f"/casa-mulher/{pk}/?year={year}&tv=1&slide={idx}", d.name]); idx += 1
+        elif "subven" in n or "emenda" in n or "fundo" in n or n.strip() == "outros":
+            urls.append([f"/monitoramento/{pk}/?year={year}&tv=1&slide={idx}", d.name]); idx += 1
     # Add total to all URLs
     total = len(urls)
     for u in urls:

@@ -1,0 +1,11 @@
+{% extends "base_tv.html" %}
+
+{% block title %}{{ directorate.name }}{% endblock %}
+{% block body_class %}dashboard-fit-vh {{ theme_class|default:'theme-emerald' }}{% endblock %}
+{% block header_bg %}{% if theme_class == 'theme-amber' %}linear-gradient(100deg,#78350f,#d97706){% elif theme_class == 'theme-indigo' %}linear-gradient(100deg,#312e81,#4338ca){% elif theme_class == 'theme-rose' %}linear-gradient(100deg,#881337,#db2777){% else %}linear-gradient(100deg,#064e3b,#059669){% endif %}{% endblock %}
+{% block module_name %}{{ directorate.name }}{% endblock %}
+{% block module_sub %}Monitoramento e Avaliação{% endblock %}
+
+{% block content %}
+{% include "monitoramento/_dashboard_body.html" %}
+{% endblock %}

@@ -1,0 +1,244 @@
+{% load static %}
+<div class="overview-kpi-strip">
+    <div class="overview-kpi-mini">
+        <div class="okpi-icon okpi-blue"><i data-lucide="building-2"></i></div>
+        <div class="okpi-text">
+            <strong>{{ subvencao_stats.totalOSCs }}</strong>
+            <span>OSCs cadastradas</span>
+        </div>
+    </div>
+    <div class="overview-kpi-mini">
+        <div class="okpi-icon okpi-amber"><i data-lucide="clipboard-list"></i></div>
+        <div class="okpi-text">
+            <strong>{{ subvencao_stats.totalVisits }}</strong>
+            <span>Visitas no bimestre</span>
+        </div>
+    </div>
+    <div class="overview-kpi-mini">
+        <div class="okpi-icon okpi-emerald"><i data-lucide="shield-check"></i></div>
+        <div class="okpi-text">
+            <strong>{{ subvencao_stats.finalizedVisits }}</strong>
+            <span>Visitas finalizadas</span>
+        </div>
+    </div>
+    <div class="overview-kpi-mini">
+        <div class="okpi-icon okpi-purple"><i data-lucide="percent"></i></div>
+        <div class="okpi-text">
+            <strong>{{ subvencao_stats.finalizationRate }}%</strong>
+            <span>Taxa de finalização</span>
+        </div>
+    </div>
+</div>
+
+<div class="overview-chart-grid">
+    <div class="overview-chart-card">
+        <div class="overview-chart-header">
+            <div>
+                <p class="inline-eyebrow" style="margin:0;">Visitas por mês</p>
+                <h2 style="margin:2px 0 0;">{{ selected_year }}</h2>
+            </div>
+        </div>
+        <div class="overview-chart-canvas-wrap">
+            <canvas id="visitsByMonthChart"
+                data-labels="{{ visits_by_month_labels_json }}"
+                data-values="{{ visits_by_month_data_json }}"
+                data-color="{{ icon_color|default:'#059669' }}"></canvas>
+        </div>
+    </div>
+
+    <div class="overview-chart-card">
+        <div class="overview-chart-header">
+            <div>
+                <p class="inline-eyebrow" style="margin:0;">Visitas</p>
+                <h2 style="margin:2px 0 0;">{{ subvencao_stats.finalizedVisits }} finalizadas</h2>
+            </div>
+        </div>
+        <div class="overview-chart-canvas-wrap">
+            <canvas id="visitsDonutChart"
+                data-values="{{ visits_donut_data_json }}"
+                data-color="{{ icon_color|default:'#059669' }}"></canvas>
+        </div>
+    </div>
+
+    <div class="overview-chart-card">
+        <div class="overview-chart-header">
+            <div>
+                <p class="inline-eyebrow" style="margin:0;">Relatórios de Visita</p>
+                <h2 style="margin:2px 0 0;">Finalizados x Rascunhos</h2>
+            </div>
+        </div>
+        <div class="overview-chart-canvas-wrap">
+            <canvas id="reportsBarChart"
+                data-values="{{ reports_bar_data_json }}"
+                data-color="{{ icon_color|default:'#059669' }}"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var visitsChartCanvas = document.getElementById("visitsByMonthChart");
+    if (visitsChartCanvas) {
+        var barColor = visitsChartCanvas.dataset.color || "#059669";
+        new Chart(visitsChartCanvas, {
+            type: "bar",
+            data: {
+                labels: JSON.parse(visitsChartCanvas.dataset.labels),
+                datasets: [{
+                    data: JSON.parse(visitsChartCanvas.dataset.values),
+                    backgroundColor: barColor,
+                    borderRadius: 4,
+                    maxBarThickness: 30,
+                }],
+            },
+            options: {
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    datalabels: { display: false },
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: { size: 11, weight: "600" }, color: "#94a3b8" } },
+                    y: { beginAtZero: true, ticks: { precision: 0, color: "#94a3b8" }, grid: { color: "#f1f5f9" } },
+                },
+            },
+        });
+    }
+
+    var visitsDonutCanvas = document.getElementById("visitsDonutChart");
+    if (visitsDonutCanvas) {
+        var donutColor = visitsDonutCanvas.dataset.color || "#059669";
+        var donutValues = JSON.parse(visitsDonutCanvas.dataset.values);
+        new Chart(visitsDonutCanvas, {
+            type: "doughnut",
+            data: {
+                labels: ["Finalizadas", "Rascunho"],
+                datasets: [{
+                    data: donutValues,
+                    backgroundColor: [donutColor, "#f97316"],
+                    borderWidth: 0,
+                }],
+            },
+            options: {
+                maintainAspectRatio: false,
+                cutout: "72%",
+                plugins: {
+                    legend: {
+                        position: "bottom",
+                        labels: {
+                            boxWidth: 10,
+                            boxHeight: 10,
+                            padding: 14,
+                            font: { size: 11, weight: "600" },
+                        },
+                    },
+                    datalabels: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) { return ctx.label + ": " + ctx.parsed; },
+                        },
+                    },
+                },
+            },
+        });
+    }
+
+    var reportsBarCanvas = document.getElementById("reportsBarChart");
+    if (reportsBarCanvas) {
+        var reportsColor = reportsBarCanvas.dataset.color || "#059669";
+        var reportsValues = JSON.parse(reportsBarCanvas.dataset.values);
+        new Chart(reportsBarCanvas, {
+            type: "bar",
+            data: {
+                labels: ["Finalizados", "Rascunhos"],
+                datasets: [{
+                    data: reportsValues,
+                    backgroundColor: [reportsColor, "#cbd5e1"],
+                    borderRadius: 4,
+                    maxBarThickness: 56,
+                }],
+            },
+            options: {
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    datalabels: { display: false },
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: { size: 11, weight: "600" }, color: "#94a3b8" } },
+                    y: { beginAtZero: true, ticks: { precision: 0, color: "#94a3b8" }, grid: { color: "#f1f5f9" } },
+                },
+            },
+        });
+    }
+});
+</script>
+
+<style>
+.overview-kpi-strip {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+}
+
+.overview-kpi-mini {
+    flex: 1 1 200px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #fff;
+    border: 1px solid #eef2f7;
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.okpi-icon {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.okpi-icon i { width: 19px; height: 19px; stroke-width: 2px; }
+.okpi-icon.okpi-blue { background: #eff6ff; color: #2563eb; }
+.okpi-icon.okpi-amber { background: #fff7ed; color: #c2410c; }
+.okpi-icon.okpi-emerald { background: #ecfdf5; color: #059669; }
+.okpi-icon.okpi-purple { background: #f5f3ff; color: #7c3aed; }
+
+.okpi-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.okpi-text strong { font-size: 20px; font-weight: 800; color: #0f172a; line-height: 1.1; }
+.okpi-text span { font-size: 11px; font-weight: 600; color: #64748b; white-space: nowrap; }
+
+.overview-chart-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+@media (max-width: 1100px) {
+    .overview-chart-grid { grid-template-columns: 1fr; }
+}
+
+.overview-chart-card {
+    background: #fff;
+    border: 1px solid #eef2f7;
+    border-radius: 16px;
+    padding: 20px 22px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    min-width: 0;
+}
+.overview-chart-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+.overview-chart-canvas-wrap { position: relative; height: 220px; }
+
+.inline-eyebrow {
+    margin: 0 0 4px;
+    color: #0f766e;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+</style>

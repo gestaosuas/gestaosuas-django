@@ -13,9 +13,10 @@ from apps.directorates.models import Directorate, MonthlyReport
 from apps.core.export import ExcelExportMixin, build_workbook
 from apps.core.utils import MONTH_LABELS as MONTH_LABELS_ARR
 from apps.core.utils import (
-    MONTH_LABELS, MONTH_OPTIONS, build_sparkline, build_column_points,
-    build_period_label, build_year_range_from_years, build_variation,
-    build_donut_style, safe_total, build_series, current_or_total
+    MONTH_LABELS, MONTH_OPTIONS, build_sparkline,
+    build_period_label, build_year_range_from_years,
+    build_donut_style, build_series, current_or_total,
+    build_series_or_none, build_variation_or_none,
 )
 from .models import BeneficiosReport
 from .forms import BeneficiosReportForm
@@ -79,21 +80,33 @@ class BeneficiosHomeView(TvTemplateMixin, BeneficiosBaseMixin, DetailView):
                     "sparkline": build_sparkline(history),
                     "icon": icon,
                     "color": color,
-                    "variation": build_variation(history, selected_month),
+                    "variation": build_variation_or_none(reports_by_month, field_name, selected_month),
                 }
             )
 
-        latest = reports.last()
-        familias_history = build_series(reports_by_month, "familias_pbf")
-        pessoas_history = build_series(reports_by_month, "pessoas_cadunico")
+        familias_history = build_series_or_none(reports_by_month, "familias_pbf")
+        pessoas_history = build_series_or_none(reports_by_month, "pessoas_cadunico")
+        line_chart_familias = [
+            {"label": label, "value": familias_history[index]}
+            for index, (_month_num, label) in enumerate(MONTH_LABELS)
+        ]
+        line_chart_pessoas = [
+            {"label": label, "value": pessoas_history[index]}
+            for index, (_month_num, label) in enumerate(MONTH_LABELS)
+        ]
+
+        # "Visitas Domiciliares" respeita o mesmo filtro de mes dos 4 cards de
+        # KPI (mes especifico -> so aquele relatorio; "all" -> soma do ano).
         visits_breakdown = [
             {
                 "label": label,
-                "value": safe_total(latest, field_name),
+                "value": current_or_total(reports_by_month, field_name, selected_month),
                 "color": color,
             }
             for field_name, label, color in VISITS_BREAKDOWN
         ]
+        visits_period_label = build_period_label(selected_year, selected_month)
+        latest = reports.last()
         monthly_reports = MonthlyReport.objects.filter(
             directorate=directorate,
             setor="beneficios",
@@ -108,9 +121,10 @@ class BeneficiosHomeView(TvTemplateMixin, BeneficiosBaseMixin, DetailView):
                 "cards": cards,
                 "reports": reports,
                 "latest_report": latest,
-                "line_chart_familias": build_column_points(familias_history),
-                "line_chart_pessoas": build_column_points(pessoas_history),
+                "line_chart_familias": line_chart_familias,
+                "line_chart_pessoas": line_chart_pessoas,
                 "visits_breakdown": visits_breakdown,
+                "visits_period_label": visits_period_label,
                 "visits_donut_style": build_donut_style(visits_breakdown),
                 "monthly_narratives": monthly_reports,
             }

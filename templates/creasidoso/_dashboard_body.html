@@ -1,0 +1,96 @@
+{% load static %}
+<div class="dashboard-split-layout">
+    <aside class="metrics-stack">
+        {% for c in cards %}
+        <article class="metric-card-modern">
+            <div class="metric-top">
+                <div class="icon-circle" style="--accent-color:{{ c.color }};background:{{ c.color }}15;"><i data-lucide="{{ c.icon }}"></i></div>
+                {% if c.variation %}<span class="variation {{ c.variation.direction }}"><i data-lucide="{{ c.variation.icon }}"></i>{{ c.variation.text }}</span>{% endif %}
+            </div>
+            <p class="metric-context">{{ c.label }}</p>
+            <strong>{{ c.value }}</strong>
+        </article>
+        {% endfor %}
+    </aside>
+
+    <div class="charts-stack">
+        <div class="charts-row-inner">
+            <article class="chart-panel"><div class="chart-header"><div><h2>Tipos de Violencia Idosos</h2><p class="chart-subtitle">{{ period_label }}</p></div></div>
+                <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                    {% if donut_idoso_items %}
+                    <canvas id="donutIdoso"></canvas>
+                    {% else %}
+                    <div class="chart-empty">Sem dados de Idoso</div>
+                    {% endif %}
+                </div>
+            </article>
+            <article class="chart-panel"><div class="chart-header"><div><h2>Tipos de Violencia PCD</h2><p class="chart-subtitle">{{ period_label }}</p></div></div>
+                <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                    {% if donut_pcd_items %}
+                    <canvas id="donutPcd"></canvas>
+                    {% else %}
+                    <div class="chart-empty">Sem dados de PCD</div>
+                    {% endif %}
+                </div>
+            </article>
+        </div>
+        <div class="charts-row-inner">
+            <article class="chart-panel"><div class="chart-header"><div><h2>Violencia Idosos</h2><p class="chart-subtitle">{{ period_label }}</p></div></div>
+                <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                    {% if bar_idoso_items %}
+                    <canvas id="barIdoso"></canvas>
+                    {% else %}
+                    <div class="chart-empty">Sem dados de Idoso</div>
+                    {% endif %}
+                </div>
+            </article>
+            <article class="chart-panel"><div class="chart-header"><div><h2>Violencia Pessoa com Deficiencia</h2><p class="chart-subtitle">{{ period_label }}</p></div></div>
+                <div class="monitoring-chart-wrap monitoring-chart-wrap-line">
+                    {% if bar_pcd_items %}
+                    <canvas id="barPcd"></canvas>
+                    {% else %}
+                    <div class="chart-empty">Sem dados de PCD</div>
+                    {% endif %}
+                </div>
+            </article>
+        </div>
+    </div>
+</div>
+
+{{ donut_idoso_items|json_script:"donut-idoso" }}
+{{ donut_pcd_items|json_script:"donut-pcd" }}
+{{ bar_idoso_items|json_script:"bar-idoso" }}
+{{ bar_pcd_items|json_script:"bar-pcd" }}
+
+<script>
+document.addEventListener("DOMContentLoaded",function(){
+    if(window.Chart&&window.ChartDataLabels)Chart.register(ChartDataLabels);
+    var di=JSON.parse(document.getElementById("donut-idoso").textContent);
+    var dp=JSON.parse(document.getElementById("donut-pcd").textContent);
+    var bi=JSON.parse(document.getElementById("bar-idoso").textContent);
+    var bp=JSON.parse(document.getElementById("bar-pcd").textContent);
+    var colors=["#3b82f6","#f59e0b","#ef4444","#10b981","#8b5cf6"];
+    function makeDonut(id,items){
+        if(!items.length)return;
+        new Chart(document.getElementById(id),{type:"doughnut",data:{labels:items.map(function(i){return i.label}),
+            datasets:[{data:items.map(function(i){return i.value}),backgroundColor:items.map(function(i){return i.color}),
+            borderColor:"#fff",borderWidth:2}]},options:{maintainAspectRatio:false,cutout:"55%",
+            plugins:{legend:{position:"bottom",labels:{font:{size:10,weight:"700"},padding:12,usePointStyle:!0,pointStyleWidth:8}},
+            tooltip:{callbacks:{label:function(c){var t=c.dataset.data.reduce(function(a,b){return a+b},0);return c.label+": "+c.raw+(t?" ("+Math.round(c.raw/t*100)+"%)":"")}}}}}})}
+    function makeBar(id,items){
+        if(!items.length)return;
+        new Chart(document.getElementById(id),{type:"bar",data:{labels:items.map(function(i){return i.label}),
+            datasets:[{data:items.map(function(i){return i.value}),backgroundColor:"#3b82f6",borderRadius:8,barThickness:20}]},
+            options:{maintainAspectRatio:!1,indexAxis:"y",
+            plugins:{legend:{display:!1},datalabels:{anchor:"end",align:"right",font:{weight:"800",size:9},formatter:function(v){return v||""}}},
+            scales:{x:{display:!1,beginAtZero:!0,suggestedMax:Math.max.apply(null,items.map(function(i){return i.value}),1)*1.3},
+            y:{grid:{display:!1},ticks:{font:{size:10,weight:"700"},color:"#64748b",padding:4}}}}})}
+    makeDonut("donutIdoso",di);makeDonut("donutPcd",dp);makeBar("barIdoso",bi);makeBar("barPcd",bp);
+});
+</script>
+
+<style>
+.variation{display:flex;align-items:center;gap:3px;padding:3px 6px;border-radius:14px;font-size:10px;font-weight:800}
+.variation.positive{background:#ecfdf5;color:#10b981}.variation.negative{background:#fef2f2;color:#ef4444}.variation i{width:11px;height:11px}
+.chart-empty{display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+</style>

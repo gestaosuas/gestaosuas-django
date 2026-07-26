@@ -88,6 +88,11 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
         # home.html) em vez da página inteira - evita recarregar navbar/
         # cabecalho/cards a cada clique. Fallback (sem X-Requested-With,
         # ex. acesso direto por URL/bookmark) sempre renderiza a pagina cheia.
+        # ?tv=1 (carrossel de TV) tem prioridade sobre os dois - nao dá pra só
+        # usar TvTemplateMixin aqui porque esse metodo já é sobrescrito nesta
+        # classe (um metodo definido direto na classe sempre vence o mixin).
+        if self.request.GET.get("tv") == "1":
+            return ["monitoramento/tv.html"]
         if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return ["monitoramento/_tab_content.html"]
         return [self.template_name]

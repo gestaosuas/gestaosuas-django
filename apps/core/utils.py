@@ -144,6 +144,56 @@ def build_series(reports_by_month, field_name):
     return [safe_total(reports_by_month.get(month_num), field_name) for month_num, _label in MONTH_LABELS]
 
 
+def build_series_or_none(reports_by_month, field_name):
+    """Como build_series(), mas retorna None (nao 0) pros meses sem nenhuma
+    linha de relatorio - permite o grafico desenhar uma lacuna real em vez de
+    fingir que o valor foi zero. Nao reaproveita build_series() por design:
+    troque com cuidado, essa distincao None-vs-0 e o ponto inteiro da funcao."""
+    return [
+        safe_total(reports_by_month[month_num], field_name) if month_num in reports_by_month else None
+        for month_num, _label in MONTH_LABELS
+    ]
+
+
+def build_variation_or_none(reports_by_month, field_name, selected_month):
+    """Variante de build_variation() que parte de reports_by_month (nao de uma
+    serie ja achatada por build_series()) para distinguir "mes sem relatorio"
+    de "mes com valor 0 real". No modo "all" (Ano Inteiro), compara o ultimo
+    mes com relatorio lancado contra o mes imediatamente anterior a ele, em
+    vez de sempre desistir (None) como build_variation() faz. Nunca fabrica
+    uma comparacao contra um mes sem relatorio - se o mes anterior ao mes
+    "atual" nao tem linha nenhuma, retorna None."""
+    if selected_month != "all":
+        try:
+            current_month_num = int(selected_month)
+        except (ValueError, TypeError):
+            return None
+        if current_month_num <= 1 or current_month_num not in reports_by_month:
+            return None
+        previous_month_num = current_month_num - 1
+    else:
+        reported_months = sorted(reports_by_month.keys())
+        if len(reported_months) < 2:
+            return None
+        current_month_num = reported_months[-1]
+        previous_month_num = current_month_num - 1
+
+    if previous_month_num not in reports_by_month:
+        return None
+
+    current_value = safe_total(reports_by_month.get(current_month_num), field_name)
+    previous_value = safe_total(reports_by_month.get(previous_month_num), field_name)
+
+    if previous_value == 0:
+        return {"value": 100, "is_up": True} if current_value > 0 else None
+
+    diff = ((current_value - previous_value) / previous_value) * 100
+    return {
+        "value": abs(round(diff, 1)),
+        "is_up": diff > 0,
+    }
+
+
 def current_or_total(reports_by_month, field_name, selected_month):
     if selected_month != "all":
         try:
