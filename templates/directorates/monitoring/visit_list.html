@@ -44,6 +44,11 @@
                     <a href="?bimestre=all" class="btn-text-link visit-clear-link"><i data-lucide="trash-2"></i> Limpar</a>
                 </div>
             </form>
+            {% if show_reports_nav %}
+            <a href="{% url 'directorates:report-list' directorate.pk %}" class="btn-primary-premium" style="background: white; color: #0f172a;">
+                <i data-lucide="file-check-2"></i> Relatórios e Pareceres
+            </a>
+            {% endif %}
             <a href="{% url 'directorates:visit-create' directorate.pk %}" class="btn-primary-premium">
                 <i data-lucide="plus"></i> Nova Visita
             </a>
@@ -282,18 +287,6 @@
                         <label class="flex items-center gap-2 py-1 cursor-pointer hover:bg-white px-2 rounded">
                             <input type="checkbox" name="user_ids" value="{{ profile.id }}">
                             <span class="text-xs font-medium">{{ profile.full_name }}</span>
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="premium-label">Diretorias com Acesso</label>
-                    <div class="max-h-40 overflow-y-auto border rounded-xl p-3 bg-zinc-50">
-                        {% for dir in all_directorates %}
-                        <label class="flex items-center gap-2 py-1 cursor-pointer hover:bg-white px-2 rounded">
-                            <input type="checkbox" name="directorate_ids" value="{{ dir.id }}">
-                            <span class="text-xs font-medium">{{ dir.name }}</span>
                         </label>
                         {% endfor %}
                     </div>

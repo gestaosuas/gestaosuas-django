@@ -120,19 +120,21 @@ ETAPA 3: RELATÓRIO FINAL + PARECER CONCLUSIVO
 - `relatorio_final` → **Relatório Final** (Etapa 3a)
 - `parecer_conclusivo` → **Parecer Conclusivo** (Etapa 3b)
 
-### A.6 Permissões de Visita por Perfil (CONFIRMADO pelo usuário em 2026-07-21)
+### A.6 Permissões de Visita por Perfil (CONFIRMADO pelo usuário em 2026-07-21; refinado em 2026-07-25)
 
 | Ação | Admin | Diretor | Agente |
 |------|-------|---------|--------|
-| Ver visitas da diretoria | Todas | Todas (visualização) | **Apenas as próprias** |
+| Ver visitas da diretoria | Todas | Todas (visualização) | **Apenas as próprias + delegadas** |
 | Criar Nova Visita | Sim | Sim | Sim |
-| Editar visita (rascunho) | Sim | **Não** (só visualiza) | **Sim** (só as próprias) |
-| Finalizar visita | Sim | **Não** | **Sim** (só as próprias) |
-| Preencher Relatório de Visita | Sim | **Não** | **Sim** (só as próprias) |
-| Relatório Final / Parecer | Sim | **Não** | **Sim** (só as próprias) |
+| Editar visita (rascunho) | Sim | **Sim, se ele criou** / só visualiza se for de outra pessoa | **Sim** (só as próprias/delegadas) |
+| Finalizar visita | Sim | **Sim, se ele criou** / não, se for de outra pessoa | **Sim** (só as próprias/delegadas) |
+| Preencher Relatório de Visita | Sim | **Sim, se ele criou** / não, se for de outra pessoa | **Sim** (só as próprias/delegadas) |
+| Relatório Final / Parecer | Sim | **Sim, se ele criou** / não, se for de outra pessoa | **Sim** (só as próprias/delegadas) |
 | Excluir visita | Sim | Não | Não |
 
-**Resumo**: Somente o agente que criou a visita pode editá-la e finalizá-la. O diretor vê tudo mas não edita nada — é um perfil de supervisão/consulta. Admin tem acesso total.
+**Resumo (refinado 2026-07-25)**: agente edita/finaliza só as próprias visitas (ou as que foram delegadas a ele via `FormDelegation`) — visita de outro agente, mesmo com acesso à diretoria, não abre nem em modo leitura. Diretor vê tudo na sua diretoria em modo leitura, **exceto as visitas que ele mesmo criou**, que ele edita/finaliza normalmente igual um agente dono (esclarecido pelo usuário: diretor supervisiona o trabalho alheio, mas não fica travado no próprio). Admin tem acesso total sempre.
+
+**Reforço de servidor (2026-07-25)**: até então, `FormDelegation` só filtrava listagens (`VisitListView`, `MonitoringReportListView`, dashboard do módulo) — as telas de edição (`VisitInstrumentalView`, `VisitReportView`, `RevertReportView`, upload/remoção de documentos e notificações, reverter visita) não validavam dono/delegação nenhuma, então qualquer agente ou diretor com acesso à diretoria conseguia abrir e salvar a visita de outra pessoa via URL direta (UUID). Corrigido com `VisitAccessMixin` (`apps/directorates/views.py`), que aplica exatamente a tabela acima antes de despachar a request; a UI (`visit_instrumental.html`, `report_form.html`) também desabilita o formulário (`<fieldset disabled>`) e esconde os botões de salvar/finalizar quando `can_edit` é falso, para não mostrar uma tela editável que na prática vai rejeitar o POST. `VisitDelegateView` (delegar visita) também passou a exigir admin ou diretor — antes qualquer agente com acesso à diretoria podia redelegar (e apagar as delegações existentes de) qualquer visita.
 
 ### A.6 Views do módulo monitoramento
 
@@ -197,6 +199,8 @@ Em `apps/monitoramento/views.py` (`MonitoramentoHomeView.get_context_data()`):
 | Relatórios e Pareceres | Sim | **Não** |
 
 **Navegação AJAX das abas**: `MonitoramentoHomeView.get_template_names()` verifica o header `X-Requested-With` — se a requisição veio do clique numa aba (`fetch` com esse header), retorna só o partial `monitoramento/_tab_content.html`; senão retorna `monitoramento/home.html` completo (que inclui o partial via `{% include %}` dentro de `#tabContentRegion`). Isso evita reload de página inteira ao trocar de aba. A função JS `initTabInteractions()` (ícones Lucide, gráficos Chart.js, handlers de modal/busca) precisa ser chamada de novo após cada troca de aba via AJAX, já que o conteúdo é substituído via `innerHTML`.
+
+**Dashboard de abas agora é só para admin (CONFIRMADO pelo usuário em 2026-07-25)**: a tabela "Abas por tipo de diretoria" acima só vale pra quem enxerga o dashboard — hoje, só admin. `MonitoramentoHomeView.get()` redireciona diretor/agente direto para `directorates:visit-list` (lista "Instrumental de Visita", já filtrada por dono/delegação) nas 3 diretorias do módulo, sem passar pelo dashboard de abas nem ver "Cadastrar OSC". A lista de visitas ganhou um botão "Relatórios e Pareceres" (linkando pra `directorates:report-list`, já filtrada do mesmo jeito) — visível só para Subvenção/Emendas e Fundos (`is_subvencao_directorate`), não para Outros (que não tem essa aba nem na versão admin). "Plano de Trabalho" e "Cadastrar OSC" não ganharam nenhum link novo pra diretor/agente — ficam inacessíveis por navegação normal (a URL ainda funciona se acessada direto, não há bloqueio de servidor adicional nelas, só a ausência de link).
 
 **Formulário "Nova Visita" simplificado para Outros** (`templates/directorates/monitoring/visit_instrumental.html`, confirmado por print do usuário em 2026-07-24): a view passa `context["is_outros_visit"] = is_outros_directorate(directorate)` (em `VisitCreateView` e `VisitInstrumentalView`), e o template usa esse flag pra esconder, só para Outros:
 - Campos "Total/Mês" e "Subvencionados" e o card inteiro "Usuários presentes" (seção Atendimento)
@@ -482,3 +486,6 @@ E a visita é válida e funcional
 | 2026-07-25 | Duas listagens de visita unificadas via redirect, não deletadas | Usuário pediu inicialmente pra unir as 2 tabelas de listagem de visita (avulsa vs. aba) numa só nova tela; depois recuou (`"tudo bem, não precisa deletar, só corrigir os redirecionamentos"`) — escopo final: manter as 2 telas existentes, só garantir que toda ação (criar/editar/excluir/finalizar visita e OSC) redireciona pra tela certa via `get_visit_list_redirect`/`get_osc_list_redirect` (seção A.9-D). Coluna "Documentos" da aba também ganhou os 3 estados (Preencher/Rascunho/Finalizado) que a tela avulsa já tinha (seção A.9-C) |
 | 2026-07-25 | Diretoria "Outros" ganhou dashboard de abas (2 abas) + formulário de Nova Visita simplificado | Pedido do usuário com print de referência: Outros só precisa de "Cadastrar OSC" e "Instrumental de Visita" (sem Plano de Trabalho/Relatórios e Pareceres, que não se aplicam), e a Nova Visita de Outros usa um subconjunto de campos bem menor que Subvenção/Emendas (ver seção A.9-B) |
 | 2026-07-25 | Bug de redirect de OSC (create/update/delete) corrigido para respeitar `next`/aba, mesma classe do bug já corrigido pra visitas | `OscUpdateView.get_success_url()` nunca checava `next`; link "Editar OSC" na aba não passava `?next=`. Testado via Playwright em Subvenção e Outros: criar/editar/excluir OSC agora sempre volta pra aba correta (ver seção A.9-D) |
+| 2026-07-25 | Dashboard de abas (Cadastrar OSC/Instrumental/Plano/Relatórios) restrito a admin; diretor/agente redirecionados direto pra lista de visitas | Pedido do usuário: diretor/agente não devem ver "Cadastrar OSC" nem o dashboard de Subvenção/Emendas e Fundos/Outros — ao clicar na diretoria, vão direto pra `visit-list` (já filtrada por dono/delegação), com um botão novo "Relatórios e Pareceres" (não aparece pra Outros). Ver seção A.9-B |
+| 2026-07-25 | A.6 refinado: diretor edita/finaliza visitas que ELE criou (antes a tabela dizia "diretor nunca edita") | Esclarecido pelo usuário ao confirmar o comportamento de tela somente-leitura: diretor só vira supervisor/consulta nas visitas de outra pessoa, não nas próprias |
+| 2026-07-25 | Reforço de servidor: `FormDelegation` passou a proteger também as telas de edição (não só listagens), via `VisitAccessMixin`; `VisitDelegateView` restrito a admin/diretor | Antes qualquer agente/diretor com acesso à diretoria conseguia abrir/salvar a visita de qualquer outra pessoa via URL direta (UUID), e qualquer agente conseguia redelegar (apagando delegações existentes) qualquer visita — brecha de segurança encontrada durante auditoria pedida pelo usuário ("revise a lógica de delegar acesso") |

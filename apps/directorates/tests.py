@@ -89,13 +89,14 @@ class DirectoratesTestBase(TestCase):
             directorate=directorate or self.directorate,
         )
 
-    def make_visit(self, osc=None, directorate=None):
+    def make_visit(self, osc=None, directorate=None, user=None):
         return Visit.objects.create(
             id=uuid.uuid4(),
             osc=osc or self.make_osc(),
             directorate=directorate or self.directorate,
             visit_date=date.today(),
             visit_time=time(9, 0),
+            user_id=user.pk if user else None,
         )
 
     def make_work_plan(self, osc=None, directorate=None, user=None):
@@ -297,9 +298,73 @@ class ObjectScopedAccessMixinTests(DirectoratesTestBase):
         self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
 
     def test_visit_scoped_view_allowed_for_user_with_access(self):
-        visit = self.make_visit()
         user = make_user(role="agente", primary_directorate=self.directorate)
+        visit = self.make_visit(user=user)
         self.client.force_login(user)
+        response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_visit_access_denied_for_agente_not_owner_not_delegated(self):
+        """VisitAccessMixin (2026-07-25): agente com acesso a diretoria mas
+        sem ser dono nem delegado nao pode nem visualizar a visita alheia."""
+        owner = make_user(role="agente", primary_directorate=self.directorate)
+        visit = self.make_visit(user=owner)
+        other_agente = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(other_agente)
+        response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_visit_access_allowed_for_delegated_agente(self):
+        owner = make_user(role="agente", primary_directorate=self.directorate)
+        visit = self.make_visit(user=owner)
+        delegate = make_user(role="agente", primary_directorate=self.directorate)
+        FormDelegation.objects.create(id=uuid.uuid4(), visit=visit, user_id=delegate.pk, delegated_by=owner.pk)
+        self.client.force_login(delegate)
+        response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_visit_access_diretor_view_only_on_others_visit(self):
+        """Diretor visualiza (GET) a visita de um agente, mas nao consegue
+        salvar (POST) - so visitas que ele mesmo criou sao editaveis."""
+        owner = make_user(role="agente", primary_directorate=self.directorate)
+        visit = self.make_visit(user=owner)
+        diretor = make_user(role="diretor", primary_directorate=self.directorate)
+        self.client.force_login(diretor)
+        get_response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
+        )
+        self.assertEqual(get_response.status_code, 200)
+        post_response = self.client.post(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}),
+            {"status": "draft", "observacoes": "tentativa", "recomendacoes": ""},
+        )
+        self.assertEqual(post_response.status_code, 403)
+
+    def test_visit_access_diretor_full_access_on_own_visit(self):
+        diretor = make_user(role="diretor", primary_directorate=self.directorate)
+        visit = self.make_visit(user=diretor)
+        self.client.force_login(diretor)
+        get_response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
+        )
+        self.assertEqual(get_response.status_code, 200)
+        post_response = self.client.post(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}),
+            {"status": "draft", "observacoes": "diretor editando a propria", "recomendacoes": ""},
+        )
+        self.assertEqual(post_response.status_code, 302)
+
+    def test_visit_access_admin_bypasses_ownership(self):
+        owner = make_user(role="agente", primary_directorate=self.directorate)
+        visit = self.make_visit(user=owner)
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
         response = self.client.get(
             reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
         )
@@ -570,12 +635,25 @@ class VisitDelegateViewTests(DirectoratesTestBase):
         self.assertEqual(delegations.first().user_id, second_target.pk)
 
     def test_delegate_denied_for_user_without_directorate_access(self):
+        """role=diretor pra isolar a checagem de diretoria (o role check do
+        VisitDelegateView roda antes e bloquearia um agente de qualquer jeito
+        - ver test_delegate_denied_for_agente_role abaixo)."""
         visit = self.make_visit()
-        outsider = make_user(role="agente", primary_directorate=self.other_directorate)
+        outsider = make_user(role="diretor", primary_directorate=self.other_directorate)
         self.client.force_login(outsider)
         url = reverse("directorates:visit-delegate", kwargs={"pk": visit.pk})
         response = self.client.post(url, {"user_ids": []}, follow=False)
         self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
+
+    def test_delegate_denied_for_agente_role(self):
+        """VisitDelegateView (2026-07-25): so admin/diretor podem delegar,
+        mesmo um agente com acesso normal a diretoria nao pode."""
+        visit = self.make_visit()
+        agente = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(agente)
+        url = reverse("directorates:visit-delegate", kwargs={"pk": visit.pk})
+        response = self.client.post(url, {"user_ids": []})
+        self.assertEqual(response.status_code, 403)
 
 
 @override_settings(STORAGES=STATIC_TEST_STORAGES)

@@ -33,12 +33,18 @@
     <i data-lucide="lock"></i>
     <span>Documento finalizado. O formulario esta em modo somente leitura.</span>
 </div>
+{% elif can_edit == False %}
+<div class="locked-banner no-print visit-locked-banner">
+    <i data-lucide="eye"></i>
+    <span>Visita de outro usuario. Voce esta em modo somente leitura.</span>
+</div>
 {% endif %}
 
 <div class="visit-page-shell">
     <form method="post" id="instrumentalForm" class="visit-form-stack" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ return_url }}">
+        <fieldset {% if can_edit == False %}disabled{% endif %} style="border:0; padding:0; margin:0; min-width:0;">
 
         <div class="visit-main-panel-card">
             <section class="visit-top-actions-section no-print">
@@ -52,7 +58,7 @@
                     <button type="button" onclick="printProfessionalReport()" class="visit-top-action-btn" {% if is_new %}id="printReportButton"{% endif %}>
                         <i class="ph ph-printer"></i> Imprimir Relatorio
                     </button>
-                    {% if object.status != 'finalized' and object.status != 'completed' %}
+                    {% if object.status != 'finalized' and object.status != 'completed' and can_edit != False %}
                     <button type="button" onclick="submitVisit('draft')" class="visit-top-action-btn">
                         <i class="ph ph-floppy-disk"></i> Salvar Rascunho
                     </button>
@@ -676,7 +682,7 @@
         <input type="hidden" name="status" id="finalStatus" value="{% if object and object.status %}{{ object.status }}{% else %}draft{% endif %}">
         <input type="hidden" name="rh_data" id="id_rh_data">
 
-        {% if object.status != 'finalized' and object.status != 'completed' %}
+        {% if object.status != 'finalized' and object.status != 'completed' and can_edit != False %}
         <div class="sticky-footer-actions no-print visit-footer-actions">
             <div class="visit-footer-actions-inner">
                 <button type="button" onclick="submitVisit('draft')" class="btn-outline-monitoring visit-save-draft-btn">
@@ -688,6 +694,7 @@
             </div>
         </div>
         {% endif %}
+        </fieldset>
     </form>
 
     <!-- VISÃO DE IMPRESSÃO (Oculta na tela, visível apenas no papel) -->

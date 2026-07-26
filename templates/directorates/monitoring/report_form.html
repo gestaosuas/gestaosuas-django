@@ -28,16 +28,20 @@
                 <i data-lucide="printer" style="width: 16px; height: 16px;"></i> Imprimir
             </button>
 
-            {% if report_data.status != 'finalized' %}
+            {% if report_data.status != 'finalized' and can_edit != False %}
                 <button type="button" class="btn-premium-primary" id="saveDraftBtn" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: white; border: none; background: #eab308; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(234, 179, 8, 0.2);">
                     <i data-lucide="save" style="width: 16px; height: 16px;"></i> Salvar Rascunho
                 </button>
                 <button type="button" class="btn-premium-primary" id="finalizeBtn" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 24px; border-radius: 12px; font-size: 12px; font-weight: 800; text-transform: uppercase; color: white; border: none; background: #16a34a; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);">
                     <i data-lucide="check-circle" style="width: 16px; height: 16px;"></i> Finalizar
                 </button>
-            {% else %}
+            {% elif report_data.status == 'finalized' %}
                 <div style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 11px; font-weight: 800; text-transform: uppercase; color: #15803d; background: #dcfce7; border: 1px solid #bbf7d0; letter-spacing: 0.05em;">
                     <i data-lucide="lock" style="width: 14px; height: 14px;"></i> Relatório Finalizado & Bloqueado
+                </div>
+            {% else %}
+                <div style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 11px; font-weight: 800; text-transform: uppercase; color: #1e3a8a; background: rgba(255,255,255,0.9); border: 1px solid rgba(255,255,255,0.4); letter-spacing: 0.05em;">
+                    <i data-lucide="eye" style="width: 14px; height: 14px;"></i> Visita de outro usuário — somente leitura
                 </div>
             {% endif %}
         </div>
@@ -70,6 +74,7 @@
         <!-- Interactive Form -->
         <form id="monitoringReportForm">
             {% csrf_token %}
+            <fieldset {% if can_edit == False %}disabled{% endif %} style="border:0; padding:0; margin:0; min-width:0;">
             <div style="display: flex; flex-direction: column; gap: 35px;">
                 {% if report_type == 'relatorio_final' %}
                     <!-- Section 1: DADOS DA PARCERIA -->
@@ -757,6 +762,7 @@
                     </section>
                 {% endif %}
             </div>
+            </fieldset>
         </form>
 
         <!-- Official Print Footer Block -->

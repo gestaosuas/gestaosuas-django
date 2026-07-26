@@ -16,7 +16,7 @@ from apps.accounts.models import Profile, ProfileDirectorate
 from apps.core.export import ExcelExportMixin, build_workbook
 from apps.directorates.models import Directorate, FormDelegation, MonthlyReport, Osc, Visit, WorkPlan
 from apps.directorates.forms import OscForm
-from apps.directorates.views import get_monitoramento_theme
+from apps.directorates.views import get_monitoramento_theme, is_subvencao_directorate, is_outros_directorate
 from apps.core.utils import (
     MONTH_LABELS, MONTH_OPTIONS, build_sparkline,
     build_period_label, build_year_range_from_years, build_variation
@@ -82,6 +82,20 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
 
     def get_object(self, queryset=None):
         return self.get_directorate()
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        directorate = self.object
+        if is_subvencao_directorate(directorate) or is_outros_directorate(directorate):
+            profile = getattr(request.user, "profile", None)
+            is_admin = request.user.is_superuser or (profile and profile.role == "admin")
+            if not is_admin:
+                # Diretor/agente nao veem mais o dashboard de abas dessas 3
+                # diretorias - vao direto pra lista de Instrumental de Visitas
+                # (docs/dominio/04-... A.6, confirmado 2026-07-25).
+                return redirect("directorates:visit-list", pk=directorate.pk)
+        context = self.get_context_data(object=self.object)
+        return self.render_to_response(context)
 
     def get_template_names(self):
         # Troca de aba via JS busca só o fragmento (ver tabContentRegion em

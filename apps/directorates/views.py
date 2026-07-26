@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.http import JsonResponse, HttpResponseForbidden, Http404
 from django.template.loader import render_to_string
 
-from apps.accounts.mixins import DirectorateAccessMixin
+from apps.accounts.mixins import DirectorateAccessMixin, user_has_directorate_access
 import json
 import uuid
 import math
@@ -564,6 +564,39 @@ class VisitScopedMixin(_ObjectDirectorateScopedMixin):
     scope_model = Visit
 
 
+class VisitAccessMixin(VisitScopedMixin):
+    """Alem do acesso a diretoria (VisitScopedMixin), restringe o acesso a
+    visita conforme dono/delegacao/papel (docs/dominio/04-... A.6, refinado
+    em 2026-07-25): admin sempre; diretor tem acesso total se ele mesmo criou
+    a visita, senao so leitura (GET); agente/user so na propria visita ou com
+    FormDelegation, senao 403 ja no GET."""
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        visit = self.get_scoped_object()
+        profile = getattr(request.user, "profile", None)
+        is_admin = request.user.is_superuser or (profile and profile.role == "admin")
+        # Checagem de diretoria primeiro (mesma regra/mensagem de
+        # DirectorateAccessMixin) - senao um usuario sem nenhum acesso a
+        # diretoria cairia direto no 403 de dono/delegacao abaixo, em vez do
+        # redirect padrao "voce nao tem acesso a esta area".
+        if not is_admin and not user_has_directorate_access(request.user, visit.directorate):
+            messages.error(request, "Você não tem acesso a esta área.")
+            return redirect("core:landing")
+        is_owner = str(visit.user_id) == str(request.user.id)
+        if not is_admin:
+            if profile and profile.role == "diretor":
+                if not is_owner and request.method != "GET":
+                    return HttpResponseForbidden("Você não pode editar uma visita que não criou.")
+            else:
+                is_delegated = FormDelegation.objects.filter(visit=visit, user_id=request.user.id).exists()
+                if not (is_owner or is_delegated):
+                    return HttpResponseForbidden("Você não tem acesso a esta visita.")
+        self.can_edit = is_admin or is_owner or not (profile and profile.role == "diretor")
+        return super().dispatch(request, *args, **kwargs)
+
+
 class WorkPlanScopedMixin(_ObjectDirectorateScopedMixin):
     scope_model = WorkPlan
 
@@ -855,6 +888,7 @@ class VisitListView(DirectorateScopedMixin, ListView):
         directorate = self.get_directorate()
         context["directorate"] = directorate
         context["theme_class"] = get_monitoramento_theme(directorate)[0]
+        context["show_reports_nav"] = is_subvencao_directorate(directorate)
         for visit in context["visits"]:
             identificacao = visit.identificacao or {}
             visit.registered_by_name = (
@@ -879,14 +913,22 @@ class VisitListView(DirectorateScopedMixin, ListView):
         return context
 
 class VisitDelegateView(VisitScopedMixin, View):
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        profile = getattr(request.user, "profile", None)
+        is_allowed = request.user.is_superuser or (profile and profile.role in ("admin", "diretor"))
+        if not is_allowed:
+            return HttpResponseForbidden("Apenas administradores e diretores podem delegar visitas.")
+        return super().dispatch(request, *args, **kwargs)
+
     def post(self, request, pk):
         visit = self.get_scoped_object()
         user_ids = request.POST.getlist("user_ids")
-        directorate_ids = request.POST.getlist("directorate_ids")
-        
+
         # Clear existing
         FormDelegation.objects.filter(visit=visit).delete()
-        
+
         # Add Users
         for uid in user_ids:
             FormDelegation.objects.create(
@@ -895,16 +937,7 @@ class VisitDelegateView(VisitScopedMixin, View):
                 user_id=uid,
                 delegated_by=request.user.id
             )
-            
-        # Add Directorates
-        for did in directorate_ids:
-            FormDelegation.objects.create(
-                id=uuid.uuid4(),
-                visit=visit,
-                directorate_id=did,
-                delegated_by=request.user.id
-            )
-            
+
         return redirect(get_visit_list_redirect(visit.directorate))
 
 class WorkPlanListView(DirectorateScopedMixin, ListView):
@@ -1115,7 +1148,7 @@ class MonitoringReportListView(DirectorateScopedMixin, ListView):
         context["theme_class"] = get_monitoramento_theme(directorate)[0]
         return context
 
-class VisitReportView(VisitScopedMixin, DetailView):
+class VisitReportView(VisitAccessMixin, DetailView):
     """Generic view to handle the 3 types of specialized reports."""
     model = Visit
     template_name = "directorates/monitoring/report_form.html"
@@ -1136,6 +1169,7 @@ class VisitReportView(VisitScopedMixin, DetailView):
         context["report_type"] = report_type
         context["report_label"] = self.REPORT_LABELS.get(report_type, report_type.replace("_", " ").title())
         context["theme_class"] = get_monitoramento_theme(self.object.directorate)[0]
+        context["can_edit"] = self.can_edit
         
         MONTH_NAMES = {
             1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril",
@@ -1502,7 +1536,7 @@ class VisitReportView(VisitScopedMixin, DetailView):
         except Exception as e:
             return JsonResponse({"success": False, "error": str(e)}, status=400)
 
-class VisitUploadDocumentView(VisitScopedMixin, View):
+class VisitUploadDocumentView(VisitAccessMixin, View):
     def post(self, request, pk):
         visit = self.get_scoped_object()
         file = request.FILES.get("file")
@@ -1533,7 +1567,7 @@ class VisitUploadDocumentView(VisitScopedMixin, View):
 from django.core.files.storage import FileSystemStorage
 from django.conf import settings
 
-class VisitUploadNotificationView(VisitScopedMixin, View):
+class VisitUploadNotificationView(VisitAccessMixin, View):
     def post(self, request, pk):
         visit = self.get_scoped_object()
         file = request.FILES.get("file")
@@ -1564,7 +1598,7 @@ class VisitUploadNotificationView(VisitScopedMixin, View):
             return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
-class VisitRemoveNotificationView(VisitScopedMixin, View):
+class VisitRemoveNotificationView(VisitAccessMixin, View):
     def post(self, request, pk):
         visit = self.get_scoped_object()
         try:
@@ -1762,7 +1796,7 @@ class VisitCreateView(DirectorateScopedMixin, TemplateView):
             return redirect(next_url)
         return redirect(get_visit_list_redirect(directorate))
 
-class VisitInstrumentalView(VisitScopedMixin, UpdateView):
+class VisitInstrumentalView(VisitAccessMixin, UpdateView):
     model = Visit
     template_name = "directorates/monitoring/visit_instrumental.html"
     fields = ["status", "observacoes", "recomendacoes"]
@@ -1783,6 +1817,7 @@ class VisitInstrumentalView(VisitScopedMixin, UpdateView):
         context["directorate"] = self.object.directorate
         context["oscs"] = Osc.objects.filter(directorate_id=self.object.directorate.pk).order_by("name")
         context["is_new"] = False
+        context["can_edit"] = self.can_edit
         context["theme_class"] = get_monitoramento_theme(self.object.directorate)[0]
         context["is_subvencao_visit"] = is_subvencao_directorate(self.object.directorate)
         context["is_emendas_visit"] = is_emendas_directorate(self.object.directorate)
@@ -1906,7 +1941,7 @@ class VisitInstrumentalView(VisitScopedMixin, UpdateView):
             return next_url
         return get_visit_list_redirect(self.object.directorate)
 
-class VisitDeleteDocumentView(VisitScopedMixin, View):
+class VisitDeleteDocumentView(VisitAccessMixin, View):
     def post(self, request, pk):
         import json
         import urllib.request
@@ -1952,7 +1987,7 @@ class VisitDeleteDocumentView(VisitScopedMixin, View):
             
         return JsonResponse({"success": False, "error": "Index invalido"}, status=400)
 
-class VisitRevertView(VisitScopedMixin, View):
+class VisitRevertView(VisitAccessMixin, View):
     def post(self, request, pk):
         visit = self.get_scoped_object()
         visit.status = "draft"
@@ -1962,7 +1997,7 @@ class VisitRevertView(VisitScopedMixin, View):
             return redirect(next_url)
         return redirect(get_visit_list_redirect(visit.directorate))
 
-class RevertReportView(VisitScopedMixin, View):
+class RevertReportView(VisitAccessMixin, View):
     """Reverte o status de relatorio_final ou parecer_conclusivo para 'draft'."""
     ALLOWED = ("relatorio_final", "parecer_conclusivo")
 
