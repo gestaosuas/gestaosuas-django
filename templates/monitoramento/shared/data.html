@@ -5,6 +5,7 @@
 {% block body_class %}{{ theme_class|default:'theme-emerald' }}{% endblock %}
 
 {% block content %}
+{% include "partials/navbar.html" %}
 <section class="simple-shell benefits-shell">
     <a class="back-link" href="{{ back_url }}">&larr; Voltar para o painel</a>
 

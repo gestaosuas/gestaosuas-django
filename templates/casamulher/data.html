@@ -5,6 +5,7 @@
 {% block body_class %}theme-pink{% endblock %}
 
 {% block content %}
+{% include "partials/navbar.html" %}
 <section class="simple-shell benefits-shell">
     <a class="back-link" href="{% url 'casamulher:home' directorate.pk %}?year={{ selected_year }}">&larr; Voltar</a>
     <div class="benefits-hero">

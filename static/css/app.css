@@ -2800,4 +2800,15 @@ body.dashboard-fit-vh .metrics-stack {
     .dashboard-main:not(.cras-main):not(.beneficios-main) {
         padding-top: 80px;
     }
+
+    /* .benefits-shell fica dentro de paginas cujo <main class="dashboard-main">
+       vem com style="padding-top:0" inline (necessario nas paginas com banner
+       colorido proprio, tipo CRAS/SINE-CP, que ja compensam a navbar via seu
+       proprio espacamento interno) - mas as paginas que so tem um back-link
+       simples no topo (Casa da Mulher, Protecao Especial, CREAS Idoso, NAICA,
+       Pop Rua) nao tinham nenhuma compensacao, e o back-link ficava escondido
+       atras da navbar (position:absolute, 80px, sem reservar espaco no fluxo). */
+    .benefits-shell {
+        padding-top: 96px;
+    }
 }
