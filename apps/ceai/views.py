@@ -472,15 +472,33 @@ class CeaiDataListView(ExcelExportMixin, CeaiBaseMixin, RoleRequiredMixin, Templ
     def export_excel(self):
         ctx = self.get_context_data()
         months = ctx.get("month_headers", [])
+        blank_row = [""] * (len(months) + 1)
         sheets = []
         for unit_data in ctx.get("units_data", []):
-            # Main indicators
-            for row in unit_data.get("matrix", []):
-                pass  # handled below
-            # One sheet per unit
+            # One sheet por unidade: indicadores principais, depois (se houver
+            # oficinas cadastradas pra essa unidade) vagas disponiveis e vagas
+            # ocupadas por oficina, na mesma aba - "junto com a tabela da
+            # unidade", como no pedido do usuario, em vez de abas separadas.
             rows = []
             for row in unit_data.get("matrix", []):
                 rows.append([row["label"]] + [str(m["val"]) for m in row.get("months", [])])
+
+            oficinas = unit_data.get("oficinas", {})
+            available = oficinas.get("available", [])
+            occupied = oficinas.get("occupied", [])
+            if available or occupied:
+                rows.append(blank_row)
+                rows.append(["OFICINAS - VAGAS DISPONÍVEIS"] + [""] * len(months))
+                for row in available:
+                    label = f"{row['label']} ({row['category']})" if row.get("category") else row["label"]
+                    rows.append([label] + [str(m["val"]) for m in row.get("months", [])])
+
+                rows.append(blank_row)
+                rows.append(["OFICINAS - TOTAL DE VAGAS OCUPADAS"] + [""] * len(months))
+                for row in occupied:
+                    label = f"{row['label']} ({row['category']})" if row.get("category") else row["label"]
+                    rows.append([label] + [str(m["val"]) for m in row.get("months", [])])
+
             sheets.append({
                 "title": unit_data["name"][:31],
                 "headers": months,
