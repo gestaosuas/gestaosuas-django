@@ -1,15 +1,13 @@
 from django import forms
 from .models import CasaDaMulherReport, DiversidadeReport, NucleoDiversidadeReport
 
+MONTH_CHOICES = [(1, "JAN"), (2, "FEV"), (3, "MAR"), (4, "ABR"), (5, "MAI"), (6, "JUN"),
+                  (7, "JUL"), (8, "AGO"), (9, "SET"), (10, "OUT"), (11, "NOV"), (12, "DEZ")]
+
+
 class CasaDaMulherForm(forms.ModelForm):
-    month = forms.IntegerField(
-        widget=forms.HiddenInput(),
-        required=True
-    )
-    year = forms.IntegerField(
-        widget=forms.HiddenInput(),
-        required=True
-    )
+    month = forms.ChoiceField(label="Mês", choices=MONTH_CHOICES, widget=forms.Select(attrs={"class": "form-input"}))
+    year = forms.IntegerField(label="Ano", widget=forms.NumberInput(attrs={"class": "form-input", "min": 2020}))
 
     section_map = [
         ("ATENDIMENTOS", ["cm_atend_mulheres_atendidas"]),
@@ -94,14 +92,8 @@ class CasaDaMulherForm(forms.ModelForm):
 
 
 class DiversidadeForm(forms.ModelForm):
-    month = forms.IntegerField(
-        widget=forms.HiddenInput(),
-        required=True
-    )
-    year = forms.IntegerField(
-        widget=forms.HiddenInput(),
-        required=True
-    )
+    month = forms.ChoiceField(label="Mês", choices=MONTH_CHOICES, widget=forms.Select(attrs={"class": "form-input"}))
+    year = forms.IntegerField(label="Ano", widget=forms.NumberInput(attrs={"class": "form-input", "min": 2020}))
 
     section_map = [
         ("ATENDIMENTO", ["div_atend_mulheres_atendidas", "div_atend_nucleo_diversidade"]),
@@ -175,14 +167,8 @@ class DiversidadeForm(forms.ModelForm):
 
 
 class NucleoDiversidadeForm(forms.ModelForm):
-    month = forms.IntegerField(
-        widget=forms.HiddenInput(),
-        required=True
-    )
-    year = forms.IntegerField(
-        widget=forms.HiddenInput(),
-        required=True
-    )
+    month = forms.ChoiceField(label="Mês", choices=MONTH_CHOICES, widget=forms.Select(attrs={"class": "form-input"}))
+    year = forms.IntegerField(label="Ano", widget=forms.NumberInput(attrs={"class": "form-input", "min": 2020}))
 
     section_map = [
         ("ATENDIMENTOS", ["nd_pessoas_atendidas"]),
