@@ -2,7 +2,7 @@
 
 {% block title %}Atualizar {{ module_title }} | {{ directorate.name }}{% endblock %}
 
-{% block body_class %}dashboard-fit-vh theme-indigo{% endblock %}
+{% block body_class %}theme-indigo{% endblock %}
 
 {% block content %}
 <div class="app-shell">
@@ -116,8 +116,8 @@
 
                         <div style="display: flex; gap: 10px;">
                             <a href="{{ back_url }}" class="btn-primary-premium" style="text-decoration: none; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);">
-                                <i data-lucide="x"></i>
-                                <span>Cancelar</span>
+                                <i data-lucide="arrow-left"></i>
+                                <span>Voltar ao Painel</span>
                             </a>
                             <button type="button" class="btn-primary-premium" onclick="showSubmitModal()" style="background: #ffffff; color: #4338ca; border: none; cursor: pointer; font-weight: 800; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
                                 <i data-lucide="save"></i>

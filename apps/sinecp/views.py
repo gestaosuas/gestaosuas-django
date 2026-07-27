@@ -189,6 +189,7 @@ class SharedCreateUpdateView(SineCpBaseMixin, FormView):
     success_view_name = ""
     report_title = ""
     delete_month_view_name = ""
+    back_tab = "sine"
 
     def get_initial(self):
         initial = super().get_initial()
@@ -227,6 +228,7 @@ class SharedCreateUpdateView(SineCpBaseMixin, FormView):
         context["is_admin_user"] = self.is_admin()
         context["delete_month_url"] = reverse(self.delete_month_view_name)
         context["month_options"] = MONTH_OPTIONS
+        context["back_url"] = reverse("sinecp:home") + f"?tab={self.back_tab}&year={context['selected_year']}"
         return context
 
     def get(self, request, *args, **kwargs):
@@ -276,6 +278,7 @@ class QualificacaoCreateUpdateView(SharedCreateUpdateView):
     success_view_name = "sinecp:qualificacao-data"
     report_title = "Qualificacao"
     delete_month_view_name = "sinecp:qualificacao-delete-month"
+    back_tab = "cp"
     required_unit = "Centro Profissionalizante"
 
     def form_valid(self, form):
