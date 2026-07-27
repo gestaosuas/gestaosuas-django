@@ -320,6 +320,7 @@ class SharedDataView(SineCpBaseMixin, TemplateView):
                     "values": [{"val": getattr(reports.get(m), f, "") if reports.get(m) else "", "sub_id": reports.get(m).id if reports.get(m) else None, "month": m, "year": selected_year} for m, _ in MONTH_LABELS],
                 } for f in fields]
             })
+        available_years = sorted(set(self.model.objects.filter(directorate=directorate).values_list("year", flat=True)), reverse=True)
         context.update({
             "directorate": directorate,
             "selected_year": selected_year,
@@ -330,6 +331,7 @@ class SharedDataView(SineCpBaseMixin, TemplateView):
             "back_url": reverse("sinecp:home") + f"?tab={self.back_tab}&year={selected_year}",
             "form_url": reverse(self.form_view_name) + f"?year={selected_year}",
             "monthly_report_url": reverse(self.monthly_report_view_name) + f"?year={selected_year}",
+            "years_range": build_year_range_from_years(available_years, selected_year),
         })
         return context
 
@@ -408,6 +410,7 @@ class SharedMonthlyNarrativeView(SineCpBaseMixin, TemplateView):
         if self.is_agente():
             history_qs = history_qs.filter(user_external_id=self.request.user.pk)
         history = history_qs[:8]
+        available_years = sorted(set(MonthlyReport.objects.filter(directorate=directorate, setor=self.setor).values_list("year", flat=True)), reverse=True)
         context.update({
             "directorate": directorate,
             "selected_year": selected_year,
@@ -418,6 +421,7 @@ class SharedMonthlyNarrativeView(SineCpBaseMixin, TemplateView):
             "module_title": self.module_title,
             "back_url": reverse("sinecp:home") + f"?tab={self.back_tab}&year={selected_year}",
             "reports_url": reverse(self.form_view_name),
+            "years_range": build_year_range_from_years(available_years, selected_year),
         })
         return context
 
@@ -437,6 +441,7 @@ class SharedNarrativeListView(SineCpBaseMixin, TemplateView):
         reports = MonthlyReport.objects.filter(directorate=directorate, setor=self.setor, year=selected_year).order_by("-year", "-month")
         if self.is_agente():
             reports = reports.filter(user_external_id=self.request.user.pk)
+        available_years = sorted(set(MonthlyReport.objects.filter(directorate=directorate, setor=self.setor).values_list("year", flat=True)), reverse=True)
         context.update({
             "directorate": directorate,
             "selected_year": selected_year,
@@ -445,6 +450,7 @@ class SharedNarrativeListView(SineCpBaseMixin, TemplateView):
             "can_delete": self.is_admin(),
             "back_url": reverse("sinecp:home") + f"?tab={self.back_tab}&year={selected_year}",
             "monthly_report_base_url": reverse(self.monthly_view_name),
+            "years_range": build_year_range_from_years(available_years, selected_year),
         })
         return context
 
