@@ -96,6 +96,7 @@ class QualificacaoReportForm(StyledMonitoringForm):
                 "onibus_concluintes_unit",
                 "maravilha_concluintes",
                 "uditech_concluintes",
+                "uditech_centro_concluintes",
             ],
         ),
         (
@@ -118,6 +119,7 @@ class QualificacaoReportForm(StyledMonitoringForm):
                 "cp_planalto_atendimentos",
                 "maravilha_atendimentos",
                 "unitech_atendimentos",
+                "uditech_centro_atendimentos",
                 "onibus_atendimentos",
             ],
         ),
@@ -145,6 +147,7 @@ class QualificacaoReportForm(StyledMonitoringForm):
         "onibus_concluintes_unit": "ONIBUS",
         "maravilha_concluintes": "MARAVILHA",
         "uditech_concluintes": "UDITECH",
+        "uditech_centro_concluintes": "UDITECH Centro",
         "bairros_visitados": "Bairros Visitados",
         "concluintes_onibus": "Concluintes",
         "cursos_onibus": "Cursos",
@@ -157,6 +160,7 @@ class QualificacaoReportForm(StyledMonitoringForm):
         "cp_planalto_atendimentos": "CP PLANALTO",
         "maravilha_atendimentos": "MARAVILHA",
         "unitech_atendimentos": "UDITECH",
+        "uditech_centro_atendimentos": "UDITECH Centro",
         "onibus_atendimentos": "ONIBUS",
         "cursos_andamento": "Cursos em andamento (CP)",
     }

@@ -193,3 +193,9 @@ ALTER TABLE creas_protetivo_reports ADD COLUMN IF NOT EXISTS ti_de_m13 integer D
 ALTER TABLE creas_protetivo_reports ADD COLUMN IF NOT EXISTS ti_de_f0 integer DEFAULT 0;
 ALTER TABLE creas_protetivo_reports ADD COLUMN IF NOT EXISTS ti_de_f7 integer DEFAULT 0;
 ALTER TABLE creas_protetivo_reports ADD COLUMN IF NOT EXISTS ti_de_f13 integer DEFAULT 0;
+
+-- ============================================================================
+-- qualificacao_reports — nova unidade "UDITECH Centro" em Concluintes/Atendimentos (2026-07-27)
+-- ============================================================================
+ALTER TABLE qualificacao_reports ADD COLUMN IF NOT EXISTS uditech_centro_concluintes integer DEFAULT 0;
+ALTER TABLE qualificacao_reports ADD COLUMN IF NOT EXISTS uditech_centro_atendimentos integer DEFAULT 0;
