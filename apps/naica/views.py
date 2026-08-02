@@ -313,7 +313,10 @@ class NaicaDataView(ExcelExportMixin, NaicaBaseMixin, TemplateView):
             key = (report.unit_name, report.month)
             reports_by_unit_month[key] = report
 
-        visible_units = self.filter_units(NAICA_UNITS)
+        all_visible_units = self.filter_units(NAICA_UNITS)
+        selected_unit = self.get_unit_name()
+        visible_units = [selected_unit] if selected_unit != "all" and selected_unit in all_visible_units else all_visible_units
+        available_years = NaicaReport.objects.filter(directorate=directorate).values_list("year", flat=True)
         units_tables = []
         for unit in visible_units:
             groups = []
@@ -341,8 +344,10 @@ class NaicaDataView(ExcelExportMixin, NaicaBaseMixin, TemplateView):
         context.update({
             "directorate": directorate,
             "selected_year": selected_year,
+            "years_range": build_year_range_from_years(available_years, selected_year),
+            "selected_unit": selected_unit,
             "month_labels": [label for _month, label in MONTH_LABELS],
-            "naica_units": visible_units,
+            "naica_units": all_visible_units,
             "units_tables": units_tables,
             "can_delete": self.is_admin(),
         })

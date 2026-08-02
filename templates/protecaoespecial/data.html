@@ -13,8 +13,12 @@
             <p class="eyebrow">Tabela de Dados</p>
             <h1>{{ subcategory|title }} &mdash; {{ selected_year }}</h1>
         </div>
-        <div class="benefits-filter-bar static-bar">
-            <span class="pill">Ano {{ selected_year }}</span>
+        <form method="get" class="benefits-filter-bar">
+            <select name="year" class="filter-select" onchange="this.form.submit()">
+                {% for y in years_range %}
+                    <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
             <a href="{% if subcategory == 'protetivo' %}{% url 'protecaoespecial:form-protetivo' directorate.pk %}{% else %}{% url 'protecaoespecial:form-socioeducativo' directorate.pk %}{% endif %}?year={{ selected_year }}" class="primary-button" style="text-decoration:none">
                 <i data-lucide="file-plus" style="width:16px;height:16px"></i> Novo
             </a>
@@ -23,7 +27,7 @@
                 <i data-lucide="file-spreadsheet" style="width:14px;height:14px;"></i> Exportar Excel
             </a>
             {% endif %}
-        </div>
+        </form>
     </div>
     {% for g in table_groups %}
     <div class="data-table-card" style="margin-top:24px">

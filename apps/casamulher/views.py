@@ -392,8 +392,9 @@ class CasaMulherGenericDataView(ExcelExportMixin, CasaMulherBaseMixin, TemplateV
                                 for m in range(1, 13)]}
                     for f in fields]
             groups.append({"title": title, "rows": rows})
+        years_range = build_year_range([self.model.objects.filter(directorate=d)], year)
         ctx.update({
-            "directorate": d, "selected_year": year, "subcategory": self.subcategory,
+            "directorate": d, "selected_year": year, "years_range": years_range, "subcategory": self.subcategory,
             "month_labels": [l for _, l in MONTH_LABELS], "table_groups": groups,
             "can_delete": self.is_admin(),
         })

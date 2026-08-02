@@ -424,7 +424,8 @@ class CreasIdosoDataView(ExcelExportMixin, CreasBaseMixin, TemplateView):
                                 for m in range(1, 13)]}
                     for f in fields]
             groups.append({"title": title, "rows": rows})
-        ctx.update({"directorate": d, "selected_year": year, "subcategory": "idoso",
+        years_range = build_year_range([CreasIdosoReport.objects.filter(directorate=d)], year)
+        ctx.update({"directorate": d, "selected_year": year, "years_range": years_range, "subcategory": "idoso",
                      "month_labels": [l for _, l in MONTH_LABELS], "table_groups": groups,
                      "can_delete": self.is_admin()})
         return ctx
@@ -479,7 +480,8 @@ class CreasPcdDataView(ExcelExportMixin, CreasBaseMixin, TemplateView):
                                 for m in range(1, 13)]}
                     for f in fields]
             groups.append({"title": title, "rows": rows})
-        ctx.update({"directorate": d, "selected_year": year, "subcategory": "pcd",
+        years_range = build_year_range([CreasPcdReport.objects.filter(directorate=d)], year)
+        ctx.update({"directorate": d, "selected_year": year, "years_range": years_range, "subcategory": "pcd",
                      "month_labels": [l for _, l in MONTH_LABELS], "table_groups": groups,
                      "can_delete": self.is_admin()})
         return ctx

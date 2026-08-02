@@ -307,7 +307,11 @@ class CrasDataView(ExcelExportMixin, CrasBaseMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         directorate = self.get_directorate()
         selected_year = self.get_year()
-        visible_units = self.filter_units(CRAS_UNITS)
+        all_visible_units = self.filter_units(CRAS_UNITS)
+        unit_filter = self.request.GET.get("unit", "all")
+        visible_units = [unit_filter] if unit_filter != "all" and unit_filter in all_visible_units else all_visible_units
+        available_years = sorted(list(set(CrasReport.objects.filter(directorate=directorate).values_list("year", flat=True))), reverse=True)
+        if not available_years: available_years = [selected_year]
         reports = {}
         rma_data = {}
         for r in CrasReport.objects.filter(directorate=directorate, year=selected_year):
@@ -338,6 +342,9 @@ class CrasDataView(ExcelExportMixin, CrasBaseMixin, TemplateView):
         context.update({
             "directorate": directorate,
             "selected_year": selected_year,
+            "years_range": build_year_range_from_years(available_years, selected_year),
+            "unit_filter": unit_filter,
+            "cras_units": all_visible_units,
             "month_labels": [l for _, l in MONTH_LABELS],
             "units_tables": units_tables,
             "can_delete": self.is_admin(),

@@ -536,8 +536,9 @@ class CreasProtetivoDataView(ExcelExportMixin, ProteacaoEspecialBaseMixin, Templ
                         })
             groups.append({"title": label, "rows": rows})
 
+        years_range = build_year_range([CreasProtetivoReport.objects.filter(directorate=d)], year)
         ctx.update({
-            "directorate": d, "selected_year": year, "subcategory": "protetivo",
+            "directorate": d, "selected_year": year, "years_range": years_range, "subcategory": "protetivo",
             "month_labels": [l for _, l in MONTH_LABELS], "table_groups": groups,
             "can_delete": self.is_admin(),
         })
@@ -587,8 +588,9 @@ class CreasSocioeducativoDataView(ExcelExportMixin, ProteacaoEspecialBaseMixin, 
                                 for m in range(1, 13)]}
                     for f in fields]
             groups.append({"title": title, "rows": rows})
+        years_range = build_year_range([CreasSocioeducativoReport.objects.filter(directorate=d)], year)
         ctx.update({
-            "directorate": d, "selected_year": year, "subcategory": "socioeducativo",
+            "directorate": d, "selected_year": year, "years_range": years_range, "subcategory": "socioeducativo",
             "month_labels": [l for _, l in MONTH_LABELS], "table_groups": groups,
             "can_delete": self.is_admin(),
         })

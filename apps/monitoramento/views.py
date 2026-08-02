@@ -400,6 +400,10 @@ class MonitoramentoDataView(ExcelExportMixin, MonitoramentoBaseMixin, TemplateVi
         )
         reports_by_month = {r.month: r for r in reports}
 
+        available_years = GenericMonitoringReport.objects.filter(
+            directorate=directorate, reference=reference
+        ).values_list("year", flat=True)
+
         table_groups = []
         for section in sections:
             fields = [f for f in section.get("fields", []) if f.get("type") == "number"]
@@ -425,6 +429,7 @@ class MonitoramentoDataView(ExcelExportMixin, MonitoramentoBaseMixin, TemplateVi
         context.update({
             "directorate": directorate,
             "selected_year": selected_year,
+            "years_range": build_year_range_from_years(available_years, selected_year),
             "reference": reference,
             "month_labels": [label for _month, label in MONTH_LABELS],
             "table_groups": table_groups,
