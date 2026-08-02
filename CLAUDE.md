@@ -369,6 +369,28 @@ Sem esperar pelo cutover de banco limpo (ainda não aconteceu — ver nota acima
 - Isso finalmente aplicou o **Passo 7** (pendente desde 2026-07-13 — ver item #5 da tabela de débito técnico, agora marcado como concluído) e o novo **Passo 9B**. Passo 9 já era no-op (fix anterior).
 - Deploy completo feito com `./atualizar.sh` na sequência (depois de corrigidos os bugs do próprio script — ver "Gotchas operacionais da VPS" acima). Container `gestaosuas_app` recriado, logs limpos, `HTTP 302` confirmado na porta 8080.
 
+### Sincronização incremental Supabase → dev local (2026-08-02) — sem reset de banco
+
+Diferente do cutover completo (dump+restore) usado em 2026-07-13, essa rodada sincronizou só os dados que estavam desatualizados, comparando linha a linha em vez de substituir tabelas inteiras — o objetivo era trazer dado real de produção (relatórios mensais, dados por diretoria, visitas técnicas) sem arriscar apagar dado que só existe localmente (testes de desenvolvimento já feitos direto no Django).
+
+**Processo usado** (via `psycopg` conectando direto no pooler do Supabase — ver credenciais em `.env.local` — e no Postgres local em `127.0.0.1:5433`, sem precisar de container Postgres 17 temporário porque não é `pg_dump`/`pg_restore`, só `SELECT`/`INSERT` linha a linha):
+1. Backup (`pg_dump -Fc`) do banco de dev local antes de qualquer escrita.
+2. Para cada tabela: comparar `SELECT id FROM tabela` dos dois lados (`set` em Python) — nunca confiar só na contagem total (`COUNT(*)` igual não significa dado igual, ver achado do CRAS/CEAI abaixo).
+3. Linhas que só existem no Supabase → `INSERT` local (dado novo real).
+4. Linhas que só existem local → **investigadas antes de decidir**, nunca apagadas por padrão (ver achados abaixo).
+5. Checar FK (`user_id` → `accounts_user`, `directorate_id` → `directorates`) antes de inserir — todas resolveram sem órfãos nesta rodada.
+6. Colunas `jsonb`/`json` precisam ser envolvidas em `psycopg.types.json.Jsonb(...)` antes do `INSERT` (senão `psycopg.ProgrammingError: cannot adapt type 'dict'`).
+
+**Achados importantes** (mesma classe do gotcha já documentado em 2026-07-13 — contagem igual pode esconder divergência real):
+- `cras_reports`: 49 (Supabase) vs 46 (local) — mesmo tendo IDs diferentes, batiam por acaso quando comparadas por período; a comparação por `id` achou **10 faltando localmente E 7 que só existem localmente** (unidade CAMPO ALEGRE, `created_at` de 2026-07-21 — teste de preenchimento real feito em dev, preservado).
+- `naica_reports`: 39 vs 31, 8 faltando localmente, nenhum órfão local.
+- `beneficios_reports` e `submissions` (CEAI): mesma contagem nos dois lados escondia 1 registro diferente em cada — `submissions` tinha um **conflito real**: a mesma unidade/mês tinha um envio no Supabase (dado real, autor identificado) e outro só local (números redondos suspeitos, sem autor — claramente teste manual). Resolvido substituindo o registro de teste local pelo real do Supabase.
+- `visits`/`oscs`/`work_plans`/`form_delegations`: mesmo padrão — 202/202 visitas escondia 6 faltando + 6 só-locais (visitas reais de teste de features entre 2026-07-25 e 2026-07-27, preservadas). `oscs` e `work_plans` tiveram que ser sincronizados **antes** de `visits` (dependência de FK).
+- `monthly_reports`: 19 (Supabase) vs 17 (local) — 2 relatórios narrativos novos (Benefícios e CRAS, julho/2026); os outros 17 já batiam por ID exato.
+- Tabelas que só existem localmente e nunca existiram no Supabase (features novas, não migradas): `casa_da_mulher_reports`, `diversidade_reports`, `creas_protetivo_reports`, `nucleo_diversidade_reports` — fora do escopo dessa sincronização, sem fonte no Supabase pra comparar.
+
+**Lição**: `COUNT(*)` igual nunca é suficiente pra concluir que duas tabelas estão sincronizadas — sempre comparar por `id` (ou outra chave estável) antes de decidir se uma tabela "já está em dia".
+
 ---
 
 ## Export Excel

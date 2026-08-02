@@ -108,11 +108,31 @@ def build_work_plan_document_context(plan):
     }
 
 
-def get_request_user_display_name(request):
-    profile = getattr(request.user, "profile", None)
+def get_user_display_name(user):
+    profile = getattr(user, "profile", None)
     if profile and profile.full_name:
         return profile.full_name
-    return request.user.get_full_name() or request.user.get_username()
+    return user.get_full_name() or user.get_username()
+
+
+def get_request_user_display_name(request):
+    return get_user_display_name(request.user)
+
+
+def build_registered_by_map(visits):
+    """Fallback para visitas antigas cujo identificacao JSON nunca gravou o nome de quem
+    registrou (dado que so passou a ser capturado em 2026-07) - usa o user_id (FK real,
+    sempre presente) para resolver um nome/departamento via Profile em vez de "Desconhecido"."""
+    missing_user_ids = {
+        v.user_id
+        for v in visits
+        if v.user_id
+        and not ((v.identificacao or {}).get("registered_by_name") or (v.identificacao or {}).get("registrado_por"))
+    }
+    if not missing_user_ids:
+        return {}
+    profiles = Profile.objects.filter(user_id__in=missing_user_ids).select_related("user")
+    return {profile.user_id: get_user_display_name(profile.user) for profile in profiles}
 
 
 def title_name(value):
@@ -846,7 +866,7 @@ class VisitListView(DirectorateScopedMixin, ListView):
     paginate_by = 50
 
     def get_queryset(self):
-        qs = Visit.objects.filter(directorate_id=self.kwargs["pk"]).select_related("osc", "directorate")
+        qs = Visit.objects.filter(directorate_id=self.kwargs["pk"]).select_related("osc", "directorate", "work_plan")
         profile = getattr(self.request.user, 'profile', None)
         
         # --- PERMISSION FILTERING ---
@@ -887,11 +907,14 @@ class VisitListView(DirectorateScopedMixin, ListView):
         context["directorate"] = directorate
         context["theme_class"] = get_monitoramento_theme(directorate)[0]
         context["show_reports_nav"] = is_subvencao_directorate(directorate)
+        context["is_emendas"] = is_emendas_directorate(directorate)
+        registered_by_map = build_registered_by_map(context["visits"])
         for visit in context["visits"]:
             identificacao = visit.identificacao or {}
             visit.registered_by_name = (
                 identificacao.get("registered_by_name")
                 or identificacao.get("registrado_por")
+                or registered_by_map.get(visit.user_id)
                 or "Desconhecido"
             )
             assinaturas = visit.assinaturas or {}
@@ -1210,12 +1233,18 @@ class VisitReportView(VisitAccessMixin, DetailView):
         report_data = getattr(self.object, report_type) or {}
         report_texts = get_visit_report_texts(self.object)
 
+        directorate = self.object.directorate
+        dir_name_lower = (directorate.name or "").lower()
+        import unicodedata
+        normalized_dir_name = "".join(c for c in unicodedata.normalize('NFD', dir_name_lower) if unicodedata.category(c) != 'Mn')
+        is_emendas = "emenda" in normalized_dir_name or "fundo" in normalized_dir_name
+        is_subvencao = "subvencao" in normalized_dir_name
+
         if report_type == "relatorio_final":
             if not report_data:
                 report_data = {
                     "osc_name": self.object.osc.name,
                     "cnpj": "",
-                    "emenda": "",
                     "termo_fomento": "",
                     "vigencia": "",
                     "valor_autorizado": "",
@@ -1240,17 +1269,20 @@ class VisitReportView(VisitAccessMixin, DetailView):
                     "comissao_financeiro_nome": "",
                     "status": "draft",
                 }
+                if is_subvencao:
+                    report_data["conclusao"] = ""
+                else:
+                    report_data["emenda"] = ""
             else:
                 if not report_data.get("osc_name"):
                     report_data["osc_name"] = self.object.osc.name
-                    
+
         elif report_type == "parecer_conclusivo":
             if not report_data:
                 rf = self.object.relatorio_final or {}
                 report_data = {
                     "osc_name": rf.get("osc_name") or self.object.osc.name,
                     "cnpj": rf.get("cnpj") or "00.000.000/0000-00",
-                    "emenda": rf.get("emenda") or "Ex: 1430/2023",
                     "termo_fomento": rf.get("termo_fomento") or "Ex: 629/2024",
                     "vigencia": rf.get("vigencia") or "Ex: 04/12/2024 a 30/06/2025",
                     "valor_autorizado": rf.get("valor_autorizado") or "R$ 0,00",
@@ -1265,10 +1297,14 @@ class VisitReportView(VisitAccessMixin, DetailView):
                     "financeiro_nome": "",
                     "status": "draft",
                 }
+                if is_subvencao:
+                    report_data["conclusao_final"] = ""
+                else:
+                    report_data["emenda"] = rf.get("emenda") or "Ex: 1430/2023"
             else:
                 if not report_data.get("osc_name"):
                     report_data["osc_name"] = self.object.osc.name
-                    
+
         elif report_type == "parecer_tecnico":
             osc = self.object.osc
             osc_objeto = report_texts["objeto"]
@@ -1500,13 +1536,6 @@ class VisitReportView(VisitAccessMixin, DetailView):
             
             # Force automatically the previous visit's date for prefilling
             report_data["date"] = visit_date_str
-        
-        directorate = self.object.directorate
-        dir_name_lower = (directorate.name or "").lower()
-        import unicodedata
-        normalized_dir_name = "".join(c for c in unicodedata.normalize('NFD', dir_name_lower) if unicodedata.category(c) != 'Mn')
-        is_emendas = "emenda" in normalized_dir_name or "fundo" in normalized_dir_name
-        is_subvencao = "subvencao" in normalized_dir_name
 
         context["is_emendas"] = is_emendas
         context["is_subvencao"] = is_subvencao

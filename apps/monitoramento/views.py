@@ -17,7 +17,7 @@ from apps.core.export import ExcelExportMixin, build_workbook
 from apps.core.notifications import log_activity
 from apps.directorates.models import Directorate, FormDelegation, MonthlyReport, Osc, Visit, WorkPlan
 from apps.directorates.forms import OscForm
-from apps.directorates.views import get_monitoramento_theme
+from apps.directorates.views import build_registered_by_map, get_monitoramento_theme
 from apps.core.utils import (
     MONTH_LABELS, MONTH_OPTIONS, build_sparkline,
     build_period_label, build_year_range_from_years, build_variation
@@ -134,7 +134,7 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
             visits_qs = directorate.visits.filter(visit_date__year=curr_year)
 
         stats_visits = list(visits_qs)
-        dashboard_visits_qs = visits_qs.select_related("osc", "directorate").order_by("-visit_date", "-created_at")
+        dashboard_visits_qs = visits_qs.select_related("osc", "directorate", "work_plan").order_by("-visit_date", "-created_at")
         if not is_admin:
             if profile and profile.role == "diretor":
                 is_primary = str(profile.primary_directorate_id) == str(directorate.pk)
@@ -146,11 +146,13 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
                 dashboard_visits_qs = dashboard_visits_qs.filter(Q(user_id=self.request.user.id) | Q(id__in=delegated_visit_ids))
 
         all_visits = list(dashboard_visits_qs)
+        registered_by_map = build_registered_by_map(all_visits)
         for visit in all_visits:
             identificacao = visit.identificacao or {}
             visit.registered_by_name = (
                 identificacao.get("registered_by_name")
                 or identificacao.get("registrado_por")
+                or registered_by_map.get(visit.user_id)
                 or "Desconhecido"
             )
             assinaturas = visit.assinaturas or {}

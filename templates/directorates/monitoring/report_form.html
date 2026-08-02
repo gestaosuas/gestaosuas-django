@@ -89,10 +89,12 @@
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">CNPJ</label>
                                 <input type="text" id="cnpj" value="{{ report_data.cnpj|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
                             </div>
+                            {% if not is_subvencao %}
                             <div>
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Recurso</label>
                                 <input type="text" id="emenda" value="{{ report_data.emenda|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
                             </div>
+                            {% endif %}
                             <div>
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Nº Termo</label>
                                 <input type="text" id="termo_fomento" value="{{ report_data.termo_fomento|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
@@ -150,6 +152,14 @@
                         <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">5. CUMPRIMENTO DO OBJETO</h3>
                         <textarea id="cumprimento_objeto_final" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.cumprimento_objeto_final }}</textarea>
                     </section>
+
+                    {% if is_subvencao %}
+                    <!-- Section 6: CONCLUSÃO (somente Subvenção) -->
+                    <section>
+                        <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">6. CONCLUSÃO</h3>
+                        <textarea id="conclusao" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 120px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;" placeholder="Digite a conclusão...">{{ report_data.conclusao }}</textarea>
+                    </section>
+                    {% endif %}
 
                     <!-- Date and Signatures flow -->
                     <div style="border-top: 1px solid #cbd5e1; padding-top: 24px; margin-top: 20px;">
@@ -292,10 +302,12 @@
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">CNPJ</label>
                                 <input type="text" id="cnpj" value="{{ report_data.cnpj|default:'00.000.000/0000-00' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
                             </div>
+                            {% if not is_subvencao %}
                             <div>
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Recurso</label>
                                 <input type="text" id="emenda" value="{{ report_data.emenda|default:'Ex: 1430/2023' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
                             </div>
+                            {% endif %}
                             <div>
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Nº Termo</label>
                                 <input type="text" id="termo_fomento" value="{{ report_data.termo_fomento|default:'Ex: 629/2024' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
@@ -327,11 +339,19 @@
                         </div>
                     </section>
 
-                    <!-- Section 3: CONCLUSÃO -->
+                    <!-- Section 3: CONCLUSÃO (Emendas) / SUSTENTABILIDADE E CONTINUIDADE (Subvenção) -->
                     <section>
-                        <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">3. CONCLUSÃO</h3>
-                        <textarea id="conclusao" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 120px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;" placeholder="Digite a conclusão final...">{{ report_data.conclusao }}</textarea>
+                        <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">3. {% if is_subvencao %}SUSTENTABILIDADE E CONTINUIDADE DAS AÇÕES QUE FORAM OBJETO DA PARCERIA{% else %}CONCLUSÃO{% endif %}</h3>
+                        <textarea id="conclusao" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 120px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;" placeholder="{% if is_subvencao %}Digite a sustentabilidade e continuidade das ações...{% else %}Digite a conclusão final...{% endif %}">{{ report_data.conclusao }}</textarea>
                     </section>
+
+                    {% if is_subvencao %}
+                    <!-- Section 4: CONCLUSÃO (somente Subvenção) -->
+                    <section>
+                        <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">4. CONCLUSÃO</h3>
+                        <textarea id="conclusao_final" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 120px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;" placeholder="Digite a conclusão final...">{{ report_data.conclusao_final }}</textarea>
+                    </section>
+                    {% endif %}
 
                     <!-- Date and Signatures flow -->
                     <div style="border-top: 1px solid #cbd5e1; padding-top: 24px; margin-top: 20px;">
@@ -1309,23 +1329,24 @@
         if (reportType === 'relatorio_final') {
             // Collect fields
             report.cnpj = document.getElementById('cnpj') ? document.getElementById('cnpj').value : "";
-            report.emenda = document.getElementById('emenda') ? document.getElementById('emenda').value : "";
+            if (document.getElementById('emenda')) { report.emenda = document.getElementById('emenda').value; }
             report.termo_fomento = document.getElementById('termo_fomento') ? document.getElementById('termo_fomento').value : "";
             report.vigencia = document.getElementById('vigencia') ? document.getElementById('vigencia').value : "";
             report.valor_autorizado = document.getElementById('valor_autorizado') ? document.getElementById('valor_autorizado').value : "";
-            
+
             report.objeto_relatorio = document.getElementById('objeto_relatorio') ? document.getElementById('objeto_relatorio').value : "";
             report.referencias = document.getElementById('referencias') ? document.getElementById('referencias').value : "";
-            
+
             report.objetivos = document.getElementById('objetivos') ? document.getElementById('objetivos').value : "";
             report.metas = document.getElementById('metas') ? document.getElementById('metas').value : "";
             report.metas_quantitativas = document.getElementById('metas_quantitativas') ? document.getElementById('metas_quantitativas').value : "";
             report.resultados = document.getElementById('resultados') ? document.getElementById('resultados').value : "";
             report.execucao_financeira = document.getElementById('execucao_financeira') ? document.getElementById('execucao_financeira').value : "";
-            
+
             report.cumprimento_objeto_final = document.getElementById('cumprimento_objeto_final') ? document.getElementById('cumprimento_objeto_final').value : "";
+            if (document.getElementById('conclusao')) { report.conclusao = document.getElementById('conclusao').value; }
             report.local_data = document.getElementById('local_data') ? document.getElementById('local_data').value : "";
-            
+
             report.texto_homologacao = document.getElementById('texto_homologacao') ? document.getElementById('texto_homologacao').value : "";
             report.homologacao_local_data = document.getElementById('homologacao_local_data') ? document.getElementById('homologacao_local_data').value : "";
 
@@ -1374,15 +1395,16 @@
         } else if (reportType === 'parecer_conclusivo') {
             // Collect fields
             report.cnpj = document.getElementById('cnpj') ? document.getElementById('cnpj').value : "";
-            report.emenda = document.getElementById('emenda') ? document.getElementById('emenda').value : "";
+            if (document.getElementById('emenda')) { report.emenda = document.getElementById('emenda').value; }
             report.termo_fomento = document.getElementById('termo_fomento') ? document.getElementById('termo_fomento').value : "";
             report.vigencia = document.getElementById('vigencia') ? document.getElementById('vigencia').value : "";
             report.valor_autorizado = document.getElementById('valor_autorizado') ? document.getElementById('valor_autorizado').value : "";
-            
+
             report.fundamentacao = document.getElementById('fundamentacao') ? document.getElementById('fundamentacao').value : "";
             report.cumprimento_objeto = document.getElementById('cumprimento_objeto') ? document.getElementById('cumprimento_objeto').value : "";
             report.beneficios_impactos = document.getElementById('beneficios_impactos') ? document.getElementById('beneficios_impactos').value : "";
             report.conclusao = document.getElementById('conclusao') ? document.getElementById('conclusao').value : "";
+            report.conclusao_final = document.getElementById('conclusao_final') ? document.getElementById('conclusao_final').value : "";
             report.local_data = document.getElementById('local_data') ? document.getElementById('local_data').value : "";
 
             // Collect names and signatures
@@ -1396,11 +1418,12 @@
 
             // Finalized check requirements
             if (status === 'finalized') {
-                if (!report.conclusao.trim()) {
+                var conclusaoCheck = isSubvencao ? (report.conclusao_final || "") : (report.conclusao || "");
+                if (!conclusaoCheck.trim()) {
                     alert("Por favor, preencha o campo de Conclusão antes de finalizar!");
                     return;
                 }
-                
+
                 var roles = {
                     tecnico: "Gestor Técnico",
                     financeiro: "Gestor Financeiro"
