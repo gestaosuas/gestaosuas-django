@@ -391,6 +391,19 @@ Diferente do cutover completo (dump+restore) usado em 2026-07-13, essa rodada si
 
 **Lição**: `COUNT(*)` igual nunca é suficiente pra concluir que duas tabelas estão sincronizadas — sempre comparar por `id` (ou outra chave estável) antes de decidir se uma tabela "já está em dia".
 
+### Mesma sincronização aplicada na VPS de produção (2026-08-02)
+
+Repetido o processo acima contra `gestaosuas_prod` na VPS (não só o dev local) — mesmo método incremental (`psycopg`, comparação por `id`, nunca `pg_dump`/`pg_restore`), rodando **dentro do container `gestaosuas_app`** via `docker exec` (tem `psycopg` já instalado como dependência real do projeto — `requirements/base.txt` — e acesso de rede tanto ao serviço `db` quanto à internet pro pooler do Supabase; evita expor a porta do Postgres da VPS, que não tem `ports:` mapeado no `docker-compose.yml` base, só no `docker-compose.dev.yml`).
+
+- Backup manual (`pg_dump -Fc`, 10.6 MB) tirado antes de qualquer escrita, independente do backup que o próprio `atualizar.sh` já faz no passo seguinte.
+- Script rodado primeiro em `--dry-run` (ROLLBACK no final, só reporta), inspecionado, só depois em `--apply` (COMMIT real).
+- Resultado: **52 linhas inseridas em 8 tabelas** (`oscs` +5, `work_plans` +8, `visits` +9, `form_delegations` +4, `monthly_reports` +3, `cras_reports` +12, `naica_reports` +8, `submissions` +1, `creas_idoso_reports` +2), **0 erros**. Segunda rodada em `--dry-run` confirmou `so_supabase=0` em todas as 15 tabelas verificadas — sincronização 100% completa.
+- **2 conflitos de chave única** (`(directorate_id, month, year)`) resolvidos com confirmação explícita do usuário antes de agir: `submissions` (CEAI, Jul/2026) e `creas_idoso_reports` (Jan/2026) tinham um registro na VPS com cara de teste (`data: {'units': {}}` vazio, ou números redondos suspeitos — 100/5/10/105/210/525 — em `status='draft'`) colidindo com o registro real do Supabase (autor nomeado, `status='finalized'`, números variados). Ambos os registros de teste na VPS foram criados pelo mesmo `user_id`/`created_by`, na mesma janela de 5 minutos (2026-07-27 19:24–19:29) — padrão de teste manual pós-deploy. Deletados e substituídos pelo dado real do Supabase.
+- **Gotcha de conexão**: construir a connection string do Postgres como URL crua (`postgresql://user:senha@host:porta/db`) quebra se a senha tiver caractere `@` — o parser do libpq splita no primeiro `@` errado, tentando resolver um "host" tipo `senha_parcial@db`. Usar sempre `psycopg.connect(host=..., user=..., password=..., dbname=...)` com kwargs nomeados, nunca montar a URL na mão.
+- **Gotcha de colunas**: algumas colunas existem só no destino (`visits.visit_time`, `cras_reports.rma_url`, `creas_idoso_reports`/`creas_pcd_reports`/`qualificacao_reports` com colunas novas de estratificação — todas via `ALTER TABLE` aplicado local/VPS mas nunca propagado de volta pro Supabase, que é só leitura agora). O script de sync precisa usar a **interseção** de colunas entre os dois bancos (nunca a lista de colunas de um lado só) — as colunas exclusivas do destino ficam com o default/NULL nas linhas novas, sem travar o `INSERT`.
+- Isso finalmente elimina o gap que motivava o "VPS clean-DB plan" (banco de produção agora tem os mesmos dados do Supabase que o dev local já tinha desde 2026-08-02, sem precisar de um cutover completo com reset).
+- Deploy do código feito na sequência via `./atualizar.sh` (skill `vps-deploy`) — commit `f2acd44`, containers recriados com nome exato `gestaosuas_app`/`gestaosuas_db`, `HTTP_STATUS=302` confirmado.
+
 ---
 
 ## Export Excel
