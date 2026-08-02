@@ -7,9 +7,11 @@ from django.shortcuts import redirect, get_object_or_404
 from django.urls import reverse
 from django.views.generic import DetailView, FormView, TemplateView, View
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
-from apps.core.mixins import TvTemplateMixin
+from apps.core.mixins import TvTemplateMixin, NarrativeReportMixin, NarrativeEditorMixin
 from apps.core.export import ExcelExportMixin, build_workbook
-from apps.directorates.models import Directorate
+from apps.core.notifications import log_activity
+from apps.directorates.models import Directorate, MonthlyReport
+from apps.core.utils import build_period_label
 
 from .models import CasaDaMulherReport, DiversidadeReport, NucleoDiversidadeReport
 from .forms import CasaDaMulherForm, DiversidadeForm, NucleoDiversidadeForm
@@ -333,28 +335,37 @@ class CasaMulherGenericFormView(CasaMulherBaseMixin, FormView):
         r.updated_at = datetime.now()
         r.save()
         messages.success(self.request, self.success_msg)
+        log_activity(self.request, d, "created", "report",
+                     f"{self.report_label} — {period_label(form.cleaned_data['year'], form.cleaned_data['month'])}",
+                     url=reverse(f"casamulher:{self.data_url_name}", kwargs={"pk": d.pk}) + f"?year={form.cleaned_data['year']}")
         return redirect(reverse("casamulher:home", kwargs={"pk": d.pk}) + f"?year={form.cleaned_data['year']}")
 
 
 class CasaDaMulherFormView(CasaMulherGenericFormView):
     form_class = CasaDaMulherForm
     subcategory = "casa-da-mulher"
+    report_label = "Casa da Mulher"
     success_msg = "Dados Casa da Mulher salvos com sucesso."
     delete_month_url_name = "delete-month-casa-da-mulher"
+    data_url_name = "data-casa-da-mulher"
 
 
 class DiversidadeFormView(CasaMulherGenericFormView):
     form_class = DiversidadeForm
     subcategory = "diversidade"
+    report_label = "Atendimentos Diversos"
     success_msg = "Dados Atendimentos Diversos salvos com sucesso."
     delete_month_url_name = "delete-month-diversidade"
+    data_url_name = "data-diversidade"
 
 
 class NucleoDiversidadeFormView(CasaMulherGenericFormView):
     form_class = NucleoDiversidadeForm
     subcategory = "nucleo-diversidade"
+    report_label = "Núcleo de Diversidade"
     success_msg = "Dados Núcleo de Diversidade salvos com sucesso."
     delete_month_url_name = "delete-month-nucleo-diversidade"
+    data_url_name = "data-nucleo-diversidade"
 
 
 class CasaMulherGenericDataView(ExcelExportMixin, CasaMulherBaseMixin, TemplateView):
@@ -516,3 +527,60 @@ class DiversidadeQuickEditView(CasaMulherSharedQuickEditView):
 
 class NucleoDiversidadeQuickEditView(CasaMulherSharedQuickEditView):
     model = NucleoDiversidadeReport
+
+
+class CasaMulherMonthlyNarrativeView(CasaMulherBaseMixin, NarrativeReportMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_report.html"
+    setor = "casa_da_mulher"
+    allowed_roles = ["admin", "diretor", "agente"]
+
+    def get_editor_url(self, month, year):
+        directorate = self.get_directorate()
+        return f"{reverse('casamulher:narrative-editor', kwargs={'pk': directorate.pk})}?year={year}&month={month}"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        directorate = self.get_directorate()
+        month = int(self.request.GET.get("month") or date.today().month)
+        year = int(self.request.GET.get("year") or date.today().year)
+        hist_year = int(self.request.GET.get("hist_year") or year)
+        context.update(self.get_narrative_context(month, year, hist_year))
+        context.update({
+            "report_label": "Casa da Mulher",
+            "theme_class": "theme-pink",
+            "back_url": reverse("casamulher:home", kwargs={"pk": directorate.pk}) + f"?year={year}",
+        })
+        return context
+
+
+class CasaMulherNarrativeEditorView(CasaMulherBaseMixin, NarrativeEditorMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_editor.html"
+    setor = "casa_da_mulher"
+    allowed_roles = ["admin", "diretor", "agente"]
+
+    def get_view_url(self, month, year):
+        directorate = self.get_directorate()
+        return f"{reverse('casamulher:monthly-report', kwargs={'pk': directorate.pk})}?year={year}&month={month}"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        month = int(self.request.GET.get("month") or date.today().month)
+        year = int(self.request.GET.get("year") or date.today().year)
+        context.update(self.get_editor_context(month, year))
+        context.update({
+            "report_label": "Casa da Mulher",
+            "theme_class": "theme-pink",
+            "months_range": MONTH_OPTIONS,
+            "cancel_url": self.get_view_url(month, year),
+        })
+        return context
+
+    def post(self, request, *args, **kwargs):
+        month = int(request.POST.get("month"))
+        year = int(request.POST.get("year"))
+        directorate = self.save_narrative(request, month, year)
+        if directorate is not None:
+            log_activity(request, directorate, "finalized", "report",
+                         f"Relatorio Mensal Casa da Mulher {build_period_label(year, month)}",
+                         url=self.get_view_url(month, year))
+        return redirect(self.get_view_url(month, year))

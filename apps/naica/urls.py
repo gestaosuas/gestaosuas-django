@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     NaicaHomeView, NaicaCreateUpdateView, NaicaDataView,
-    NaicaMonthlyNarrativeView, NaicaNarrativeListView,
+    NaicaMonthlyNarrativeView, NaicaNarrativeEditorView,
     NaicaQuickEditView, NaicaDeleteMonthView
 )
 
@@ -16,5 +16,5 @@ urlpatterns = [
     path("<dir_slug:pk>/dados/", NaicaDataView.as_view(), name="data"),
     path("<dir_slug:pk>/dados/excluir-mes/", NaicaDeleteMonthView.as_view(), name="delete-month"),
     path("<dir_slug:pk>/relatorio-mensal/", NaicaMonthlyNarrativeView.as_view(), name="monthly-report"),
-    path("<dir_slug:pk>/relatorios/", NaicaNarrativeListView.as_view(), name="reports"),
+    path("<dir_slug:pk>/relatorio-mensal/editor/", NaicaNarrativeEditorView.as_view(), name="narrative-editor"),
 ]

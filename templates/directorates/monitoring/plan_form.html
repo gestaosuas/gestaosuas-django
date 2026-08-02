@@ -102,8 +102,9 @@
     </div>
 </div>
 
+{{ plan_content_json|json_script:"plan-content-data" }}
 <script>
-    let blocks = {{ object.content|default:"[]"|safe }};
+    let blocks = JSON.parse(document.getElementById('plan-content-data').textContent);
     if (!Array.isArray(blocks) || blocks.length === 0) {
         blocks = [
             { type: "title", content: "1. Objeto" },

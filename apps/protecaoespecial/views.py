@@ -7,9 +7,11 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.views.generic import DetailView, FormView, TemplateView, View
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
-from apps.core.mixins import TvTemplateMixin
+from apps.core.mixins import TvTemplateMixin, NarrativeReportMixin, NarrativeEditorMixin
 from apps.core.export import ExcelExportMixin, build_workbook
-from apps.directorates.models import Directorate
+from apps.core.notifications import log_activity
+from apps.core.utils import build_period_label
+from apps.directorates.models import Directorate, MonthlyReport
 
 from .models import CreasProtetivoReport, CreasSocioeducativoReport
 from .forms import CreasProtetivoForm, CreasSocioeducativoForm, PROTETIVO_VIOLATION_PREFIXES, PROTETIVO_SUBCATEGORIES, PROTETIVO_GENDERS, PROTETIVO_AGES
@@ -384,6 +386,9 @@ class CreasProtetivoFormView(ProteacaoEspecialBaseMixin, FormView):
         r.updated_at = datetime.now()
         r.save()
         messages.success(self.request, "Dados CREAS Protetivo salvos com sucesso.")
+        log_activity(self.request, d, "created", "report",
+                     f"CREAS Protetivo — {build_period_label(form.cleaned_data['year'], form.cleaned_data['month'])}",
+                     url=reverse("protecaoespecial:data-protetivo", kwargs={"pk": d.pk}) + f"?year={form.cleaned_data['year']}")
         return redirect(reverse("protecaoespecial:home", kwargs={"pk": d.pk}) + f"?year={form.cleaned_data['year']}")
 
 
@@ -468,6 +473,9 @@ class CreasSocioeducativoFormView(ProteacaoEspecialBaseMixin, FormView):
         r.updated_at = datetime.now()
         r.save()
         messages.success(self.request, "Dados CREAS Socioeducativo salvos com sucesso.")
+        log_activity(self.request, d, "created", "report",
+                     f"CREAS Socioeducativo — {build_period_label(form.cleaned_data['year'], form.cleaned_data['month'])}",
+                     url=reverse("protecaoespecial:data-socioeducativo", kwargs={"pk": d.pk}) + f"?year={form.cleaned_data['year']}")
         return redirect(reverse("protecaoespecial:home", kwargs={"pk": d.pk}) + f"?year={form.cleaned_data['year']}")
 
 
@@ -706,3 +714,117 @@ class CreasProtetivoQuickEditView(CreasSharedQuickEditView):
 
 class CreasSocioeducativoQuickEditView(CreasSharedQuickEditView):
     model = CreasSocioeducativoReport
+
+
+class CreasProtetivoMonthlyNarrativeView(ProteacaoEspecialBaseMixin, NarrativeReportMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_report.html"
+    setor = "protecao_especial_protetivo"
+    allowed_roles = ["admin", "diretor", "agente"]
+
+    def get_editor_url(self, month, year):
+        directorate = self.get_directorate()
+        return f"{reverse('protecaoespecial:protetivo-narrative-editor', kwargs={'pk': directorate.pk})}?year={year}&month={month}"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        directorate = self.get_directorate()
+        month = int(self.request.GET.get("month") or date.today().month)
+        year = int(self.request.GET.get("year") or date.today().year)
+        hist_year = int(self.request.GET.get("hist_year") or year)
+        context.update(self.get_narrative_context(month, year, hist_year))
+        context.update({
+            "report_label": "Proteção Especial — Protetivo",
+            "theme_class": "theme-amber",
+            "back_url": reverse("protecaoespecial:home", kwargs={"pk": directorate.pk}) + f"?year={year}",
+        })
+        return context
+
+
+class CreasProtetivoNarrativeEditorView(ProteacaoEspecialBaseMixin, NarrativeEditorMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_editor.html"
+    setor = "protecao_especial_protetivo"
+    allowed_roles = ["admin", "diretor", "agente"]
+
+    def get_view_url(self, month, year):
+        directorate = self.get_directorate()
+        return f"{reverse('protecaoespecial:protetivo-monthly-report', kwargs={'pk': directorate.pk})}?year={year}&month={month}"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        month = int(self.request.GET.get("month") or date.today().month)
+        year = int(self.request.GET.get("year") or date.today().year)
+        context.update(self.get_editor_context(month, year))
+        context.update({
+            "report_label": "Proteção Especial — Protetivo",
+            "theme_class": "theme-amber",
+            "months_range": MONTH_OPTIONS,
+            "cancel_url": self.get_view_url(month, year),
+        })
+        return context
+
+    def post(self, request, *args, **kwargs):
+        month = int(request.POST.get("month"))
+        year = int(request.POST.get("year"))
+        directorate = self.save_narrative(request, month, year)
+        if directorate is not None:
+            log_activity(request, directorate, "finalized", "report",
+                         f"Relatorio Mensal Protecao Especial (Protetivo) {build_period_label(year, month)}",
+                         url=self.get_view_url(month, year))
+        return redirect(self.get_view_url(month, year))
+
+
+class CreasSocioeducativoMonthlyNarrativeView(ProteacaoEspecialBaseMixin, NarrativeReportMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_report.html"
+    setor = "protecao_especial_socioeducativo"
+    allowed_roles = ["admin", "diretor", "agente"]
+
+    def get_editor_url(self, month, year):
+        directorate = self.get_directorate()
+        return f"{reverse('protecaoespecial:socioeducativo-narrative-editor', kwargs={'pk': directorate.pk})}?year={year}&month={month}"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        directorate = self.get_directorate()
+        month = int(self.request.GET.get("month") or date.today().month)
+        year = int(self.request.GET.get("year") or date.today().year)
+        hist_year = int(self.request.GET.get("hist_year") or year)
+        context.update(self.get_narrative_context(month, year, hist_year))
+        context.update({
+            "report_label": "Proteção Especial — Socioeducativo",
+            "theme_class": "theme-amber",
+            "back_url": reverse("protecaoespecial:home", kwargs={"pk": directorate.pk}) + f"?year={year}",
+        })
+        return context
+
+
+class CreasSocioeducativoNarrativeEditorView(ProteacaoEspecialBaseMixin, NarrativeEditorMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_editor.html"
+    setor = "protecao_especial_socioeducativo"
+    allowed_roles = ["admin", "diretor", "agente"]
+
+    def get_view_url(self, month, year):
+        directorate = self.get_directorate()
+        return f"{reverse('protecaoespecial:socioeducativo-monthly-report', kwargs={'pk': directorate.pk})}?year={year}&month={month}"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        month = int(self.request.GET.get("month") or date.today().month)
+        year = int(self.request.GET.get("year") or date.today().year)
+        context.update(self.get_editor_context(month, year))
+        context.update({
+            "report_label": "Proteção Especial — Socioeducativo",
+            "theme_class": "theme-amber",
+            "months_range": MONTH_OPTIONS,
+            "cancel_url": self.get_view_url(month, year),
+        })
+        return context
+
+    def post(self, request, *args, **kwargs):
+        month = int(request.POST.get("month"))
+        year = int(request.POST.get("year"))
+        directorate = self.save_narrative(request, month, year)
+        if directorate is not None:
+            log_activity(request, directorate, "finalized", "report",
+                         f"Relatorio Mensal Protecao Especial (Socioeducativo) {build_period_label(year, month)}",
+                         url=self.get_view_url(month, year))
+        return redirect(self.get_view_url(month, year))

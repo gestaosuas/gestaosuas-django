@@ -1,5 +1,11 @@
-from django.test import TestCase
+import os
+import uuid
 
+from django.conf import settings
+from django.test import TestCase
+from django.urls import reverse
+
+from apps.accounts.tests import make_user
 from apps.core.utils import build_series_or_none, build_variation_or_none
 
 
@@ -74,3 +80,48 @@ class BuildVariationOrNoneTests(TestCase):
         reports_by_month = {4: FakeReport(valor=0), 5: FakeReport(valor=0)}
         result = build_variation_or_none(reports_by_month, "valor", "all")
         self.assertIsNone(result)
+
+
+class ProtectedMediaViewTests(TestCase):
+    """core:protected-media substitui o /media/ direto do Django (só
+    registrado com DEBUG=True — dava 404 em produção, confirmado nesta
+    sessão contra a VPS real) por uma rota que exige login e valida que o
+    caminho resolvido continua dentro de MEDIA_ROOT (path traversal)."""
+
+    def setUp(self):
+        self.rel_path = f"test-protected/{uuid.uuid4().hex}.txt"
+        self.abs_path = os.path.join(str(settings.MEDIA_ROOT), self.rel_path)
+        os.makedirs(os.path.dirname(self.abs_path), exist_ok=True)
+        with open(self.abs_path, "wb") as f:
+            f.write(b"conteudo de teste")
+
+    def tearDown(self):
+        if os.path.isfile(self.abs_path):
+            os.remove(self.abs_path)
+
+    def _url(self, path):
+        return reverse("core:protected-media", kwargs={"file_path": path})
+
+    def test_anonymous_user_redirected_to_login(self):
+        response = self.client.get(self._url(self.rel_path))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("accounts:login"), response.url)
+
+    def test_authenticated_user_downloads_existing_file(self):
+        user, _ = make_user()
+        self.client.force_login(user)
+        response = self.client.get(self._url(self.rel_path))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b"".join(response.streaming_content), b"conteudo de teste")
+
+    def test_nonexistent_file_is_404(self):
+        user, _ = make_user()
+        self.client.force_login(user)
+        response = self.client.get(self._url("test-protected/nao-existe.txt"))
+        self.assertEqual(response.status_code, 404)
+
+    def test_path_traversal_outside_media_root_is_blocked(self):
+        user, _ = make_user()
+        self.client.force_login(user)
+        response = self.client.get(self._url("../../config/settings.py"))
+        self.assertEqual(response.status_code, 404)

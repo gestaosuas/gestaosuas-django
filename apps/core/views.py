@@ -1,9 +1,16 @@
+import os
+
+from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import OperationalError, ProgrammingError
-from django.http import Http404, JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import redirect
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import TemplateView, RedirectView, View
 
+from apps.accounts.mixins import RoleRequiredMixin
 from apps.accounts.models import Profile
 from apps.directorates.models import Directorate
 
@@ -114,6 +121,71 @@ class TvApiUrlsView(LoginRequiredMixin, View):
         return JsonResponse({"slides": slides, "total": len(slides)})
 
 
+class NotificationsUnreadView(LoginRequiredMixin, View):
+    """JSON endpoint returning unread activity-log notifications (admin only)."""
+
+    def get(self, request):
+        try:
+            profile = Profile.objects.get(user=request.user)
+            if profile.role != "admin":
+                return JsonResponse({"error": "forbidden"}, status=403)
+        except (Profile.DoesNotExist, OperationalError, ProgrammingError):
+            return JsonResponse({"error": "forbidden"}, status=403)
+
+        from apps.core.models import ActivityLog
+        from apps.core.notifications import ACTION_VERBS
+
+        items = []
+        for log in ActivityLog.objects.filter(read_at__isnull=True).order_by("-created_at")[:30]:
+            verb = ACTION_VERBS.get(log.action_type, log.action_type)
+            items.append({
+                "id": str(log.id),
+                "message": f"{log.user_name} {verb} {log.resource_name}",
+                "directorate_name": log.directorate_name,
+                "url": (log.details or {}).get("url", ""),
+                "created_at": log.created_at.isoformat() if log.created_at else "",
+            })
+        return JsonResponse({"count": len(items), "items": items})
+
+
+class NotificationsMarkReadView(LoginRequiredMixin, View):
+    """Marks all currently-unread notifications as read (admin only)."""
+
+    def post(self, request):
+        try:
+            profile = Profile.objects.get(user=request.user)
+            if profile.role != "admin":
+                return JsonResponse({"error": "forbidden"}, status=403)
+        except (Profile.DoesNotExist, OperationalError, ProgrammingError):
+            return JsonResponse({"error": "forbidden"}, status=403)
+
+        from django.utils import timezone
+        from apps.core.models import ActivityLog
+
+        ActivityLog.objects.filter(read_at__isnull=True).update(read_at=timezone.now())
+        return JsonResponse({"status": "success"})
+
+
+class ProtectedMediaView(LoginRequiredMixin, View):
+    """Serve arquivos de MEDIA_ROOT só para usuários autenticados.
+
+    Substitui o link cru pra /media/ (só registrado com DEBUG=True em
+    config/urls.py — 404 em produção) por uma rota que funciona em prod e
+    exige login. Valida que o caminho resolvido continua dentro de
+    MEDIA_ROOT antes de servir, contra path traversal (../, caminho
+    absoluto etc.).
+    """
+
+    def get(self, request, file_path):
+        media_root = os.path.realpath(str(settings.MEDIA_ROOT))
+        full_path = os.path.realpath(os.path.join(media_root, file_path))
+        if full_path != media_root and not full_path.startswith(media_root + os.sep):
+            raise Http404
+        if not os.path.isfile(full_path):
+            raise Http404
+        return FileResponse(open(full_path, "rb"))
+
+
 class MapView(LoginRequiredMixin, TemplateView):
     template_name = "core/map.html"
     def get_context_data(self, **kwargs):
@@ -126,6 +198,12 @@ class MapView(LoginRequiredMixin, TemplateView):
 
 class MapManagementView(LoginRequiredMixin, TemplateView):
     template_name = "core/map_management.html"
+    def get(self, request, *args, **kwargs):
+        profile = getattr(request.user, 'profile', None)
+        is_admin = request.user.is_superuser or (profile and profile.role == 'admin')
+        if not is_admin:
+            return redirect('core:map')
+        return super().get(request, *args, **kwargs)
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         from apps.core.models import MapUnit, MapCategory
@@ -186,3 +264,28 @@ class MapManagementView(LoginRequiredMixin, TemplateView):
                 MapUnit.objects.filter(id=unit_id).delete()
                 messages.success(request, "Unidade removida.")
         return redirect("core:map_management")
+
+
+class NarrativeReportDeleteView(LoginRequiredMixin, RoleRequiredMixin, View):
+    """Exclui um MonthlyReport (Relatorio Mensal narrativo) de qualquer
+    diretoria/setor -- endpoint unico reaproveitado pelo sidebar de
+    historico de todas as diretorias (ver templates/directorates/shared/
+    narrative_report.html). Admin-only: mesma regra de "só admin edita/
+    exclui relatório já finalizado" pedida pelo usuário para o botão de
+    editar.
+    """
+    allowed_roles = ["admin"]
+
+    def post(self, request, *args, **kwargs):
+        from apps.directorates.models import MonthlyReport
+
+        report_id = request.POST.get("report_id")
+        MonthlyReport.objects.filter(pk=report_id).delete()
+        messages.success(request, "Relatório excluído.")
+
+        next_url = request.POST.get("next")
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+        ):
+            return redirect(next_url)
+        return redirect(reverse("core:map"))

@@ -76,6 +76,10 @@
                         <div class="mgmt-icon violet"><i data-lucide="database"></i></div>
                         <div class="mgmt-info"><strong>Dados Núcleo de Diversidade</strong><span>Tabela anual de indicadores</span></div>
                     </a>
+                    <a href="{% url 'casamulher:monthly-report' directorate.pk %}?year={{ selected_year }}" class="mgmt-card">
+                        <div class="mgmt-icon pink"><i data-lucide="file-text"></i></div>
+                        <div class="mgmt-info"><strong>Relatório Mensal</strong><span>Narrativa e histórico do período</span></div>
+                    </a>
                 </div>
             </div>
 

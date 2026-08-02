@@ -45,7 +45,22 @@ echo ""
 echo "[1/5] Fazendo backup do banco de dados..."
 mkdir -p "$BACKUP_DIR"
 docker exec gestaosuas_db pg_dump -U "$DB_USER" -Fc "$DB_NAME" > "$BACKUP_DIR/$DUMP_FILE"
-echo "      Salvo em: $BACKUP_DIR/$DUMP_FILE ($(du -sh "$BACKUP_DIR/$DUMP_FILE" | cut -f1))"
+
+# Criptografia opcional (best-effort, igual GDRIVE_DIR): sem
+# BACKUP_ENCRYPTION_PASSPHRASE no .env, o backup segue funcionando sem
+# criptografia, só com aviso — nunca derruba o deploy por causa disso.
+if [ -n "${BACKUP_ENCRYPTION_PASSPHRASE:-}" ]; then
+    openssl enc -aes-256-cbc -pbkdf2 -salt \
+        -in "$BACKUP_DIR/$DUMP_FILE" \
+        -out "$BACKUP_DIR/$DUMP_FILE.enc" \
+        -pass "env:BACKUP_ENCRYPTION_PASSPHRASE"
+    rm "$BACKUP_DIR/$DUMP_FILE"
+    DUMP_FILE="$DUMP_FILE.enc"
+    echo "      Salvo (criptografado) em: $BACKUP_DIR/$DUMP_FILE ($(du -sh "$BACKUP_DIR/$DUMP_FILE" | cut -f1))"
+else
+    echo "      AVISO: BACKUP_ENCRYPTION_PASSPHRASE não definida no .env — backup salvo sem criptografia."
+    echo "      Salvo em: $BACKUP_DIR/$DUMP_FILE ($(du -sh "$BACKUP_DIR/$DUMP_FILE" | cut -f1))"
+fi
 
 # ── 2. Copia para o Google Drive (opcional) ────────────────
 # Best-effort: sem GDRIVE_DIR configurado no .env, ou falha ao copiar
@@ -57,9 +72,9 @@ if [ -z "${GDRIVE_DIR:-}" ]; then
 elif mkdir -p "$GDRIVE_DIR" 2>/dev/null && cp "$BACKUP_DIR/$DUMP_FILE" "$GDRIVE_DIR/$DUMP_FILE" 2>/dev/null; then
     echo "      Copiado para: $GDRIVE_DIR/$DUMP_FILE"
     # Mantém apenas os 10 backups mais recentes no Drive (mesma retenção do local).
-    GDRIVE_COUNT=$(ls -1 "$GDRIVE_DIR"/*.dump 2>/dev/null | wc -l)
+    GDRIVE_COUNT=$(ls -1 "$GDRIVE_DIR"/*.dump* 2>/dev/null | wc -l)
     if [ "$GDRIVE_COUNT" -gt 10 ]; then
-        ls -1t "$GDRIVE_DIR"/*.dump | tail -n +11 | while read -r f; do rm -f "$f"; done
+        ls -1t "$GDRIVE_DIR"/*.dump* | tail -n +11 | while read -r f; do rm -f "$f"; done
     fi
 else
     echo "      AVISO: não foi possível copiar para o Google Drive (mount em $GDRIVE_DIR disponível?)."
@@ -89,11 +104,11 @@ docker compose -f docker-compose.yml up -d --build
 echo "      Containers reiniciados."
 
 # ── Limpeza de backups antigos (mantém últimos 10) ─────────
-BACKUP_COUNT=$(ls -1 "$BACKUP_DIR"/*.dump 2>/dev/null | wc -l)
+BACKUP_COUNT=$(ls -1 "$BACKUP_DIR"/*.dump* 2>/dev/null | wc -l)
 if [ "$BACKUP_COUNT" -gt 10 ]; then
     echo ""
     echo "[*] Removendo backups antigos (mantendo os 10 mais recentes)..."
-    ls -1t "$BACKUP_DIR"/*.dump | tail -n +11 | while read f; do rm -f "$f"; done
+    ls -1t "$BACKUP_DIR"/*.dump* | tail -n +11 | while read f; do rm -f "$f"; done
 fi
 
 echo ""

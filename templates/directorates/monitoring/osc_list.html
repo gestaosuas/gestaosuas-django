@@ -21,11 +21,13 @@
                     <h1>Organizações da Sociedade Civil</h1>
                     <p class="subtitle-muted">Gerencie as OSCs vinculadas a esta diretoria</p>
                 </div>
+                {% if can_delete %}
                 <div class="mon-page-actions">
                     <a href="{% url 'directorates:osc-create' directorate.pk %}" class="btn-primary-premium">
                         <i data-lucide="plus"></i> Nova OSC
                     </a>
                 </div>
+                {% endif %}
             </header>
 
             {# ── Stats + Filters row ── #}
@@ -95,10 +97,10 @@
                                 {% endif %}
                             </td>
                             <td class="actions-cell">
+                                {% if can_delete %}
                                 <a href="{% url 'directorates:osc-update' osc.pk %}" class="action-icon-btn-sm" title="Editar">
                                     <i data-lucide="pencil"></i>
                                 </a>
-                                {% if can_delete %}
                                 <form action="{% url 'directorates:osc-delete' osc.pk %}" method="post" style="display:inline;"
                                       onsubmit="return confirm('Excluir OSC {{ osc.name }}?')">
                                     {% csrf_token %}
@@ -106,6 +108,8 @@
                                         <i data-lucide="trash-2"></i>
                                     </button>
                                 </form>
+                                {% else %}
+                                <span class="cell-muted">—</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -114,9 +118,11 @@
                             <td colspan="6" class="empty-table-cell">
                                 <i data-lucide="building-x"></i>
                                 <p>Nenhuma OSC cadastrada ainda.</p>
+                                {% if can_delete %}
                                 <a href="{% url 'directorates:osc-create' directorate.pk %}" class="btn-primary-premium" style="margin-top:12px;">
                                     <i data-lucide="plus"></i> Cadastrar primeira OSC
                                 </a>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}

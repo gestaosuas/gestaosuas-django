@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     CrasHomeView, CrasCreateUpdateView, CrasDataView,
-    CrasMonthlyNarrativeView, CrasNarrativeListView,
+    CrasMonthlyNarrativeView, CrasNarrativeEditorView,
     CrasQuickEditView, CrasDeleteMonthView
 )
 
@@ -16,5 +16,5 @@ urlpatterns = [
     path("<dir_slug:pk>/dados/", CrasDataView.as_view(), name="data"),
     path("<dir_slug:pk>/dados/excluir-mes/", CrasDeleteMonthView.as_view(), name="delete-month"),
     path("<dir_slug:pk>/relatorio-mensal/", CrasMonthlyNarrativeView.as_view(), name="monthly-report"),
-    path("<dir_slug:pk>/relatorios/", CrasNarrativeListView.as_view(), name="reports"),
+    path("<dir_slug:pk>/relatorio-mensal/editor/", CrasNarrativeEditorView.as_view(), name="narrative-editor"),
 ]

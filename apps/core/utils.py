@@ -1,4 +1,5 @@
 import unicodedata
+import nh3
 
 def strip_accents(text):
     if not text:
@@ -6,6 +7,53 @@ def strip_accents(text):
     return "".join(
         c for c in unicodedata.normalize("NFD", str(text))
         if unicodedata.category(c) != "Mn"
+    )
+
+
+def extract_report_html(content):
+    """Normaliza MonthlyReport.content (JSONField) para uma string HTML.
+
+    Relatorios narrativos migrados do Supabase guardam um dict no formato
+    {"html": "<p>...</p>"} (saida do editor rich-text do Next.js/TipTap).
+    Relatorios criados no editor Quill do Django gravam a string HTML
+    direto no campo. As duas formas viram a mesma string aqui.
+    """
+    if isinstance(content, dict):
+        return content.get("html", "") or ""
+    if isinstance(content, str):
+        return content
+    return ""
+
+
+_NARRATIVE_ALLOWED_TAGS = {
+    "p", "br", "strong", "b", "em", "i", "u", "s", "strike",
+    "h1", "h2", "h3", "h4", "h5", "h6",
+    "ul", "ol", "li", "blockquote", "a",
+    "table", "thead", "tbody", "tr", "td", "th",
+}
+_NARRATIVE_ALLOWED_ATTRS = {
+    "a": {"href", "target"},
+    "td": {"colspan", "rowspan"},
+    "th": {"colspan", "rowspan"},
+}
+
+
+def sanitize_report_html(html):
+    """Sanitiza HTML vindo do editor rich-text (Quill) antes de salvar.
+
+    O POST manda o innerHTML bruto do editor num campo oculto — sem isso, um
+    usuario mal-intencionado poderia mandar um <script>/on* handler direto
+    no POST (o Quill do lado do cliente nao protege contra isso, so a
+    sanitizacao no servidor). Mesma classe de risco do XSS ja corrigido no
+    Plano de Trabalho — aqui a defesa e sanitizar o HTML em vez de nao
+    renderizar HTML nenhum, porque o objetivo do editor e justamente permitir
+    formatacao rica.
+    """
+    return nh3.clean(
+        html or "",
+        tags=_NARRATIVE_ALLOWED_TAGS,
+        attributes=_NARRATIVE_ALLOWED_ATTRS,
+        link_rel="noopener noreferrer nofollow",
     )
 
 

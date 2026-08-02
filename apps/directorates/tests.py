@@ -249,12 +249,17 @@ class ObjectScopedAccessMixinTests(DirectoratesTestBase):
     <uuid:pk> identifica o objeto, não a diretoria — o acesso deve ser resolvido
     a partir de `objeto.directorate`."""
 
-    def test_osc_update_allowed_for_user_with_directorate_access(self):
+    def test_osc_update_forbidden_for_non_admin_with_directorate_access(self):
+        """OSC vira admin-only pra criar/editar/excluir (2026-07-29, decisão
+        explícita do usuário) — diretor/agente perdem acesso mesmo tendo
+        vínculo com a diretoria da OSC. O dispatch() de admin em
+        OscUpdateView roda antes de OscScopedMixin, então nem chega a
+        resolver a diretoria do objeto."""
         osc = self.make_osc()
         user = make_user(role="agente", primary_directorate=self.directorate)
         self.client.force_login(user)
         response = self.client.get(reverse("directorates:osc-update", kwargs={"pk": osc.pk}))
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 403)
 
     def test_osc_update_denied_for_user_without_directorate_access(self):
         osc = self.make_osc()
@@ -263,19 +268,18 @@ class ObjectScopedAccessMixinTests(DirectoratesTestBase):
         response = self.client.get(
             reverse("directorates:osc-update", kwargs={"pk": osc.pk}), follow=False
         )
-        self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
+        self.assertEqual(response.status_code, 403)
 
-    def test_osc_update_nonexistent_object_is_a_clean_404_even_for_regular_user(self):
-        """Diferente do caso de diretoria inexistente: get_scoped_object() usa
-        get_object_or_404 corretamente, então o Http404 é levantado dentro do
-        get_directorate() chamado por dispatch() e cai no except genérico — 404
-        vira redirect amigável para quem não é admin."""
+    def test_osc_update_nonexistent_object_is_forbidden_before_lookup_for_regular_user(self):
+        """O guard de admin em OscUpdateView.dispatch() roda antes de
+        OscScopedMixin resolver o objeto — um não-admin recebe 403 mesmo
+        para um pk inexistente, sem nunca chegar no get_object_or_404."""
         user = make_user(role="user")
         self.client.force_login(user)
         response = self.client.get(
             reverse("directorates:osc-update", kwargs={"pk": uuid.uuid4()}), follow=False
         )
-        self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
+        self.assertEqual(response.status_code, 403)
 
     def test_osc_update_nonexistent_object_is_clean_404_for_admin(self):
         """Ao contrário do bug em OscListView, aqui o admin recebe um 404 de
@@ -371,16 +375,30 @@ class ObjectScopedAccessMixinTests(DirectoratesTestBase):
         self.assertEqual(response.status_code, 200)
 
     def test_work_plan_scoped_view_denied_for_user_without_access(self):
+        """Plano de Trabalho também virou admin-only pra gerenciar
+        (2026-07-29) — o guard de admin em WorkPlanUpdateView.dispatch()
+        bloqueia antes mesmo de checar a diretoria do plano."""
         plan = self.make_work_plan()
         user = make_user(role="agente", primary_directorate=self.other_directorate)
         self.client.force_login(user)
         response = self.client.get(
             reverse("directorates:plan-update", kwargs={"pk": plan.pk}), follow=False
         )
-        self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
+        self.assertEqual(response.status_code, 403)
 
 
 class OscCrudTests(DirectoratesTestBase):
+    def test_osc_create_view_forbidden_for_diretor_and_agente(self):
+        """Cadastrar OSC virou admin-only (2026-07-29, decisão explícita do
+        usuário) — diretor e agente perdem acesso mesmo tendo vínculo com a
+        diretoria."""
+        url = reverse("directorates:osc-create", kwargs={"pk": self.directorate.pk})
+        for role in ("diretor", "agente"):
+            user = make_user(role=role, primary_directorate=self.directorate)
+            self.client.force_login(user)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403)
+
     def test_osc_create_view_creates_osc_scoped_to_directorate(self):
         admin = make_user(role="admin")
         self.client.force_login(admin)
@@ -467,13 +485,15 @@ class OscCrudTests(DirectoratesTestBase):
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Osc.objects.filter(pk=osc.pk).exists())
 
-    def test_osc_delete_view_allowed_for_diretor(self):
+    def test_osc_delete_view_forbidden_for_diretor(self):
+        """Excluir OSC virou admin-only (2026-07-29) — diretor perdeu o
+        acesso que tinha antes (era admin/diretor)."""
         osc = self.make_osc()
         diretor = make_user(role="diretor", primary_directorate=self.directorate)
         self.client.force_login(diretor)
         response = self.client.post(reverse("directorates:osc-delete", kwargs={"pk": osc.pk}))
-        self.assertEqual(response.status_code, 302)
-        self.assertFalse(Osc.objects.filter(pk=osc.pk).exists())
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Osc.objects.filter(pk=osc.pk).exists())
 
 
 class WorkPlanCrudTests(DirectoratesTestBase):
@@ -481,11 +501,24 @@ class WorkPlanCrudTests(DirectoratesTestBase):
     self.request.user.pk` neste diff. A coluna work_plans.user_id é NOT NULL no
     banco real (confirmado via information_schema) mas o campo do model é
     `null=True, blank=True` — ou seja, sem essa linha o INSERT quebra com
-    IntegrityError. Este teste teria falhado antes da correção."""
+    IntegrityError. Este teste teria falhado antes da correção.
+
+    Ator trocado de agente pra admin em 2026-07-29: WorkPlanCreateView virou
+    admin-only (ver OscCrudTests/WorkPlanCrudTests acima) — o teste de
+    regressão do user_id continua válido, só que só é alcançável por admin
+    agora."""
+
+    def test_work_plan_create_view_forbidden_for_diretor_and_agente(self):
+        url = reverse("directorates:plan-create", kwargs={"pk": self.directorate.pk})
+        for role in ("diretor", "agente"):
+            user = make_user(role=role, primary_directorate=self.directorate)
+            self.client.force_login(user)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403)
 
     def test_work_plan_create_view_sets_user_id_from_request_user(self):
         osc = self.make_osc()
-        user = make_user(role="agente", primary_directorate=self.directorate)
+        user = make_user(role="admin")
         self.client.force_login(user)
         url = reverse("directorates:plan-create", kwargs={"pk": self.directorate.pk})
         response = self.client.post(
@@ -512,7 +545,7 @@ class WorkPlanCrudTests(DirectoratesTestBase):
         auth.users) para garantir que o fluxo funciona sem o workaround que
         existia aqui antes."""
         osc = self.make_osc()
-        user = make_user(role="agente", primary_directorate=self.directorate)
+        user = make_user(role="admin")
         self.client.force_login(user)
         url = reverse("directorates:plan-create", kwargs={"pk": self.directorate.pk})
         response = self.client.post(
@@ -557,6 +590,29 @@ class WorkPlanCrudTests(DirectoratesTestBase):
         response = self.client.post(reverse("directorates:plan-delete", kwargs={"pk": plan.pk}))
         self.assertEqual(response.status_code, 302)
         self.assertFalse(WorkPlan.objects.filter(pk=plan.pk).exists())
+
+
+class WorkPlanContentXssTests(DirectoratesTestBase):
+    """plan_form.html injetava `{{ object.content|default:"[]"|safe }}` cru
+    dentro de um <script> (XSS confirmado, 2026-07-29) — trocado por
+    `plan_content_json|json_script:"plan-content-data"` + JSON.parse. Um
+    `content` malicioso não deve conseguir fechar a tag <script> nem
+    executar como HTML/JS fora do JSON."""
+
+    PAYLOAD = [{"text": "</script><script>window.__xss=1</script>"}]
+
+    def test_malicious_content_does_not_break_out_of_script_tag(self):
+        plan = self.make_work_plan()
+        plan.content = self.PAYLOAD
+        plan.save()
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        response = self.client.get(reverse("directorates:plan-update", kwargs={"pk": plan.pk}))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertNotIn("<script>window.__xss=1</script>", html)
+        self.assertIn('id="plan-content-data"', html)
+        self.assertIn("JSON.parse", html)
 
 
 class VisitFlowTests(DirectoratesTestBase):

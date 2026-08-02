@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Editor — Relatório Mensal {{ report_label }} | {{ directorate.name }}{% endblock %}
+
+{% block body_class %}{{ theme_class|default:"theme-blue" }}{% endblock %}
+
+{% block extra_head %}
+<link href="{% static 'css/quill.snow.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+
+    <main class="dashboard-main narrative-editor-main" style="padding-top:0;">
+        <div class="monitoring-header-container">
+            <div class="monitoring-header-content">
+                <div class="monitoring-title-area">
+                    <div style="display:flex;align-items:center;gap:20px;margin-bottom:10px;">
+                        <div style="width:50px;height:50px;background:white;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--nav-grad-start,#2563eb);">
+                            <i data-lucide="pencil-line" style="width:32px;height:32px;"></i>
+                        </div>
+                        <div>
+                            <h1>{% if monthly_report %}Editar{% else %}Novo{% endif %} Relatório — {{ report_label }}</h1>
+                            <p style="margin:0;font-size:14px;opacity:0.9;">Competência {{ selected_month|stringformat:"02d" }}/{{ selected_year }}</p>
+                        </div>
+                    </div>
+                    <a href="{{ cancel_url }}" class="btn-ghost-white" style="margin-top:10px;display:inline-flex;">
+                        <i data-lucide="arrow-left"></i> Voltar sem salvar
+                    </a>
+                </div>
+
+                <div class="monitoring-header-actions">
+                    <form method="get" class="narrative-period-form">
+                        <select name="month" class="filter-select">
+                            {% for m_val, m_name in months_range %}
+                            <option value="{{ m_val }}" {% if m_val == selected_month %}selected{% endif %}>{{ m_name }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="number" name="year" value="{{ selected_year }}" min="2020" class="filter-input" style="width:90px;">
+                        <button type="submit" class="btn-primary-premium" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);">
+                            <i data-lucide="calendar"></i> Trocar Período
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="narrative-editor-wrap">
+            <form method="post" id="narrative-editor-form" class="narrative-editor-card">
+                {% csrf_token %}
+                <input type="hidden" name="month" value="{{ selected_month }}">
+                <input type="hidden" name="year" value="{{ selected_year }}">
+                <input type="hidden" name="content_html" id="content_html_input">
+
+                <div id="quill-toolbar">
+                    <span class="ql-formats">
+                        <select class="ql-header">
+                            <option value="1"></option>
+                            <option value="2"></option>
+                            <option value="3"></option>
+                            <option selected></option>
+                        </select>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-bold"></button>
+                        <button class="ql-italic"></button>
+                        <button class="ql-underline"></button>
+                        <button class="ql-strike"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-list" value="ordered"></button>
+                        <button class="ql-list" value="bullet"></button>
+                        <button class="ql-blockquote"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-link"></button>
+                        <button class="ql-clean"></button>
+                    </span>
+                </div>
+                <div id="quill-editor">{{ report_content_html|safe }}</div>
+
+                <div class="narrative-editor-footer">
+                    <span class="narrative-editor-hint">
+                        <i data-lucide="info"></i> As alterações só são salvas ao clicar em "Salvar Relatório".
+                    </span>
+                    <button type="submit" class="btn-primary-premium">
+                        <i data-lucide="save"></i> Salvar Relatório
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
+</div>
+
+<script src="{% static 'js/vendor/quill.js' %}"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var quill = new Quill('#quill-editor', {
+        theme: 'snow',
+        modules: { toolbar: '#quill-toolbar' },
+        placeholder: 'Escreva aqui o relatório narrativo do mês...'
+    });
+
+    document.getElementById('narrative-editor-form').addEventListener('submit', function () {
+        document.getElementById('content_html_input').value = quill.root.innerHTML;
+    });
+});
+</script>
+
+<style>
+    .narrative-period-form {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .narrative-editor-wrap {
+        flex: 1;
+        min-height: 0;
+        padding: 20px;
+        display: flex;
+    }
+
+    .narrative-editor-card {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        overflow: hidden;
+    }
+
+    #quill-toolbar.ql-toolbar.ql-snow {
+        border: none;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+    }
+
+    #quill-editor {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #quill-editor .ql-container.ql-snow {
+        border: none;
+        flex: 1;
+        min-height: 0;
+        font-size: 15px;
+    }
+
+    #quill-editor .ql-editor {
+        min-height: 420px;
+        max-height: calc(100vh - 340px);
+        overflow-y: auto;
+        padding: 24px 32px;
+        line-height: 1.8;
+    }
+
+    .narrative-editor-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 24px;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .narrative-editor-hint {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #94a3b8;
+    }
+
+    .narrative-editor-hint i { width: 14px; height: 14px; }
+</style>
+{% endblock %}

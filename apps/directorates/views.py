@@ -50,6 +50,7 @@ def get_persistent_bimester(request):
 from .models import Directorate, Osc, Visit, WorkPlan, MonthlyReport, FormDelegation
 from apps.beneficios.models import BeneficiosReport
 from apps.accounts.models import Profile, ProfileDirectorate
+from apps.core.notifications import log_activity
 
 
 def _fix_str_encoding(value):
@@ -126,10 +127,7 @@ def _save_file_locally(file_obj, path):
     file_obj.seek(0)
     with open(local_path, "wb") as f:
         f.write(file_obj.read())
-    media_url = settings.MEDIA_URL
-    if not media_url.startswith("/"):
-        media_url = "/" + media_url
-    return f"{media_url}{path}"
+    return reverse("core:protected-media", kwargs={"file_path": path})
 
 
 def upload_to_supabase(file_obj, path):
@@ -992,6 +990,8 @@ class WorkPlanObjectivesView(WorkPlanScopedMixin, View):
         plan.atividades = (request.POST.get("atividades") or "").strip()
         plan.save()
         messages.success(request, f"Objeto e objetivos do plano \"{plan.title}\" salvos com sucesso.")
+        log_activity(request, plan.directorate, "updated", "work_plan", f"Plano de Trabalho — {plan.title}",
+                     url=reverse("directorates:plan-update", kwargs={"pk": plan.pk}))
         next_url = get_safe_next_url(request)
         if next_url:
             return redirect(next_url)
@@ -1002,6 +1002,13 @@ class WorkPlanUpdateView(WorkPlanScopedMixin, UpdateView):
     template_name = "directorates/monitoring/plan_form.html"
     fields = ["title", "content", "status"]
 
+    def dispatch(self, request, *args, **kwargs):
+        profile = getattr(request.user, 'profile', None)
+        is_admin = request.user.is_superuser or (profile and profile.role == 'admin')
+        if not is_admin:
+            return HttpResponseForbidden()
+        return super().dispatch(request, *args, **kwargs)
+
     def get_object(self, queryset=None):
         return self.get_scoped_object()
 
@@ -1011,7 +1018,15 @@ class WorkPlanUpdateView(WorkPlanScopedMixin, UpdateView):
         context["selected_osc_id"] = str(self.object.osc_id)
         context["return_url"] = get_safe_next_url(self.request) or reverse("directorates:plan-list", kwargs={"pk": self.object.directorate.pk})
         context["theme_class"] = get_monitoramento_theme(self.object.directorate)[0]
+        context["plan_content_json"] = self.object.content or []
         return context
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        log_activity(self.request, self.object.directorate, "updated", "work_plan",
+                     f"Plano de Trabalho — {self.object.title}",
+                     url=reverse("directorates:plan-update", kwargs={"pk": self.object.pk}))
+        return response
 
     def get_success_url(self):
         next_url = get_safe_next_url(self.request)
@@ -1024,6 +1039,13 @@ class WorkPlanCreateView(DirectorateScopedMixin, CreateView):
     template_name = "directorates/monitoring/plan_form.html"
     fields = ["title", "content", "status", "osc"]
 
+    def dispatch(self, request, *args, **kwargs):
+        profile = getattr(request.user, 'profile', None)
+        is_admin = request.user.is_superuser or (profile and profile.role == 'admin')
+        if not is_admin:
+            return HttpResponseForbidden()
+        return super().dispatch(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         directorate = self.get_directorate()
@@ -1031,12 +1053,17 @@ class WorkPlanCreateView(DirectorateScopedMixin, CreateView):
         context["selected_osc_id"] = self.request.GET.get("osc", "")
         context["return_url"] = get_safe_next_url(self.request) or reverse("directorates:plan-list", kwargs={"pk": self.kwargs["pk"]})
         context["theme_class"] = get_monitoramento_theme(directorate)[0]
+        context["plan_content_json"] = []
         return context
 
     def form_valid(self, form):
         form.instance.directorate_id = self.kwargs["pk"]
         form.instance.user_id = self.request.user.pk
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        log_activity(self.request, self.object.directorate, "created", "work_plan",
+                     f"Plano de Trabalho — {self.object.title}",
+                     url=reverse("directorates:plan-update", kwargs={"pk": self.object.pk}))
+        return response
 
     def get_success_url(self):
         next_url = get_safe_next_url(self.request)
@@ -1050,7 +1077,7 @@ class WorkPlanDeleteView(WorkPlanScopedMixin, DeleteView):
 
     def dispatch(self, request, *args, **kwargs):
         profile = getattr(request.user, 'profile', None)
-        is_admin = request.user.is_superuser or (profile and profile.role in ('admin', 'diretor'))
+        is_admin = request.user.is_superuser or (profile and profile.role == 'admin')
         if not is_admin:
             return HttpResponseForbidden()
         return super().dispatch(request, *args, **kwargs)
@@ -1631,6 +1658,13 @@ class OscCreateView(DirectorateScopedMixin, CreateView):
     form_class = OscForm
     template_name = "directorates/monitoring/osc_form.html"
 
+    def dispatch(self, request, *args, **kwargs):
+        profile = getattr(request.user, 'profile', None)
+        is_admin = request.user.is_superuser or (profile and profile.role == 'admin')
+        if not is_admin:
+            return HttpResponseForbidden()
+        return super().dispatch(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         directorate = self.get_directorate()
@@ -1642,7 +1676,10 @@ class OscCreateView(DirectorateScopedMixin, CreateView):
     def form_valid(self, form):
         form.instance.directorate_id = self.kwargs["pk"]
         form.instance.id = uuid.uuid4()
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        log_activity(self.request, self.object.directorate, "created", "osc", f"OSC {self.object.name}",
+                     url=reverse("directorates:osc-update", kwargs={"pk": self.object.pk}))
+        return response
 
     def get_success_url(self):
         next_url = self.request.POST.get("next") or self.request.GET.get("next")
@@ -1655,6 +1692,13 @@ class OscUpdateView(OscScopedMixin, UpdateView):
     form_class = OscForm
     template_name = "directorates/monitoring/osc_form.html"
 
+    def dispatch(self, request, *args, **kwargs):
+        profile = getattr(request.user, 'profile', None)
+        is_admin = request.user.is_superuser or (profile and profile.role == 'admin')
+        if not is_admin:
+            return HttpResponseForbidden()
+        return super().dispatch(request, *args, **kwargs)
+
     def get_object(self, queryset=None):
         return self.get_scoped_object()
 
@@ -1664,6 +1708,12 @@ class OscUpdateView(OscScopedMixin, UpdateView):
         context["return_url"] = get_safe_next_url(self.request) or get_osc_list_redirect(self.object.directorate)
         context["theme_class"] = get_monitoramento_theme(self.object.directorate)[0]
         return context
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        log_activity(self.request, self.object.directorate, "updated", "osc", f"OSC {self.object.name}",
+                     url=reverse("directorates:osc-update", kwargs={"pk": self.object.pk}))
+        return response
 
     def get_success_url(self):
         next_url = self.request.POST.get("next") or self.request.GET.get("next")
@@ -1676,7 +1726,7 @@ class OscDeleteView(OscScopedMixin, DeleteView):
 
     def dispatch(self, request, *args, **kwargs):
         profile = getattr(request.user, 'profile', None)
-        is_admin = request.user.is_superuser or (profile and profile.role in ('admin', 'diretor'))
+        is_admin = request.user.is_superuser or (profile and profile.role == 'admin')
         if not is_admin:
             return HttpResponseForbidden()
         return super().dispatch(request, *args, **kwargs)
@@ -1785,13 +1835,16 @@ class VisitCreateView(DirectorateScopedMixin, TemplateView):
             create_url = reverse("directorates:visit-create", kwargs={"pk": directorate.pk})
             return redirect(f"{create_url}?next={next_url}" if next_url else create_url)
 
+        visit_url = reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
         if visit.status == "finalized":
             messages.success(request, "Visita finalizada com sucesso.")
+            log_activity(request, directorate, "finalized", "visit", f"Visita — {visit.osc.name}", url=visit_url)
             # Sempre volta para a lista de visitas (nao para o "next" generico de
             # voltar/cancelar da pagina) - e la que o botao "Relatorio de Visita"
             # aparece habilitado para o proximo passo.
             return redirect(get_visit_list_redirect(directorate))
         messages.success(request, "Rascunho salvo com sucesso.")
+        log_activity(request, directorate, "created", "visit", f"Visita — {visit.osc.name}", url=visit_url)
         next_url = get_safe_next_url(request)
         if next_url:
             return redirect(next_url)
@@ -1927,13 +1980,18 @@ class VisitInstrumentalView(VisitAccessMixin, UpdateView):
             edit_url = reverse("directorates:visit-instrumental", kwargs={"pk": self.object.pk})
             return redirect(f"{edit_url}?next={next_url}" if next_url else edit_url)
 
+        visit_url = reverse("directorates:visit-instrumental", kwargs={"pk": self.object.pk})
         if self.object.status == "finalized":
             messages.success(request, "Visita finalizada com sucesso.")
+            log_activity(request, self.object.directorate, "finalized", "visit",
+                         f"Visita — {self.object.osc.name}", url=visit_url)
             # Sempre volta para a lista de visitas (nao para o "next" generico de
             # voltar/cancelar da pagina) - e la que o botao "Relatorio de Visita"
             # aparece habilitado para o proximo passo.
             return redirect(get_visit_list_redirect(self.object.directorate))
         messages.success(request, "Rascunho salvo com sucesso.")
+        log_activity(request, self.object.directorate, "updated", "visit",
+                     f"Visita — {self.object.osc.name}", url=visit_url)
         return redirect(self.get_success_url())
 
     def get_success_url(self):

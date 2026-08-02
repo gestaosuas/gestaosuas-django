@@ -9,7 +9,7 @@ from django.views.generic import DetailView, FormView, TemplateView, View
 from django.utils import timezone
 
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
-from apps.core.mixins import TvTemplateMixin
+from apps.core.mixins import TvTemplateMixin, NarrativeReportMixin, NarrativeEditorMixin
 from apps.directorates.models import Directorate, MonthlyReport
 from apps.core.utils import (
     MONTH_LABELS, MONTH_OPTIONS, build_sparkline, build_column_points,
@@ -17,6 +17,7 @@ from apps.core.utils import (
     strip_accents
 )
 from apps.core.export import ExcelExportMixin, build_workbook
+from apps.core.notifications import log_activity
 from .models import CrasReport
 from .forms import CrasReportForm
 
@@ -264,17 +265,19 @@ class CrasCreateUpdateView(CrasBaseMixin, FormView):
         rma_file = form.cleaned_data.get("rma_file")
         if rma_file:
             import uuid as _uuid, os
-            from django.conf import settings
             from django.core.files.storage import default_storage
             ext = os.path.splitext(rma_file.name)[1]
             m = int(month_val)
             filename = f"rma/{directorate.pk}/{unit_name}/{year_val}_{m:02d}_{_uuid.uuid4().hex[:8]}{ext}"
             saved_path = default_storage.save(filename, rma_file)
-            report.rma_url = settings.MEDIA_URL + saved_path
+            report.rma_url = reverse("core:protected-media", kwargs={"file_path": saved_path})
             report.anexo_rma = rma_file.name
         report.updated_at = datetime.now()
         report.save()
         messages.success(self.request, f"Dados do CRAS {unit_name} salvos.")
+        log_activity(self.request, directorate, "created", "report",
+                     f"CRAS ({unit_name}) — {build_period_label(year_val, month_val)}",
+                     url=reverse("cras:data", kwargs={"pk": directorate.pk}) + f"?year={year_val}")
         return redirect(reverse("cras:home", kwargs={"pk": directorate.pk}) + f"?year={year_val}&month={month_val}&unit={unit_name}")
 
 
@@ -341,53 +344,61 @@ class CrasDataView(ExcelExportMixin, CrasBaseMixin, TemplateView):
         })
         return context
 
-class CrasMonthlyNarrativeView(CrasBaseMixin, TemplateView):
-    template_name = "cras/monthly_report.html"
+class CrasMonthlyNarrativeView(CrasBaseMixin, NarrativeReportMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_report.html"
+    setor = "cras"
+    allowed_roles = ["admin", "diretor", "agente"]
+
+    def get_editor_url(self, month, year):
+        directorate = self.get_directorate()
+        return f"{reverse('cras:narrative-editor', kwargs={'pk': directorate.pk})}?year={year}&month={month}"
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         directorate = self.get_directorate()
-        selected_year = self.get_year()
-        month_val = self.get_month_number()
-
-        # Agente vê só o próprio relatório; diretor/admin vêem todos da diretoria
-        qs = MonthlyReport.objects.filter(directorate=directorate, setor="cras", year=selected_year, month=month_val)
-        if self.is_agente():
-            qs = qs.filter(user_external_id=self.request.user.pk)
-        report = qs.first()
-
-        history_qs = MonthlyReport.objects.filter(directorate=directorate, setor="cras").order_by("-year", "-month")
-        if self.is_agente():
-            history_qs = history_qs.filter(user_external_id=self.request.user.pk)
-        history = history_qs[:8]
-
+        month = self.get_month_number()
+        year = self.get_year()
+        hist_year = int(self.request.GET.get("hist_year") or year)
+        context.update(self.get_narrative_context(month, year, hist_year))
         context.update({
-            "directorate": directorate,
-            "selected_year": selected_year,
-            "selected_month": month_val,
-            "monthly_report": report,
-            "history": history,
+            "report_label": "CRAS",
+            "theme_class": "theme-emerald",
+            "back_url": reverse("cras:home", kwargs={"pk": directorate.pk}) + f"?year={year}",
         })
         return context
 
-class CrasNarrativeListView(CrasBaseMixin, TemplateView):
-    template_name = "cras/reports.html"
+
+class CrasNarrativeEditorView(CrasBaseMixin, NarrativeEditorMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_editor.html"
+    setor = "cras"
+    allowed_roles = ["admin", "diretor", "agente"]
+
+    def get_view_url(self, month, year):
+        directorate = self.get_directorate()
+        return f"{reverse('cras:monthly-report', kwargs={'pk': directorate.pk})}?year={year}&month={month}"
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        directorate = self.get_directorate()
-        selected_year = self.get_year()
-        reports = MonthlyReport.objects.filter(directorate=directorate, setor="cras").order_by("-year", "-month")
-        if selected_year:
-            reports = reports.filter(year=selected_year)
-        # Agente vê só os próprios relatórios
-        if self.is_agente():
-            reports = reports.filter(user_external_id=self.request.user.pk)
+        month = self.get_month_number()
+        year = self.get_year()
+        context.update(self.get_editor_context(month, year))
         context.update({
-            "directorate": directorate,
-            "selected_year": selected_year,
-            "reports": reports,
-            "can_delete": self.is_admin(),
+            "report_label": "CRAS",
+            "theme_class": "theme-emerald",
+            "months_range": MONTH_OPTIONS,
+            "cancel_url": self.get_view_url(month, year),
         })
         return context
+
+    def post(self, request, *args, **kwargs):
+        month = int(request.POST.get("month"))
+        year = int(request.POST.get("year"))
+        directorate = self.save_narrative(request, month, year)
+        if directorate is not None:
+            log_activity(request, directorate, "finalized", "report",
+                         f"Relatorio Mensal CRAS {build_period_label(year, month)}",
+                         url=self.get_view_url(month, year))
+        return redirect(self.get_view_url(month, year))
 
 class CrasDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):
     allowed_roles = ["admin"]

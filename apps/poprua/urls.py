@@ -10,4 +10,6 @@ urlpatterns = [
     path('atualizar/', views.PopRuaUpdateView.as_view(), name='update_data'),
     path('atualizar/<uuid:pk>/', views.PopRuaUpdateView.as_view(), name='update_data_edit'),
     path('quick-edit/', views.PopRuaQuickEditView.as_view(), name='quick_edit'),
+    path('relatorio-mensal/', views.PopRuaMonthlyNarrativeView.as_view(), name='monthly-report'),
+    path('relatorio-mensal/editor/', views.PopRuaNarrativeEditorView.as_view(), name='narrative-editor'),
 ]

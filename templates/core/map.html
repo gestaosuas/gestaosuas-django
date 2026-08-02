@@ -270,10 +270,12 @@
                 Limpar
             </button>
 
+            {% if request.user.is_superuser or user_profile.role == 'admin' %}
             <a href="{% url 'core:map_management' %}" class="btn-manage">
                 <i data-lucide="settings" style="width: 12px;"></i>
                 Gerenciar Dados
             </a>
+            {% endif %}
         </section>
 
         <div class="map-frame-premium" id="mapFrame">

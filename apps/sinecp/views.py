@@ -8,15 +8,16 @@ from django.urls import reverse
 from django.views.generic import DetailView, FormView, TemplateView, View
 
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
-from apps.core.mixins import TvTemplateMixin
+from apps.core.mixins import TvTemplateMixin, NarrativeReportMixin, NarrativeEditorMixin
 from apps.directorates.models import Directorate, MonthlyReport
 from apps.core.export import ExcelExportMixin, build_workbook
+from apps.core.notifications import log_activity
 from apps.core.utils import (
     MONTH_LABELS, MONTH_LABELS as MONTH_LABELS_ARR, MONTH_OPTIONS,
     build_sparkline, build_column_points, build_period_label,
     build_year_range_from_years, build_variation, safe_total,
     build_series, current_or_total, sum_fields_by_month,
-    selected_or_total_fields, build_highlight_badge
+    selected_or_total_fields, build_highlight_badge,
 )
 from .models import SineReport, QualificacaoReport
 from .forms import SineReportForm, QualificacaoReportForm
@@ -271,6 +272,9 @@ class SineCreateUpdateView(SharedCreateUpdateView):
         report.updated_at = timezone.now()
         report.save()
         messages.success(self.request, "Dados salvos.")
+        log_activity(self.request, directorate, "created", "report",
+                     f"{self.report_title} — {build_period_label(year, month)}",
+                     url=reverse(self.success_view_name) + f"?year={year}")
         return redirect(reverse(self.success_view_name) + f"?year={year}")
 
 class QualificacaoCreateUpdateView(SharedCreateUpdateView):
@@ -294,6 +298,9 @@ class QualificacaoCreateUpdateView(SharedCreateUpdateView):
         report.updated_at = timezone.now()
         report.save()
         messages.success(self.request, "Dados salvos.")
+        log_activity(self.request, directorate, "created", "report",
+                     f"{self.report_title} — {build_period_label(year, month)}",
+                     url=reverse(self.success_view_name) + f"?year={year}")
         return redirect(reverse(self.success_view_name) + f"?year={year}")
 
 class SharedDataView(SineCpBaseMixin, TemplateView):
@@ -390,75 +397,80 @@ class QualificacaoDataView(ExcelExportMixin, SharedDataView):
             return blocked
         return super().get(request, *args, **kwargs)
 
-class SharedMonthlyNarrativeView(SineCpBaseMixin, TemplateView):
-    template_name = "sinecp/shared/monthly_report.html"
+SINECP_THEME_CLASS = "theme-indigo"
+
+
+class SharedMonthlyNarrativeView(SineCpBaseMixin, NarrativeReportMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_report.html"
+    allowed_roles = ["admin", "diretor", "agente"]
     setor = ""
     module_title = ""
     back_tab = "sine"
-    form_view_name = ""
+    editor_view_name = ""
+
+    def get_editor_url(self, month, year):
+        return f"{reverse(self.editor_view_name)}?year={year}&month={month}"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        directorate = self.get_directorate()
         selected_year = self.get_year()
         month = int(self.request.GET.get("month") or date.today().month)
-        qs = MonthlyReport.objects.filter(directorate=directorate, setor=self.setor, year=selected_year, month=month)
-        if self.is_agente():
-            qs = qs.filter(user_external_id=self.request.user.pk)
-        report = qs.first()
-        history_qs = MonthlyReport.objects.filter(directorate=directorate, setor=self.setor).order_by("-year", "-month")
-        if self.is_agente():
-            history_qs = history_qs.filter(user_external_id=self.request.user.pk)
-        history = history_qs[:8]
-        available_years = sorted(set(MonthlyReport.objects.filter(directorate=directorate, setor=self.setor).values_list("year", flat=True)), reverse=True)
+        hist_year = int(self.request.GET.get("hist_year") or selected_year)
+        context.update(self.get_narrative_context(month, selected_year, hist_year))
         context.update({
-            "directorate": directorate,
-            "selected_year": selected_year,
-            "selected_month": month,
-            "months_range": MONTH_OPTIONS,
-            "monthly_report": report,
-            "history": history,
-            "module_title": self.module_title,
+            "report_label": self.module_title,
+            "theme_class": SINECP_THEME_CLASS,
             "back_url": reverse("sinecp:home") + f"?tab={self.back_tab}&year={selected_year}",
-            "reports_url": reverse(self.form_view_name),
-            "years_range": build_year_range_from_years(available_years, selected_year),
         })
         return context
+
 
 class SineMonthlyNarrativeView(SharedMonthlyNarrativeView):
-    setor = "sine"; module_title = "SINE"; back_tab = "sine"; form_view_name = "sinecp:sine-reports"
+    setor = "sine"; module_title = "SINE"; back_tab = "sine"; editor_view_name = "sinecp:sine-narrative-editor"
 
 class QualificacaoMonthlyNarrativeView(SharedMonthlyNarrativeView):
-    setor = "centros"; module_title = "Qualificacao"; back_tab = "cp"; form_view_name = "sinecp:qualificacao-reports"
+    setor = "centros"; module_title = "Qualificacao"; back_tab = "cp"; editor_view_name = "sinecp:qualificacao-narrative-editor"
 
-class SharedNarrativeListView(SineCpBaseMixin, TemplateView):
-    template_name = "sinecp/shared/reports.html"
-    setor = ""; module_title = ""; back_tab = "sine"; monthly_view_name = ""
+
+class SharedNarrativeEditorView(SineCpBaseMixin, NarrativeEditorMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_editor.html"
+    allowed_roles = ["admin", "diretor", "agente"]
+    setor = ""
+    module_title = ""
+    monthly_view_name = ""
+
+    def get_view_url(self, month, year):
+        return f"{reverse(self.monthly_view_name)}?year={year}&month={month}"
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        directorate = self.get_directorate()
-        selected_year = self.get_year()
-        reports = MonthlyReport.objects.filter(directorate=directorate, setor=self.setor, year=selected_year).order_by("-year", "-month")
-        if self.is_agente():
-            reports = reports.filter(user_external_id=self.request.user.pk)
-        available_years = sorted(set(MonthlyReport.objects.filter(directorate=directorate, setor=self.setor).values_list("year", flat=True)), reverse=True)
+        month = int(self.request.GET.get("month") or date.today().month)
+        year = int(self.request.GET.get("year") or date.today().year)
+        context.update(self.get_editor_context(month, year))
         context.update({
-            "directorate": directorate,
-            "selected_year": selected_year,
-            "module_title": self.module_title,
-            "reports": reports,
-            "can_delete": self.is_admin(),
-            "back_url": reverse("sinecp:home") + f"?tab={self.back_tab}&year={selected_year}",
-            "monthly_report_base_url": reverse(self.monthly_view_name),
-            "years_range": build_year_range_from_years(available_years, selected_year),
+            "report_label": self.module_title,
+            "theme_class": SINECP_THEME_CLASS,
+            "months_range": MONTH_OPTIONS,
+            "cancel_url": self.get_view_url(month, year),
         })
         return context
 
-class SineNarrativeListView(SharedNarrativeListView):
-    setor = "sine"; module_title = "SINE"; back_tab = "sine"; monthly_view_name = "sinecp:sine-monthly-report"
+    def post(self, request, *args, **kwargs):
+        month = int(request.POST.get("month"))
+        year = int(request.POST.get("year"))
+        directorate = self.save_narrative(request, month, year)
+        if directorate is not None:
+            log_activity(request, directorate, "finalized", "report",
+                         f"Relatorio Mensal {self.module_title} {build_period_label(year, month)}",
+                         url=self.get_view_url(month, year))
+        return redirect(self.get_view_url(month, year))
 
-class QualificacaoNarrativeListView(SharedNarrativeListView):
-    setor = "centros"; module_title = "Qualificacao"; back_tab = "cp"; monthly_view_name = "sinecp:qualificacao-monthly-report"
+
+class SineNarrativeEditorView(SharedNarrativeEditorView):
+    setor = "sine"; module_title = "SINE"; monthly_view_name = "sinecp:sine-monthly-report"
+
+class QualificacaoNarrativeEditorView(SharedNarrativeEditorView):
+    setor = "centros"; module_title = "Qualificacao"; monthly_view_name = "sinecp:qualificacao-monthly-report"
 
 class SharedQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
     allowed_roles = ["admin"]

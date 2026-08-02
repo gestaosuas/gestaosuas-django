@@ -10,9 +10,10 @@ from apps.directorates.models import Directorate, MonthlyReport
 from apps.ceai.models import CeaiCategory, CeaiOficina, Submission
 from apps.ceai.constants import CEAI_UNITS, CEAI_FORM_DEFINITION, CONDOMINIO_IDOSO_FORM_DEFINITION
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
-from apps.core.mixins import TvTemplateMixin
-from apps.core.utils import MONTH_OPTIONS
+from apps.core.mixins import TvTemplateMixin, NarrativeReportMixin, NarrativeEditorMixin
+from apps.core.utils import MONTH_OPTIONS, build_period_label
 from apps.core.export import ExcelExportMixin, build_workbook
+from apps.core.notifications import log_activity
 
 
 class CeaiBaseMixin(DirectorateAccessMixin):
@@ -297,7 +298,10 @@ class CeaiUpdateDataView(CeaiBaseMixin, RoleRequiredMixin, View):
             data["_has_ceai"] = True
             submission.data = data
             submission.save()
-            
+
+        log_activity(request, directorate, "updated", "report",
+                     f"CEAI ({unit}) — {build_period_label(year, month)}",
+                     url=reverse("ceai:data_list") + f"?year={year}&unit={unit}")
         return redirect("ceai:dashboard")
 
 class CeaiCategoryApiView(CeaiBaseMixin, RoleRequiredMixin, View):
@@ -407,63 +411,60 @@ class CeaiCategoriesView(CeaiBaseMixin, RoleRequiredMixin, TemplateView):
         context["categories"] = CeaiCategory.objects.filter(unit=unit).order_by("name")
         return context
 
-class CeaiMonthlyNarrativeView(CeaiBaseMixin, RoleRequiredMixin, View):
-    template_name = "ceai/monthly_report.html"
+class CeaiMonthlyNarrativeView(CeaiBaseMixin, NarrativeReportMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_report.html"
+    setor = "ceai"
     allowed_roles = ["admin", "diretor", "agente"]
 
-    def get(self, request, pk):
-        # O pk da URL é ignorado de propósito: este relatório narrativo é
-        # sempre da diretoria fixa do CEAI (mesmo padrão das demais views
-        # deste módulo), nunca de uma diretoria arbitrária vinda da URL.
+    def get_editor_url(self, month, year):
         directorate = self.get_directorate()
-        month = int(request.GET.get("month", timezone.now().month))
-        year = int(request.GET.get("year", timezone.now().year))
-        
-        report = MonthlyReport.objects.filter(
-            directorate=directorate, 
-            setor="ceai", 
-            year=year, 
-            month=month
-        ).first()
-        
-        history = MonthlyReport.objects.filter(
-            directorate=directorate, 
-            setor="ceai"
-        ).order_by("-year", "-month")[:8]
-        
-        return render(request, self.template_name, {
-            "directorate": directorate,
-            "report": report,
-            "month": month,
-            "year": year,
-            "history": history,
-            "months_range": [
-                (1, "Janeiro"), (2, "Fevereiro"), (3, "Março"), (4, "Abril"),
-                (5, "Maio"), (6, "Junho"), (7, "Julho"), (8, "Agosto"),
-                (9, "Setembro"), (10, "Outubro"), (11, "Novembro"), (12, "Dezembro")
-            ],
-            "years_range": range(2023, timezone.now().year + 1)
-        })
+        return f"{reverse('ceai:narrative-editor', kwargs={'pk': directorate.pk})}?year={year}&month={month}"
 
-    def post(self, request, pk):
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        month = int(self.request.GET.get("month") or timezone.now().month)
+        year = int(self.request.GET.get("year") or timezone.now().year)
+        hist_year = int(self.request.GET.get("hist_year") or year)
+        context.update(self.get_narrative_context(month, year, hist_year))
+        context.update({
+            "report_label": "CEAI",
+            "theme_class": "theme-emerald",
+            "back_url": reverse("ceai:dashboard"),
+        })
+        return context
+
+
+class CeaiNarrativeEditorView(CeaiBaseMixin, NarrativeEditorMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_editor.html"
+    setor = "ceai"
+    allowed_roles = ["admin", "diretor", "agente"]
+
+    def get_view_url(self, month, year):
         directorate = self.get_directorate()
+        return f"{reverse('ceai:ceai_monthly_report', kwargs={'pk': directorate.pk})}?year={year}&month={month}"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        month = int(self.request.GET.get("month") or timezone.now().month)
+        year = int(self.request.GET.get("year") or timezone.now().year)
+        context.update(self.get_editor_context(month, year))
+        context.update({
+            "report_label": "CEAI",
+            "theme_class": "theme-emerald",
+            "months_range": MONTH_OPTIONS,
+            "cancel_url": self.get_view_url(month, year),
+        })
+        return context
+
+    def post(self, request, *args, **kwargs):
         month = int(request.POST.get("month"))
         year = int(request.POST.get("year"))
-        content = request.POST.get("content")
-        
-        MonthlyReport.objects.update_or_create(
-            directorate=directorate,
-            setor="ceai",
-            year=year,
-            month=month,
-            defaults={
-                "content": content,
-                "user_external_id": request.user.id,
-                "status": "finalized"
-            }
-        )
-
-        return redirect("ceai:dashboard")
+        directorate = self.save_narrative(request, month, year)
+        if directorate is not None:
+            log_activity(request, directorate, "finalized", "report",
+                         f"Relatório Mensal CEAI — {build_period_label(year, month)}",
+                         url=self.get_view_url(month, year))
+        return redirect(self.get_view_url(month, year))
 
 class CeaiDataListView(ExcelExportMixin, CeaiBaseMixin, RoleRequiredMixin, TemplateView):
     template_name = "ceai/data_list.html"
@@ -709,16 +710,3 @@ def safe_int(value):
             return int(float(value))
         except:
             return 0
-class CeaiReportsListView(CeaiBaseMixin, RoleRequiredMixin, TemplateView):
-    template_name = "ceai/reports.html"
-    allowed_roles = ["admin", "diretor", "agente"]
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        directorate = Directorate.objects.filter(name__icontains="CEAI").first()
-        context["directorate"] = directorate
-        context["reports"] = MonthlyReport.objects.filter(
-            directorate=directorate, 
-            setor="ceai"
-        ).order_by("-year", "-month")
-        return context

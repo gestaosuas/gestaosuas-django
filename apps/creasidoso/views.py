@@ -10,10 +10,12 @@ from django.urls import reverse
 from django.http import JsonResponse
 from django.utils import timezone
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
-from apps.core.mixins import TvTemplateMixin
+from apps.core.mixins import TvTemplateMixin, NarrativeReportMixin, NarrativeEditorMixin
 from apps.core.export import ExcelExportMixin, build_workbook
 from django.views.generic import DetailView, FormView, TemplateView, View
 from apps.core.export import ExcelExportMixin, build_workbook
+from apps.core.notifications import log_activity
+from apps.core.utils import build_period_label, MONTH_OPTIONS
 from apps.directorates.models import Directorate, MonthlyReport
 
 from .forms import CreasIdosoForm, CreasPcdForm, IDOSO_VIOLATION_PREFIXES, IDOSO_SUFFIXES, PCD_VIOLATION_PREFIXES, PCD_SUFFIXES
@@ -285,6 +287,9 @@ class CreasIdosoFormView(CreasBaseMixin, FormView):
         r.updated_at = timezone.now()
         r.save()
         messages.success(self.request, "Dados CREAS Idoso salvos.")
+        log_activity(self.request, d, "created", "report",
+                     f"CREAS Idoso — {build_period_label(year_val, month_val)}",
+                     url=reverse("creasidoso:data-idoso", kwargs={"pk": d.pk}) + f"?year={year_val}")
         return redirect(reverse("creasidoso:home", kwargs={"pk": d.pk}) + f"?year={year_val}")
 
 
@@ -346,6 +351,9 @@ class CreasPcdFormView(CreasBaseMixin, FormView):
         r.updated_at = timezone.now()
         r.save()
         messages.success(self.request, "Dados CREAS PCD salvos.")
+        log_activity(self.request, d, "created", "report",
+                     f"CREAS PCD — {build_period_label(year_val, month_val)}",
+                     url=reverse("creasidoso:data-pcd", kwargs={"pk": d.pk}) + f"?year={year_val}")
         return redirect(reverse("creasidoso:home", kwargs={"pk": d.pk}) + f"?year={year_val}")
 
 
@@ -477,40 +485,61 @@ class CreasPcdDataView(ExcelExportMixin, CreasBaseMixin, TemplateView):
         return ctx
 
 
-class CreasMonthlyNarrativeView(CreasBaseMixin, TemplateView):
-    template_name = "creasidoso/monthly_report.html"
+class CreasMonthlyNarrativeView(CreasBaseMixin, NarrativeReportMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_report.html"
+    setor = "creas"
+    allowed_roles = ["admin", "diretor", "agente"]
+
+    def get_editor_url(self, month, year):
+        d = self.get_directorate()
+        return f"{reverse('creasidoso:narrative-editor', kwargs={'pk': d.pk})}?year={year}&month={month}"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         d = self.get_directorate()
         year = self.get_year()
         m = self.get_month_number()
-        qs = MonthlyReport.objects.filter(directorate=d, setor="creas", year=year, month=m)
-        if self.is_agente():
-            qs = qs.filter(user_external_id=self.request.user.pk)
-        r = qs.first()
-        history_qs = MonthlyReport.objects.filter(directorate=d, setor="creas").order_by("-year", "-month")
-        if self.is_agente():
-            history_qs = history_qs.filter(user_external_id=self.request.user.pk)
-        history = history_qs[:8]
-        ctx.update({"directorate": d, "selected_year": year, "selected_month": m, "monthly_report": r, "history": history})
+        hist_year = int(self.request.GET.get("hist_year") or year)
+        ctx.update(self.get_narrative_context(m, year, hist_year))
+        ctx.update({
+            "report_label": "CREAS Idoso e Pessoa com Deficiência",
+            "theme_class": "theme-amber",
+            "back_url": reverse("creasidoso:home", kwargs={"pk": d.pk}) + f"?year={year}",
+        })
         return ctx
 
 
-class CreasNarrativeListView(CreasBaseMixin, TemplateView):
-    template_name = "creasidoso/reports.html"
+class CreasNarrativeEditorView(CreasBaseMixin, NarrativeEditorMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_editor.html"
+    setor = "creas"
+    allowed_roles = ["admin", "diretor", "agente"]
+
+    def get_view_url(self, month, year):
+        d = self.get_directorate()
+        return f"{reverse('creasidoso:monthly-report', kwargs={'pk': d.pk})}?year={year}&month={month}"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        d = self.get_directorate()
         year = self.get_year()
-        reports = MonthlyReport.objects.filter(directorate=d, setor="creas").order_by("-year", "-month")
-        if year:
-            reports = reports.filter(year=year)
-        if self.is_agente():
-            reports = reports.filter(user_external_id=self.request.user.pk)
-        ctx.update({"directorate": d, "selected_year": year, "reports": reports, "can_delete": self.is_admin()})
+        m = self.get_month_number()
+        ctx.update(self.get_editor_context(m, year))
+        ctx.update({
+            "report_label": "CREAS Idoso e Pessoa com Deficiência",
+            "theme_class": "theme-amber",
+            "months_range": MONTH_OPTIONS,
+            "cancel_url": self.get_view_url(m, year),
+        })
         return ctx
+
+    def post(self, request, *args, **kwargs):
+        month = int(request.POST.get("month"))
+        year = int(request.POST.get("year"))
+        directorate = self.save_narrative(request, month, year)
+        if directorate is not None:
+            log_activity(request, directorate, "finalized", "report",
+                         f"Relatorio Mensal CREAS Idoso e PCD {build_period_label(year, month)}",
+                         url=self.get_view_url(month, year))
+        return redirect(self.get_view_url(month, year))
 
 class CreasIdosoDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):
     allowed_roles = ["admin"]

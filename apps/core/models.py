@@ -59,6 +59,7 @@ class ActivityLog(TimeStampedUUIDModel):
     resource_type = models.CharField(max_length=120)
     resource_name = models.CharField(max_length=255, blank=True)
     details = models.JSONField(default=dict, blank=True)
+    read_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "activity_logs"

@@ -26,4 +26,8 @@ urlpatterns = [
     path("quick-edit/casa-da-mulher/", views.CasaDaMulherQuickEditView.as_view(), name="quick-edit-casa-da-mulher"),
     path("quick-edit/diversidade/", views.DiversidadeQuickEditView.as_view(), name="quick-edit-diversidade"),
     path("quick-edit/nucleo-diversidade/", views.NucleoDiversidadeQuickEditView.as_view(), name="quick-edit-nucleo-diversidade"),
+
+    # Monthly Narrative Reports
+    path("<dir_slug:pk>/relatorio-mensal/", views.CasaMulherMonthlyNarrativeView.as_view(), name="monthly-report"),
+    path("<dir_slug:pk>/relatorio-mensal/editor/", views.CasaMulherNarrativeEditorView.as_view(), name="narrative-editor"),
 ]

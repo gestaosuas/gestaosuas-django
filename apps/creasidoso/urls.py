@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     CreasHomeView, CreasIdosoFormView, CreasPcdFormView,
     CreasIdosoDataView, CreasPcdDataView,
-    CreasMonthlyNarrativeView, CreasNarrativeListView,
+    CreasMonthlyNarrativeView, CreasNarrativeEditorView,
     CreasIdosoQuickEditView, CreasPcdQuickEditView,
     CreasIdosoDeleteMonthView, CreasPcdDeleteMonthView
 )
@@ -22,5 +22,5 @@ urlpatterns = [
     path("<dir_slug:pk>/dados-pcd/", CreasPcdDataView.as_view(), name="data-pcd"),
     path("<dir_slug:pk>/dados-pcd/excluir-mes/", CreasPcdDeleteMonthView.as_view(), name="delete-month-pcd"),
     path("<dir_slug:pk>/relatorio-mensal/", CreasMonthlyNarrativeView.as_view(), name="monthly-report"),
-    path("<dir_slug:pk>/relatorios/", CreasNarrativeListView.as_view(), name="reports"),
+    path("<dir_slug:pk>/relatorio-mensal/editor/", CreasNarrativeEditorView.as_view(), name="narrative-editor"),
 ]

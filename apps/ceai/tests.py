@@ -135,12 +135,13 @@ class CeaiMonthlyNarrativeViewTests(CeaiTestDataMixin, TestCase):
         # update_or_create(defaults=...), que não existe como nome de campo
         # em MonthlyReport (o field se chama user_external_id, com
         # db_column="user_id") -- isso levantava TypeError. Este teste
-        # cobre a regressão.
+        # cobre a regressão. A criação/edição agora passa pelo editor
+        # (CeaiNarrativeEditorView), que grava content_html sanitizado.
         url = reverse(
-            "ceai:ceai_monthly_report", kwargs={"pk": self.other_directorate.pk}
+            "ceai:narrative-editor", kwargs={"pk": self.other_directorate.pk}
         )
         response = self.client.post(
-            url, {"month": 6, "year": 2024, "content": "Relatorio narrativo de teste CEAI"}
+            url, {"month": 6, "year": 2024, "content_html": "<p>Relatorio narrativo de teste CEAI</p>"}
         )
         self.assertEqual(response.status_code, 302)
 
@@ -149,20 +150,20 @@ class CeaiMonthlyNarrativeViewTests(CeaiTestDataMixin, TestCase):
         )
         self.assertEqual(report.user_external_id, self.legacy_admin.id)
         self.assertEqual(report.status, "finalized")
-        self.assertEqual(report.content, "Relatorio narrativo de teste CEAI")
+        self.assertEqual(report.content, "<p>Relatorio narrativo de teste CEAI</p>")
 
     def test_post_updates_existing_report_instead_of_duplicating(self):
         url = reverse(
-            "ceai:ceai_monthly_report", kwargs={"pk": self.ceai_directorate.pk}
+            "ceai:narrative-editor", kwargs={"pk": self.ceai_directorate.pk}
         )
-        self.client.post(url, {"month": 7, "year": 2024, "content": "Primeira versao"})
-        self.client.post(url, {"month": 7, "year": 2024, "content": "Versao atualizada"})
+        self.client.post(url, {"month": 7, "year": 2024, "content_html": "<p>Primeira versao</p>"})
+        self.client.post(url, {"month": 7, "year": 2024, "content_html": "<p>Versao atualizada</p>"})
 
         reports = MonthlyReport.objects.filter(
             directorate=self.ceai_directorate, setor="ceai", month=7, year=2024
         )
         self.assertEqual(reports.count(), 1)
-        self.assertEqual(reports.first().content, "Versao atualizada")
+        self.assertEqual(reports.first().content, "<p>Versao atualizada</p>")
 
 
 class CeaiSubmissionModelTests(CeaiTestDataMixin, TestCase):
@@ -250,10 +251,12 @@ class CeaiDashboardAndListViewsTests(CeaiTestDataMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("summary", response.context)
 
-    def test_reports_list_view(self):
-        response = self.client.get(reverse("ceai:reports"))
+    def test_monthly_report_view_includes_history(self):
+        url = reverse("ceai:ceai_monthly_report", kwargs={"pk": self.ceai_directorate.pk})
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["directorate"].pk, self.ceai_directorate.pk)
+        self.assertIn("history", response.context)
 
     def test_data_list_view(self):
         response = self.client.get(reverse("ceai:data_list"), {"year": 2025})

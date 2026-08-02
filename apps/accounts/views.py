@@ -1,11 +1,29 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic import ListView, UpdateView, View
 from django.shortcuts import redirect, get_object_or_404, render
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.contrib import messages
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.utils import timezone
+from apps.core.notifications import log_activity
 from .models import Profile, ProfileDirectorate, User
 from apps.directorates.models import Directorate
+
+
+def _localize_password_errors(error_messages):
+    """O catálogo pt-br vendorizado de django.contrib.auth (.deps/django)
+    não bate com a string atual do MinimumLengthValidator no Django 5.2.1
+    (msgid mudou de %(min_length)d pra %d entre versões, catálogo ficou
+    para trás) — a mensagem sai em inglês mesmo com LANGUAGE_CODE=pt-br.
+    Troca manual só desse caso pra manter a UI em português."""
+    translated = []
+    for msg in error_messages:
+        if msg.startswith("This password is too short"):
+            translated.append("Esta senha é muito curta. Ela precisa conter pelo menos 8 caracteres.")
+        else:
+            translated.append(msg)
+    return translated
 
 
 class AdminRequiredMixin(UserPassesTestMixin):
@@ -57,8 +75,13 @@ class UserCreateView(AdminRequiredMixin, View):
             errors.append("E-mail é obrigatório.")
         elif User.objects.filter(username=email).exists():
             errors.append("Já existe um usuário cadastrado com este e-mail.")
-        if len(password) < 8:
-            errors.append("A senha deve ter pelo menos 8 caracteres.")
+        if password:
+            try:
+                validate_password(password, user=User(username=email, email=email, first_name=full_name))
+            except ValidationError as e:
+                errors.extend(_localize_password_errors(e.messages))
+        else:
+            errors.append("Senha é obrigatória.")
         if role not in dict(Profile.ROLE_CHOICES):
             errors.append("Nível de acesso inválido.")
 
@@ -75,6 +98,8 @@ class UserCreateView(AdminRequiredMixin, View):
             primary_directorate_id=primary_directorate_id,
             created_at=timezone.now(),
         )
+        log_activity(request, None, "created", "user", f"Usuário {full_name} ({dict(Profile.ROLE_CHOICES).get(role, role)})",
+                     url=reverse("accounts:user_permissions", kwargs={"pk": profile.pk}))
         messages.success(request, f"Usuário {full_name} criado com sucesso!")
         return redirect("accounts:user_permissions", pk=profile.pk)
 
@@ -162,8 +187,11 @@ class UserPermissionsView(AdminRequiredMixin, UpdateView):
             # Handle password change (optional — blank keeps current password)
             new_password = request.POST.get("new_password", "").strip()
             if new_password:
-                if len(new_password) < 8:
-                    messages.error(request, "A senha deve ter pelo menos 8 caracteres. As demais alterações foram salvas.")
+                try:
+                    validate_password(new_password, user=profile.user)
+                except ValidationError as e:
+                    for msg in _localize_password_errors(e.messages):
+                        messages.error(request, f"{msg} As demais alterações foram salvas.")
                     has_error = True
                 else:
                     profile.user.set_password(new_password)
@@ -207,6 +235,9 @@ class UserPermissionsView(AdminRequiredMixin, UpdateView):
                     allowed_units=allowed_units
                 )
 
+            log_activity(request, None, "updated", "user",
+                         f"Permissões de {profile.full_name} ({profile.get_role_display()})",
+                         url=reverse("accounts:user_permissions", kwargs={"pk": profile.pk}))
             if not has_error:
                 messages.success(request, f"Permissões de {profile.full_name} atualizadas!")
             return self.form_valid(form)

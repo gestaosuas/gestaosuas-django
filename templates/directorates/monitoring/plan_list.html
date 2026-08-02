@@ -60,10 +60,10 @@
                                         onclick="openPlanObjectives(this)">
                                         <i data-lucide="list-checks"></i>
                                     </button>
+                                    {% if can_delete %}
                                     <a href="{% url 'directorates:plan-update' plan.pk %}" class="plan-icon-btn" title="Editar plano">
                                         <i data-lucide="pencil"></i>
                                     </a>
-                                    {% if can_delete %}
                                     <form action="{% url 'directorates:plan-delete' plan.pk %}" method="post" onsubmit="return confirm('Excluir plano {{ plan.title }}?')">
                                         {% csrf_token %}
                                         <button type="submit" class="plan-icon-btn danger" title="Excluir plano">
@@ -78,11 +78,13 @@
                             {% endfor %}
                         </div>
 
+                        {% if can_delete %}
                         <div class="plan-osc-actions">
                             <a href="{% url 'directorates:plan-create' directorate.pk %}?osc={{ osc.pk }}" class="plan-action-btn">
                                 <i data-lucide="plus"></i> Novo Plano
                             </a>
                         </div>
+                        {% endif %}
                         {% else %}
                         <div class="plan-osc-copy">
                             {% with latest_plan=osc.work_plans.all|first %}
@@ -103,18 +105,20 @@
                         </div>
 
                         <div class="plan-osc-actions">
+                        {% if can_delete %}
                         <a href="{% url 'directorates:plan-create' directorate.pk %}?osc={{ osc.pk }}" class="plan-action-btn">
                             <i data-lucide="plus"></i> Novo Plano
                         </a>
+                        {% endif %}
                         {% with latest_plan=osc.work_plans.all|first %}
                             {% if latest_plan %}
                             <button type="button" class="plan-icon-btn" title="Visualizar plano" onclick="openPlanPreview('{{ osc.pk }}')">
                                 <i data-lucide="eye"></i>
                             </button>
+                            {% if can_delete %}
                             <a href="{% url 'directorates:plan-update' latest_plan.pk %}" class="plan-icon-btn" title="Editar plano">
                                 <i data-lucide="pencil"></i>
                             </a>
-                            {% if can_delete %}
                             <form action="{% url 'directorates:plan-delete' latest_plan.pk %}" method="post" onsubmit="return confirm('Excluir plano {{ latest_plan.title }}?')">
                                 {% csrf_token %}
                                 <button type="submit" class="plan-icon-btn danger" title="Excluir plano">
@@ -132,9 +136,11 @@
                 <div class="plan-empty-shell">
                     <i data-lucide="building-x"></i>
                     <h2>Nenhuma OSC cadastrada</h2>
+                    {% if can_delete %}
                     <a href="{% url 'directorates:osc-create' directorate.pk %}" class="plan-primary-btn">
                         <i data-lucide="plus"></i> Cadastrar OSC
                     </a>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </section>

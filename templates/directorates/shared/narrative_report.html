@@ -1,0 +1,457 @@
+{% extends "base.html" %}
+
+{% block title %}Relatório Mensal — {{ report_label }} | {{ directorate.name }}{% endblock %}
+
+{% block body_class %}{{ theme_class|default:"theme-blue" }}{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+
+    <main class="dashboard-main narrative-main" style="padding-top:0;">
+        <div class="monitoring-header-container">
+            <div class="monitoring-header-content">
+                <div class="monitoring-title-area">
+                    <div style="display:flex;align-items:center;gap:20px;margin-bottom:10px;">
+                        <div style="width:50px;height:50px;background:white;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--nav-grad-start,#2563eb);">
+                            <i data-lucide="file-text" style="width:32px;height:32px;"></i>
+                        </div>
+                        <div>
+                            <h1>Relatório Narrativo Mensal</h1>
+                            <p style="margin:0;font-size:14px;opacity:0.9;">{{ report_label }} — Documento consolidado de atividades</p>
+                        </div>
+                    </div>
+                    <a href="{{ back_url }}" class="btn-ghost-white" style="margin-top:10px;display:inline-flex;">
+                        <i data-lucide="arrow-left"></i> Voltar para o painel
+                    </a>
+                </div>
+
+                <div class="monitoring-header-actions">
+                    <a href="{{ new_report_url }}" class="btn-primary-premium">
+                        <i data-lucide="plus"></i> Novo Relatório
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="narrative-split">
+            <aside class="narrative-sidebar">
+                <form method="get" class="narrative-year-filter">
+                    <input type="hidden" name="month" value="{{ selected_month }}">
+                    <input type="hidden" name="year" value="{{ selected_year }}">
+                    <label>Ano do histórico</label>
+                    <select name="hist_year" onchange="this.form.submit()" class="filter-select">
+                        {% for y in available_years %}
+                        <option value="{{ y }}" {% if y == history_year %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+
+                <div class="narrative-doc-list">
+                    {% for item in history %}
+                    <div class="narrative-doc-item {% if item.month == selected_month and item.year == selected_year %}active{% endif %}">
+                        <a href="?month={{ item.month }}&year={{ item.year }}&hist_year={{ history_year }}" class="narrative-doc-link">
+                            <i data-lucide="file-text"></i>
+                            <div class="narrative-doc-info">
+                                <strong>{{ item.month|stringformat:"02d" }}/{{ item.year }}</strong>
+                                <span class="narrative-doc-status status-{{ item.status }}">{{ item.get_status_display|default:item.status }}</span>
+                            </div>
+                        </a>
+                        {% if is_admin %}
+                        <div class="narrative-doc-admin-actions">
+                            <a href="{{ item.edit_url }}" class="narrative-doc-icon-btn" title="Editar">
+                                <i data-lucide="pencil"></i>
+                            </a>
+                            <form method="post" action="{% url 'core:narrative-report-delete' %}" class="narrative-doc-delete-form"
+                                  onsubmit="return confirm('Excluir o relatório de {{ item.month|stringformat:"02d" }}/{{ item.year }}? Essa ação não pode ser desfeita.');">
+                                {% csrf_token %}
+                                <input type="hidden" name="report_id" value="{{ item.pk }}">
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <button type="submit" class="narrative-doc-icon-btn narrative-doc-icon-btn-danger" title="Excluir">
+                                    <i data-lucide="trash-2"></i>
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <p class="narrative-empty-list">Nenhum relatório em {{ history_year }}.</p>
+                    {% endfor %}
+                </div>
+            </aside>
+
+            <section class="narrative-content-panel">
+                <div class="narrative-content-header">
+                    <h2>
+                        {% if monthly_report %}
+                            Relatório {{ selected_month|stringformat:"02d" }}/{{ selected_year }}
+                        {% else %}
+                            Sem relatório em {{ selected_month|stringformat:"02d" }}/{{ selected_year }}
+                        {% endif %}
+                    </h2>
+                    {% if monthly_report %}
+                    <div class="narrative-content-actions">
+                        <span class="narrative-doc-status status-{{ monthly_report.status }}">{{ monthly_report.get_status_display|default:monthly_report.status }}</span>
+                        <button type="button" onclick="window.print()" class="btn-ghost-action">
+                            <i data-lucide="printer"></i> Imprimir
+                        </button>
+                        {% if is_admin %}
+                        <a href="{{ editor_url }}" class="btn-ghost-action">
+                            <i data-lucide="pencil"></i> Editar
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="narrative-content-scroll" id="narrative-print-area">
+                    <div class="narrative-print-header">
+                        <img src="{{ logo_url }}" alt="Logo" class="narrative-print-logo">
+                        <div class="narrative-print-heading">
+                            <strong>{{ directorate.name }}</strong>
+                            <span>{{ report_label }} — Relatório Mensal {{ selected_month|stringformat:"02d" }}/{{ selected_year }}</span>
+                        </div>
+                    </div>
+                    {% if monthly_report and report_content_html %}
+                        <div class="narrative-rich-content">{{ report_content_html|safe }}</div>
+                    {% else %}
+                        <div class="narrative-empty-state">
+                            <i data-lucide="file-x" style="width:48px;height:48px;color:#94a3b8;margin-bottom:16px;"></i>
+                            <p>Nenhum documento para este período.</p>
+                            {% if can_edit %}
+                            <a href="{{ editor_url }}" class="btn-primary-premium">
+                                <i data-lucide="plus"></i> Criar Relatório
+                            </a>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </main>
+</div>
+
+<style>
+    .narrative-split {
+        display: flex;
+        gap: 20px;
+        flex: 1;
+        min-height: 0;
+        padding: 20px;
+        align-items: stretch;
+    }
+
+    .narrative-sidebar {
+        width: 300px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        padding: 18px;
+        max-height: calc(100vh - 220px);
+    }
+
+    .narrative-year-filter {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .narrative-year-filter label {
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+    }
+
+    .narrative-doc-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow-y: auto;
+        flex: 1;
+        min-height: 0;
+    }
+
+    .narrative-empty-list {
+        color: #94a3b8;
+        font-size: 13px;
+        text-align: center;
+        padding: 20px 8px;
+    }
+
+    .narrative-doc-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px;
+        border-radius: 12px;
+        border: 1px solid transparent;
+        background: #f8fafc;
+        transition: all .15s;
+    }
+
+    .narrative-doc-item:hover {
+        border-color: #cbd5e1;
+    }
+
+    .narrative-doc-item.active {
+        background: #eff6ff;
+        border-color: #3b82f6;
+    }
+
+    .narrative-doc-link {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px;
+        flex: 1;
+        min-width: 0;
+        text-decoration: none;
+        color: #475569;
+    }
+
+    .narrative-doc-item.active .narrative-doc-link { color: #1d4ed8; }
+
+    .narrative-doc-link i { width: 16px; height: 16px; flex-shrink: 0; }
+
+    .narrative-doc-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .narrative-doc-info strong { font-size: 13px; }
+
+    .narrative-doc-admin-actions {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        flex-shrink: 0;
+    }
+
+    .narrative-doc-delete-form { display: contents; }
+
+    .narrative-doc-icon-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        border: none;
+        background: transparent;
+        color: #94a3b8;
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+    .narrative-doc-icon-btn:hover { background: #e2e8f0; color: #334155; }
+    .narrative-doc-icon-btn i { width: 14px; height: 14px; }
+    .narrative-doc-icon-btn-danger:hover { background: #fee2e2; color: #dc2626; }
+
+    .narrative-doc-status {
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        width: fit-content;
+        padding: 2px 8px;
+        border-radius: 20px;
+    }
+
+    .narrative-doc-status.status-finalized { background: #dcfce7; color: #166534; }
+    .narrative-doc-status.status-draft { background: #fef9c3; color: #854d0e; }
+    .narrative-doc-status.status-submitted { background: #dbeafe; color: #1e40af; }
+
+    .narrative-content-panel {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        overflow: hidden;
+        max-height: calc(100vh - 220px);
+    }
+
+    .narrative-content-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 20px 28px;
+        border-bottom: 1px solid #f1f5f9;
+        flex-shrink: 0;
+    }
+
+    .narrative-content-header h2 {
+        font-size: 20px;
+        color: #1e293b;
+        margin: 0;
+    }
+
+    .narrative-content-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .btn-ghost-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        color: #334155;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 8px 14px;
+        border-radius: 10px;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .btn-ghost-action:hover { border-color: #cbd5e1; background: #fff; }
+    .btn-ghost-action i { width: 14px; height: 14px; }
+
+    .narrative-content-scroll {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 28px 32px;
+    }
+
+    /* Cabeçalho com logo — só aparece na impressão (ver @media print) */
+    .narrative-print-header {
+        display: none;
+    }
+
+    .narrative-rich-content {
+        line-height: 1.85;
+        color: #334155;
+        font-size: 15.5px;
+        max-width: 900px;
+        letter-spacing: 0.1px;
+    }
+
+    .narrative-rich-content p { margin: 0 0 16px; }
+    .narrative-rich-content h1, .narrative-rich-content h2, .narrative-rich-content h3,
+    .narrative-rich-content h4, .narrative-rich-content h5, .narrative-rich-content h6 {
+        color: #0f172a;
+        font-weight: 800;
+        margin: 28px 0 12px;
+        line-height: 1.35;
+    }
+    .narrative-rich-content h1 { font-size: 24px; }
+    .narrative-rich-content h2 { font-size: 20px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; }
+    .narrative-rich-content h3 { font-size: 17px; }
+    .narrative-rich-content > *:first-child { margin-top: 0; }
+    .narrative-rich-content strong { color: #0f172a; font-weight: 700; }
+    .narrative-rich-content ul, .narrative-rich-content ol { margin: 0 0 16px; padding-left: 26px; }
+    .narrative-rich-content li { margin-bottom: 6px; }
+    .narrative-rich-content table {
+        border-collapse: collapse;
+        margin: 18px 0;
+        width: 100%;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .narrative-rich-content table td, .narrative-rich-content table th {
+        border: 1px solid #e2e8f0;
+        padding: 10px 14px;
+    }
+    .narrative-rich-content table th {
+        background: #f8fafc;
+        font-weight: 700;
+        text-align: left;
+        color: #1e293b;
+    }
+    .narrative-rich-content blockquote {
+        border-left: 4px solid #cbd5e1;
+        margin: 18px 0;
+        padding: 4px 18px;
+        color: #475569;
+        font-style: italic;
+        background: #f8fafc;
+        border-radius: 0 10px 10px 0;
+    }
+    .narrative-rich-content a { color: #2563eb; text-decoration: underline; }
+
+    .narrative-empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .narrative-empty-state p { color: #64748b; font-size: 14px; margin: 0; }
+
+    @media (max-width: 900px) {
+        .narrative-split { flex-direction: column; }
+        .narrative-sidebar { width: auto; max-height: 280px; }
+        .narrative-content-panel { max-height: none; }
+    }
+
+    @media print {
+        @page {
+            margin: 18mm 16mm;
+        }
+
+        body, .narrative-content-scroll, .narrative-rich-content {
+            color: #111827 !important;
+        }
+
+        .navbar, .monitoring-header-container, .narrative-sidebar, .narrative-content-header,
+        #globalToastStack { display: none !important; }
+
+        .narrative-split { display: block; padding: 0; }
+        .narrative-content-panel { border: none; max-height: none; overflow: visible; box-shadow: none; }
+        .narrative-content-scroll { overflow: visible; padding: 0; }
+
+        /* Cabecalho impresso: logo da navbar + nome da diretoria, pedido do usuario */
+        .narrative-print-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding-bottom: 14px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #1e293b;
+            break-after: avoid;
+            break-inside: avoid;
+        }
+        .narrative-print-logo { height: 42px; width: auto; object-fit: contain; }
+        .narrative-print-heading { display: flex; flex-direction: column; gap: 2px; }
+        .narrative-print-heading strong { font-size: 16px; color: #0f172a; }
+        .narrative-print-heading span { font-size: 12px; color: #475569; }
+
+        /* Nunca quebrar tabela, cabecalho ou item de lista no meio, e manter
+           titulo colado ao paragrafo/tabela que vem logo em seguida --
+           pedido explicito do usuario. */
+        .narrative-rich-content table,
+        .narrative-rich-content tr,
+        .narrative-rich-content li,
+        .narrative-rich-content blockquote {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+        .narrative-rich-content h1, .narrative-rich-content h2, .narrative-rich-content h3,
+        .narrative-rich-content h4, .narrative-rich-content h5, .narrative-rich-content h6 {
+            break-after: avoid;
+            page-break-after: avoid;
+        }
+        .narrative-rich-content table thead {
+            display: table-header-group;
+        }
+    }
+</style>
+{% endblock %}

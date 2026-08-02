@@ -7,13 +7,14 @@ from django.urls import reverse
 from django.views.generic import DetailView, FormView, TemplateView, View
 from django.http import JsonResponse
 from apps.accounts.mixins import RoleRequiredMixin, DirectorateAccessMixin
-from apps.core.mixins import TvTemplateMixin
+from apps.core.mixins import TvTemplateMixin, NarrativeReportMixin, NarrativeEditorMixin
 from apps.core.export import ExcelExportMixin, build_workbook
+from apps.core.notifications import log_activity
 
 from apps.directorates.models import Directorate, MonthlyReport
 from apps.core.utils import (
     MONTH_LABELS, MONTH_OPTIONS, build_sparkline, build_column_points,
-    build_period_label, build_year_range_from_years, build_variation
+    build_period_label, build_year_range_from_years, build_variation,
 )
 from .models import NaicaReport
 from .forms import NaicaReportForm
@@ -285,6 +286,9 @@ class NaicaCreateUpdateView(NaicaBaseMixin, FormView):
         report.user_id = self.request.user.pk
         report.save()
         messages.success(self.request, f"Dados do NAICA {unit_name} salvos com sucesso.")
+        log_activity(self.request, directorate, "created", "report",
+                     f"NAICA ({unit_name}) — {build_period_label(year_val, month_val)}",
+                     url=reverse("naica:data", kwargs={"pk": directorate.pk}) + f"?year={year_val}")
         return redirect(
             reverse("naica:home", kwargs={"pk": directorate.pk})
             + f"?year={year_val}&month={month_val}&unit={unit_name}"
@@ -366,64 +370,61 @@ class NaicaDataView(ExcelExportMixin, NaicaBaseMixin, TemplateView):
         return build_workbook(sheets, self.export_filename)
 
 
-class NaicaMonthlyNarrativeView(NaicaBaseMixin, TemplateView):
-    template_name = "naica/monthly_report.html"
+class NaicaMonthlyNarrativeView(NaicaBaseMixin, NarrativeReportMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_report.html"
+    setor = "naica"
+    allowed_roles = ["admin", "diretor", "agente"]
+
+    def get_editor_url(self, month, year):
+        directorate = self.get_directorate()
+        return f"{reverse('naica:narrative-editor', kwargs={'pk': directorate.pk})}?year={year}&month={month}"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         directorate = self.get_directorate()
-        selected_year = self.get_year()
-        month_val = self.get_month_number()
-        qs = MonthlyReport.objects.filter(
-            directorate=directorate,
-            setor="naica",
-            year=selected_year,
-            month=month_val,
-        )
-        if self.is_agente():
-            qs = qs.filter(user_external_id=self.request.user.pk)
-        report = qs.first()
-
-        history_qs = MonthlyReport.objects.filter(directorate=directorate, setor="naica").order_by("-year", "-month", "-created_at")
-        if self.is_agente():
-            history_qs = history_qs.filter(user_external_id=self.request.user.pk)
-        history = history_qs[:8]
-
+        month = self.get_month_number()
+        year = self.get_year()
+        hist_year = int(self.request.GET.get("hist_year") or year)
+        context.update(self.get_narrative_context(month, year, hist_year))
         context.update({
-            "directorate": directorate,
-            "selected_year": selected_year,
-            "selected_month": month_val,
-            "monthly_report": report,
-            "history": history,
-            "back_url": reverse("naica:home", kwargs={"pk": directorate.pk}) + f"?year={selected_year}",
+            "report_label": "NAICA",
+            "theme_class": "theme-indigo",
+            "back_url": reverse("naica:home", kwargs={"pk": directorate.pk}) + f"?year={year}",
         })
         return context
 
 
-class NaicaNarrativeListView(NaicaBaseMixin, TemplateView):
-    template_name = "naica/reports.html"
+class NaicaNarrativeEditorView(NaicaBaseMixin, NarrativeEditorMixin, RoleRequiredMixin, TemplateView):
+    template_name = "directorates/shared/narrative_editor.html"
+    setor = "naica"
+    allowed_roles = ["admin", "diretor", "agente"]
+
+    def get_view_url(self, month, year):
+        directorate = self.get_directorate()
+        return f"{reverse('naica:monthly-report', kwargs={'pk': directorate.pk})}?year={year}&month={month}"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        directorate = self.get_directorate()
-        selected_year = self.get_year()
-        reports = MonthlyReport.objects.filter(
-            directorate=directorate,
-            setor="naica",
-        ).order_by("-year", "-month", "-created_at")
-        if selected_year:
-            reports = reports.filter(year=selected_year)
-        if self.is_agente():
-            reports = reports.filter(user_external_id=self.request.user.pk)
+        month = self.get_month_number()
+        year = self.get_year()
+        context.update(self.get_editor_context(month, year))
         context.update({
-            "directorate": directorate,
-            "selected_year": selected_year,
-            "reports": reports,
-            "can_delete": self.is_admin(),
-            "back_url": reverse("naica:home", kwargs={"pk": directorate.pk}) + f"?year={selected_year}",
-            "monthly_report_base_url": reverse("naica:monthly-report", kwargs={"pk": directorate.pk}),
+            "report_label": "NAICA",
+            "theme_class": "theme-indigo",
+            "months_range": MONTH_OPTIONS,
+            "cancel_url": self.get_view_url(month, year),
         })
         return context
+
+    def post(self, request, *args, **kwargs):
+        month = int(request.POST.get("month"))
+        year = int(request.POST.get("year"))
+        directorate = self.save_narrative(request, month, year)
+        if directorate is not None:
+            log_activity(request, directorate, "finalized", "report",
+                         f"Relatorio Mensal NAICA {build_period_label(year, month)}",
+                         url=self.get_view_url(month, year))
+        return redirect(self.get_view_url(month, year))
 
 class NaicaDeleteMonthView(LoginRequiredMixin, RoleRequiredMixin, View):
     allowed_roles = ["admin"]

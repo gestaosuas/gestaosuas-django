@@ -66,6 +66,45 @@ class LoginViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
+class LoginLockoutTests(TestCase):
+    """LockoutModelBackend (apps/accounts/backends.py, 2026-07-29): trava
+    login por username após MAX_ATTEMPTS falhas seguidas, mesmo se a senha
+    certa vier depois; reseta o contador em qualquer sucesso."""
+
+    def setUp(self):
+        from django.core.cache import cache
+        self.email = f"lockout-{uuid.uuid4().hex[:8]}@example.com"
+        self.password = "senha12345"
+        self.user, self.profile = make_user(email=self.email, password=self.password)
+        self.addCleanup(cache.delete, f"login_attempts:{self.email.lower()}")
+
+    def _attempt(self, password):
+        return self.client.post(
+            reverse("accounts:login"),
+            {"username": self.email, "password": password},
+        )
+
+    def test_sixth_attempt_blocked_even_with_correct_password(self):
+        from apps.accounts.backends import MAX_ATTEMPTS
+        for _ in range(MAX_ATTEMPTS):
+            self._attempt("senha-errada")
+        response = self._attempt(self.password)
+        self.assertIsNone(self.client.session.get("_auth_user_id"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_successful_login_before_limit_resets_counter(self):
+        for _ in range(2):
+            self._attempt("senha-errada")
+        response = self._attempt(self.password)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(str(self.client.session.get("_auth_user_id")), str(self.user.pk))
+
+        self.client.logout()
+        response = self._attempt(self.password)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(str(self.client.session.get("_auth_user_id")), str(self.user.pk))
+
+
 class LogoutViewTests(TestCase):
     def setUp(self):
         self.email = f"logout-{uuid.uuid4().hex[:8]}@example.com"
@@ -190,6 +229,27 @@ class UserCreateViewTests(TestCase):
         self.assertRedirects(
             response, reverse("accounts:user_permissions", kwargs={"pk": created_profile.pk})
         )
+
+    def test_admin_creates_user_generates_unread_notification(self):
+        """log_activity() adicionado em UserCreateView.post() (2026-07-29) —
+        criação de usuário passa a aparecer no sino de notificações do admin."""
+        self._login_admin()
+        new_email = f"audit-{uuid.uuid4().hex[:8]}@example.com"
+        self.client.post(
+            reverse("accounts:user_create"),
+            {
+                "full_name": "Ciclana de Tal",
+                "email": new_email,
+                "password": "senhaforte123",
+                "role": Profile.ROLE_AGENTE,
+                "primary_directorate": str(self.directorate.pk),
+            },
+        )
+        response = self.client.get(reverse("core:notifications-unread"))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        messages_text = " ".join(item["message"] for item in data["items"])
+        self.assertIn("Ciclana de Tal", messages_text)
 
     def test_create_user_missing_full_name_shows_error_and_does_not_create(self):
         self._login_admin()

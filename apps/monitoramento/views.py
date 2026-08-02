@@ -14,6 +14,7 @@ from django.views.generic import DetailView, FormView, TemplateView, View
 from apps.accounts.mixins import DirectorateAccessMixin, RoleRequiredMixin
 from apps.accounts.models import Profile, ProfileDirectorate
 from apps.core.export import ExcelExportMixin, build_workbook
+from apps.core.notifications import log_activity
 from apps.directorates.models import Directorate, FormDelegation, MonthlyReport, Osc, Visit, WorkPlan
 from apps.directorates.forms import OscForm
 from apps.directorates.views import get_monitoramento_theme
@@ -372,6 +373,9 @@ class MonitoramentoFormView(MonitoramentoBaseMixin, FormView):
         report.payload = form.cleaned_data
         report.save()
         messages.success(self.request, "Dados salvos com sucesso.")
+        log_activity(self.request, directorate, "created", "report",
+                     f"Indicadores — {build_period_label(year, month)}",
+                     url=reverse("monitoramento:data", kwargs={"pk": directorate.pk}) + f"?year={year}")
         return redirect(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + f"?year={year}")
 
 
