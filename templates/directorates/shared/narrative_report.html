@@ -92,9 +92,9 @@
                     {% if monthly_report %}
                     <div class="narrative-content-actions">
                         <span class="narrative-doc-status status-{{ monthly_report.status }}">{{ monthly_report.get_status_display|default:monthly_report.status }}</span>
-                        <button type="button" onclick="window.print()" class="btn-ghost-action">
+                        <a href="?{{ request.GET.urlencode }}&export=pdf" target="_blank" class="btn-ghost-action">
                             <i data-lucide="printer"></i> Imprimir
-                        </button>
+                        </a>
                         {% if is_admin %}
                         <a href="{{ editor_url }}" class="btn-ghost-action">
                             <i data-lucide="pencil"></i> Editar

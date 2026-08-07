@@ -26,6 +26,14 @@ class NarrativeReportMixin:
     def get_editor_url(self, month, year):
         raise NotImplementedError("Subclasse deve implementar get_editor_url(month, year)")
 
+    def get(self, request, *args, **kwargs):
+        if request.GET.get("export") == "pdf":
+            from apps.core.pdf import render_narrative_report_pdf
+
+            context = self.get_context_data(**kwargs)
+            return render_narrative_report_pdf(context)
+        return super().get(request, *args, **kwargs)
+
     def get_narrative_context(self, month, year, history_year=None):
         from datetime import date
         from apps.core.utils import extract_report_html

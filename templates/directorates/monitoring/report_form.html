@@ -20,13 +20,19 @@
                 <i data-lucide="arrow-left" style="width: 16px; height: 16px;"></i> Voltar
             </a>
             
+            {% if report_type == 'relatorio_final' or report_type == 'parecer_conclusivo' %}
+            <a href="?export=pdf" target="_blank" class="btn-premium-secondary" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #1e3a8a; border: none; background: white; text-decoration: none; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+                <i data-lucide="eye" style="width: 16px; height: 16px;"></i> Visualizar
+            </a>
+            {% else %}
             <button type="button" class="btn-premium-secondary" id="previewBtn" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #1e3a8a; border: none; background: white; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
                 <i data-lucide="eye" style="width: 16px; height: 16px;"></i> Visualizar
             </button>
+            {% endif %}
 
-            <button type="button" class="btn-premium-secondary" onclick="window.print()" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: white; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.1); cursor: pointer; transition: all 0.2s;">
+            <a href="?export=pdf" target="_blank" class="btn-premium-secondary" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: white; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.1); text-decoration: none; transition: all 0.2s;">
                 <i data-lucide="printer" style="width: 16px; height: 16px;"></i> Imprimir
-            </button>
+            </a>
 
             {% if report_data.status != 'finalized' and can_edit != False %}
                 <button type="button" class="btn-premium-primary" id="saveDraftBtn" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: white; border: none; background: #eab308; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(234, 179, 8, 0.2);">
@@ -83,29 +89,29 @@
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
                             <div style="grid-column: span 2;">
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">OSC parceira</label>
-                                <input type="text" id="osc_name" value="{{ report_data.osc_name }}" readonly style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; background-color: #f8fafc; color: #0f172a;">
+                                <input type="text" id="osc_name" value="{{ report_data.osc_name }}" readonly class="doc-field">
                             </div>
                             <div>
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">CNPJ</label>
-                                <input type="text" id="cnpj" value="{{ report_data.cnpj|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                                <input type="text" id="cnpj" value="{{ report_data.cnpj|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-field">
                             </div>
                             {% if not is_subvencao %}
                             <div>
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Recurso</label>
-                                <input type="text" id="emenda" value="{{ report_data.emenda|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                                <input type="text" id="emenda" value="{{ report_data.emenda|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-field">
                             </div>
                             {% endif %}
                             <div>
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Nº Termo</label>
-                                <input type="text" id="termo_fomento" value="{{ report_data.termo_fomento|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                                <input type="text" id="termo_fomento" value="{{ report_data.termo_fomento|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-field">
                             </div>
                             <div>
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Vigência</label>
-                                <input type="text" id="vigencia" value="{{ report_data.vigencia|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                                <input type="text" id="vigencia" value="{{ report_data.vigencia|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-field">
                             </div>
                             <div style="grid-column: span 2;">
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Valor autorizado por lei e repassado</label>
-                                <input type="text" id="valor_autorizado" value="{{ report_data.valor_autorizado|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                                <input type="text" id="valor_autorizado" value="{{ report_data.valor_autorizado|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-field">
                             </div>
                         </div>
                     </section>
@@ -113,13 +119,13 @@
                     <!-- Section 2: OBJETO DO RELATÓRIO -->
                     <section>
                         <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">2. OBJETO DO RELATÓRIO</h3>
-                        <textarea id="objeto_relatorio" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.objeto_relatorio }}</textarea>
+                        <textarea id="objeto_relatorio" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.objeto_relatorio }}</textarea>
                     </section>
 
                     <!-- Section 3: REFERÊNCIAS -->
                     <section>
                         <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">3. REFERÊNCIAS</h3>
-                        <textarea id="referencias" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 80px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.referencias }}</textarea>
+                        <textarea id="referencias" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.referencias }}</textarea>
                     </section>
 
                     <!-- Section 4: DESCRIÇÃO DOS OBJETIVOS, METAS PREVISTAS E EXECUÇÃO FINANCEIRA -->
@@ -127,37 +133,37 @@
                         <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 0px; letter-spacing: 0.05em;">4. DESCRIÇÃO DOS OBJETIVOS, METAS PREVISTAS E EXECUÇÃO FINANCEIRA</h3>
                         <div>
                             <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">a) Dos objetivos:</label>
-                            <textarea id="objetivos" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.objetivos }}</textarea>
+                            <textarea id="objetivos" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.objetivos }}</textarea>
                         </div>
                         <div>
                             <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">b) Das metas estabelecidas:</label>
-                            <textarea id="metas" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.metas }}</textarea>
+                            <textarea id="metas" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.metas }}</textarea>
                         </div>
                         <div style="margin-left: 20px;">
                             <label style="font-size: 11px; font-weight: 800; color: #475569; display: block; margin-bottom: 6px;">Quantitativas:</label>
-                            <textarea id="metas_quantitativas" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 80px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.metas_quantitativas }}</textarea>
+                            <textarea id="metas_quantitativas" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.metas_quantitativas }}</textarea>
                         </div>
                         <div>
                             <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">c) Dos resultados:</label>
-                            <textarea id="resultados" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.resultados }}</textarea>
+                            <textarea id="resultados" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.resultados }}</textarea>
                         </div>
                         <div>
                             <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">e) Da execução financeira e análise dos documentos comprobatórios das despesas:</label>
-                            <textarea id="execucao_financeira" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 120px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.execucao_financeira }}</textarea>
+                            <textarea id="execucao_financeira" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.execucao_financeira }}</textarea>
                         </div>
                     </section>
 
                     <!-- Section 5: CUMPRIMENTO DO OBJETO -->
                     <section>
                         <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">5. CUMPRIMENTO DO OBJETO</h3>
-                        <textarea id="cumprimento_objeto_final" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;">{{ report_data.cumprimento_objeto_final }}</textarea>
+                        <textarea id="cumprimento_objeto_final" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.cumprimento_objeto_final }}</textarea>
                     </section>
 
                     {% if is_subvencao %}
                     <!-- Section 6: CONCLUSÃO (somente Subvenção) -->
                     <section>
                         <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">6. CONCLUSÃO</h3>
-                        <textarea id="conclusao" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 120px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;" placeholder="Digite a conclusão...">{{ report_data.conclusao }}</textarea>
+                        <textarea id="conclusao" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea" placeholder="Digite a conclusão...">{{ report_data.conclusao }}</textarea>
                     </section>
                     {% endif %}
 
@@ -180,7 +186,7 @@
                                         <button type="button" onclick="clearSignature('tecnico')" style="background: transparent; border: none; color: #ef4444; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Limpar</button>
                                         <button type="button" onclick="saveIndividualSignature('tecnico')" style="background: transparent; border: none; color: #2563eb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="save" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Salvar Assinatura</button>
                                     </div>
-                                    <input type="text" id="tecnico-nome" value="{{ report_data.tecnico_nome|default:'' }}" placeholder="NOME DO TÉCNICO" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 11.5px; font-weight: 700; text-align: center; text-transform: uppercase;">
+                                    <input type="text" id="tecnico-nome" value="{{ report_data.tecnico_nome|default:'' }}" placeholder="NOME DO TÉCNICO" class="doc-field">
                                 {% else %}
                                     <div style="height: 100px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #0f172a; width: 100%; margin-bottom: 6px;">
                                         {% if report_data.signature_tecnico %}
@@ -206,7 +212,7 @@
                                         <button type="button" onclick="clearSignature('financeiro')" style="background: transparent; border: none; color: #ef4444; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Limpar</button>
                                         <button type="button" onclick="saveIndividualSignature('financeiro')" style="background: transparent; border: none; color: #2563eb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="save" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Salvar Assinatura</button>
                                     </div>
-                                    <input type="text" id="financeiro-nome" value="{{ report_data.financeiro_nome|default:'' }}" placeholder="NOME DO TÉCNICO FINANCEIRO" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 11.5px; font-weight: 700; text-align: center; text-transform: uppercase;">
+                                    <input type="text" id="financeiro-nome" value="{{ report_data.financeiro_nome|default:'' }}" placeholder="NOME DO TÉCNICO FINANCEIRO" class="doc-field">
                                 {% else %}
                                     <div style="height: 100px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #0f172a; width: 100%; margin-bottom: 6px;">
                                         {% if report_data.signature_financeiro %}
@@ -224,7 +230,7 @@
                         <!-- Homologação da Comissão -->
                         <div style="border-top: 2px dashed #cbd5e1; padding-top: 30px; margin-top: 40px; display: flex; flex-direction: column; gap: 20px;">
                             <h3 style="font-size: 14px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; text-align: center; margin-bottom: 15px;">Homologação da Comissão de Monitoramento e Avaliação</h3>
-                            <textarea id="texto_homologacao" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 80px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; text-align: center; font-style: italic;">{{ report_data.texto_homologacao }}</textarea>
+                            <textarea id="texto_homologacao" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.texto_homologacao }}</textarea>
                             
                             <div style="text-align: right; margin-bottom: 20px;">
                                 <input type="text" id="homologacao_local_data" value="{{ report_data.homologacao_local_data }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="text-align: right; border: none; font-size: 14px; font-weight: 700; color: #0f172a; width: 100%; background: transparent;">
@@ -243,7 +249,7 @@
                                             <button type="button" onclick="clearSignature('comissao_tecnico')" style="background: transparent; border: none; color: #ef4444; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Limpar</button>
                                             <button type="button" onclick="saveIndividualSignature('comissao_tecnico')" style="background: transparent; border: none; color: #2563eb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="save" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Salvar Assinatura</button>
                                         </div>
-                                        <input type="text" id="comissao_tecnico-nome" value="{{ report_data.comissao_tecnico_nome|default:'' }}" placeholder="Nome do Técnico da Comissão" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 11.5px; font-weight: 700; text-align: center; text-transform: uppercase;">
+                                        <input type="text" id="comissao_tecnico-nome" value="{{ report_data.comissao_tecnico_nome|default:'' }}" placeholder="Nome do Técnico da Comissão" class="doc-field">
                                     {% else %}
                                         <div style="height: 100px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #0f172a; width: 100%; margin-bottom: 6px;">
                                             {% if report_data.signature_comissao_tecnico %}
@@ -271,7 +277,7 @@
                                             <button type="button" onclick="clearSignature('comissao_financeiro')" style="background: transparent; border: none; color: #ef4444; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Limpar</button>
                                             <button type="button" onclick="saveIndividualSignature('comissao_financeiro')" style="background: transparent; border: none; color: #2563eb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="save" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Salvar Assinatura</button>
                                         </div>
-                                        <input type="text" id="comissao_financeiro-nome" value="{{ report_data.comissao_financeiro_nome|default:'' }}" placeholder="Nome do Financeiro da Comissão" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 11.5px; font-weight: 700; text-align: center; text-transform: uppercase;">
+                                        <input type="text" id="comissao_financeiro-nome" value="{{ report_data.comissao_financeiro_nome|default:'' }}" placeholder="Nome do Financeiro da Comissão" class="doc-field">
                                     {% else %}
                                         <div style="height: 100px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #0f172a; width: 100%; margin-bottom: 6px;">
                                             {% if report_data.signature_comissao_financeiro %}
@@ -296,29 +302,29 @@
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
                             <div style="grid-column: span 2;">
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">OSC parceira</label>
-                                <input type="text" id="osc_name" value="{{ report_data.osc_name }}" readonly style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; background-color: #f8fafc; color: #0f172a;">
+                                <input type="text" id="osc_name" value="{{ report_data.osc_name }}" readonly class="doc-field">
                             </div>
                             <div>
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">CNPJ</label>
-                                <input type="text" id="cnpj" value="{{ report_data.cnpj|default:'00.000.000/0000-00' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                                <input type="text" id="cnpj" value="{{ report_data.cnpj|default:'00.000.000/0000-00' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-field">
                             </div>
                             {% if not is_subvencao %}
                             <div>
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Recurso</label>
-                                <input type="text" id="emenda" value="{{ report_data.emenda|default:'Ex: 1430/2023' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                                <input type="text" id="emenda" value="{{ report_data.emenda|default:'Ex: 1430/2023' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-field">
                             </div>
                             {% endif %}
                             <div>
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Nº Termo</label>
-                                <input type="text" id="termo_fomento" value="{{ report_data.termo_fomento|default:'Ex: 629/2024' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                                <input type="text" id="termo_fomento" value="{{ report_data.termo_fomento|default:'Ex: 629/2024' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-field">
                             </div>
                             <div>
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Vigência</label>
-                                <input type="text" id="vigencia" value="{{ report_data.vigencia|default:'Ex: 04/12/2024 a 30/06/2025' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                                <input type="text" id="vigencia" value="{{ report_data.vigencia|default:'Ex: 04/12/2024 a 30/06/2025' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-field">
                             </div>
                             <div style="grid-column: span 2;">
                                 <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Valor autorizado por lei e repassado</label>
-                                <input type="text" id="valor_autorizado" value="{{ report_data.valor_autorizado|default:'R$ 0,00' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 13px; font-weight: 700; color: #0f172a;">
+                                <input type="text" id="valor_autorizado" value="{{ report_data.valor_autorizado|default:'R$ 0,00' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-field">
                             </div>
                         </div>
                     </section>
@@ -327,29 +333,29 @@
                     <section style="display: flex; flex-direction: column; gap: 20px;">
                         <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 0px; letter-spacing: 0.05em;">2. FUNDAMENTAÇÃO</h3>
                         <div>
-                            <textarea id="fundamentacao" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 120px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;" placeholder="Digite a fundamentação técnica...">{{ report_data.fundamentacao }}</textarea>
+                            <textarea id="fundamentacao" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea" placeholder="Digite a fundamentação técnica...">{{ report_data.fundamentacao }}</textarea>
                         </div>
                         <div>
                             <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">a) Quanto ao cumprimento do objeto:</label>
-                            <textarea id="cumprimento_objeto" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;" placeholder="Descreva o cumprimento do objeto...">{{ report_data.cumprimento_objeto }}</textarea>
+                            <textarea id="cumprimento_objeto" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea" placeholder="Descreva o cumprimento do objeto...">{{ report_data.cumprimento_objeto }}</textarea>
                         </div>
                         <div>
                             <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">b) Quanto aos benefícios e impactos da parceria:</label>
-                            <textarea id="beneficios_impactos" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 100px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;" placeholder="Descreva os benefícios e impactos...">{{ report_data.beneficios_impactos }}</textarea>
+                            <textarea id="beneficios_impactos" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea" placeholder="Descreva os benefícios e impactos...">{{ report_data.beneficios_impactos }}</textarea>
                         </div>
                     </section>
 
                     <!-- Section 3: CONCLUSÃO (Emendas) / SUSTENTABILIDADE E CONTINUIDADE (Subvenção) -->
                     <section>
                         <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">3. {% if is_subvencao %}SUSTENTABILIDADE E CONTINUIDADE DAS AÇÕES QUE FORAM OBJETO DA PARCERIA{% else %}CONCLUSÃO{% endif %}</h3>
-                        <textarea id="conclusao" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 120px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;" placeholder="{% if is_subvencao %}Digite a sustentabilidade e continuidade das ações...{% else %}Digite a conclusão final...{% endif %}">{{ report_data.conclusao }}</textarea>
+                        <textarea id="conclusao" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea" placeholder="{% if is_subvencao %}Digite a sustentabilidade e continuidade das ações...{% else %}Digite a conclusão final...{% endif %}">{{ report_data.conclusao }}</textarea>
                     </section>
 
                     {% if is_subvencao %}
                     <!-- Section 4: CONCLUSÃO (somente Subvenção) -->
                     <section>
                         <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 0.05em;">4. CONCLUSÃO</h3>
-                        <textarea id="conclusao_final" {% if report_data.status == 'finalized' %}readonly{% endif %} style="width: 100%; min-height: 120px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 16px; font-size: 13px; line-height: 1.6; font-family: inherit; font-weight: 600; resize: vertical;" placeholder="Digite a conclusão final...">{{ report_data.conclusao_final }}</textarea>
+                        <textarea id="conclusao_final" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea" placeholder="Digite a conclusão final...">{{ report_data.conclusao_final }}</textarea>
                     </section>
                     {% endif %}
 
@@ -372,7 +378,7 @@
                                         <button type="button" onclick="clearSignature('tecnico')" style="background: transparent; border: none; color: #ef4444; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Limpar</button>
                                         <button type="button" onclick="saveIndividualSignature('tecnico')" style="background: transparent; border: none; color: #2563eb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="save" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Salvar Assinatura Técnico</button>
                                     </div>
-                                    <input type="text" id="tecnico-nome" value="{{ report_data.tecnico_nome|default:'' }}" placeholder="NOME DO TÉCNICO" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 11.5px; font-weight: 700; text-align: center; text-transform: uppercase;">
+                                    <input type="text" id="tecnico-nome" value="{{ report_data.tecnico_nome|default:'' }}" placeholder="NOME DO TÉCNICO" class="doc-field">
                                 {% else %}
                                     <div style="height: 100px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #0f172a; width: 100%; margin-bottom: 6px;">
                                         {% if report_data.signature_tecnico %}
@@ -398,7 +404,7 @@
                                         <button type="button" onclick="clearSignature('financeiro')" style="background: transparent; border: none; color: #ef4444; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Limpar</button>
                                         <button type="button" onclick="saveIndividualSignature('financeiro')" style="background: transparent; border: none; color: #2563eb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; cursor: pointer;"><i data-lucide="save" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Salvar Assinatura Financeiro</button>
                                     </div>
-                                    <input type="text" id="financeiro-nome" value="{{ report_data.financeiro_nome|default:'' }}" placeholder="NOME DO FINANCEIRO" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 11.5px; font-weight: 700; text-align: center; text-transform: uppercase;">
+                                    <input type="text" id="financeiro-nome" value="{{ report_data.financeiro_nome|default:'' }}" placeholder="NOME DO FINANCEIRO" class="doc-field">
                                 {% else %}
                                     <div style="height: 100px; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #0f172a; width: 100%; margin-bottom: 6px;">
                                         {% if report_data.signature_financeiro %}
@@ -819,6 +825,59 @@
     body {
         font-family: 'Inter', sans-serif !important;
         background-color: #f1f5f9 !important;
+    }
+
+    /* Campos de Relatorio Final / Parecer Conclusivo -- sem borda de
+       formulario, ficam com cara de documento (sublinhado sutil) tanto
+       editando quanto em modo leitura (readonly). */
+    .doc-field {
+        width: 100%;
+        border: none;
+        border-bottom: 1.5px solid #e2e8f0;
+        border-radius: 0;
+        background: transparent;
+        padding: 8px 4px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f172a;
+        font-family: inherit;
+        transition: border-color 0.2s, background 0.2s;
+    }
+    .doc-field:focus {
+        outline: none;
+        border-bottom-color: #1e3a8a;
+        background: #f8fafc;
+    }
+    .doc-field[readonly] {
+        border-bottom-style: dashed;
+        color: #334155;
+    }
+
+    .doc-textarea {
+        width: 100%;
+        min-height: 90px;
+        border: none;
+        border-bottom: 1.5px dashed #cbd5e1;
+        border-radius: 0;
+        background: transparent;
+        padding: 10px 4px;
+        font-size: 13px;
+        line-height: 1.7;
+        font-family: inherit;
+        font-weight: 500;
+        color: #1e293b;
+        text-align: justify;
+        resize: vertical;
+        transition: border-color 0.2s, background 0.2s;
+    }
+    .doc-textarea:focus {
+        outline: none;
+        border-bottom-color: #1e3a8a;
+        background: #f8fafc;
+    }
+    .doc-textarea[readonly] {
+        resize: none;
+        color: #334155;
     }
 
     /* Signature Pad Styling */

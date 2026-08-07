@@ -10,9 +10,9 @@
         <a href="{% url 'directorates:plan-list' directorate.pk %}?osc={{ osc.pk }}" class="plan-document-toolbar-btn">
             <i data-lucide="arrow-left"></i> Voltar
         </a>
-        <button type="button" onclick="window.print()" class="plan-document-toolbar-btn plan-document-toolbar-btn-primary">
+        <a href="?{{ request.GET.urlencode }}&export=pdf" target="_blank" class="plan-document-toolbar-btn plan-document-toolbar-btn-primary">
             <i data-lucide="printer"></i> Imprimir Documento
-        </button>
+        </a>
     </div>
 
     <article class="plan-document-page">

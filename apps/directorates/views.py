@@ -1157,6 +1157,11 @@ class WorkPlanDocumentView(DirectorateScopedMixin, TemplateView):
         context = self.get_context_data(**kwargs)
         context.update(build_work_plan_document_context(plan))
         context["theme_class"] = get_monitoramento_theme(self.get_directorate())[0]
+
+        if request.GET.get("export") == "pdf":
+            from apps.directorates.pdf_documents import render_work_plan_document_pdf
+            return render_work_plan_document_pdf(context)
+
         return render(request, self.template_name, context)
 
 class MonitoringReportListView(DirectorateScopedMixin, ListView):
@@ -1212,6 +1217,14 @@ class VisitReportView(VisitAccessMixin, DetailView):
         "parecer_conclusivo": "Parecer Conclusivo",
         "relatorio_final": "Relatório Final",
     }
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        context = self.get_context_data()
+        if request.GET.get("export") == "pdf":
+            from apps.directorates.pdf_documents import render_visit_report_pdf
+            return render_visit_report_pdf(context)
+        return self.render_to_response(context)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1894,6 +1907,13 @@ class VisitInstrumentalView(VisitAccessMixin, UpdateView):
         if self.get_object().status in ['finalized', 'completed']:
             return ["directorates/monitoring/visit_document.html"]
         return ["directorates/monitoring/visit_instrumental.html"]
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if request.GET.get("export") == "pdf" and self.object.status in ("finalized", "completed"):
+            from apps.directorates.pdf_documents import render_visit_document_pdf
+            return render_visit_document_pdf(self.get_context_data())
+        return self.render_to_response(self.get_context_data())
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
