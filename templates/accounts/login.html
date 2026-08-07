@@ -5,152 +5,176 @@
 
 {% block body_class %}login-page{% endblock %}
 
+{% block extra_head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&display=swap" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
-<div class="login-bg">
-  <div class="login-bg-overlay"></div>
+<div class="login-particle-bg" id="loginParticleBg"></div>
 
-  <main class="login-container">
-    <div class="login-header">
-      <div class="login-logo-circle">
-        <img src="{% static 'img/logo.png' %}" alt="Logo" class="login-logo-img">
+<main class="login-container">
+  <div class="login-logo-wrap">
+    <img src="{% static 'img/logo.png' %}" alt="Logo" class="login-logo-img">
+  </div>
+
+  <div class="login-panel">
+    <form method="post" class="login-form" id="loginForm">
+      {% csrf_token %}
+
+      <div class="login-panel-head">
+        <h2>Acesso ao Sistema</h2>
+        <p>Insira suas credenciais para continuar</p>
       </div>
-      <h1 class="login-title">Bem-vindo de volta</h1>
-      <p class="login-subtitle">Sistema de Vigil&acirc;ncia Socioassistencial &bull; {{ system_reference_year }}</p>
-    </div>
 
-    <div class="login-card">
-      <form method="post" class="login-form">
-        {% csrf_token %}
-
-        {% if form.non_field_errors %}
-        <div class="login-error-msg">
+      {% if form.non_field_errors %}
+      <div class="login-error-msg" role="alert">
+        <i data-lucide="alert-circle"></i>
+        <div>
           {% for error in form.non_field_errors %}
             <span>{{ error }}</span>
           {% endfor %}
         </div>
-        {% endif %}
+      </div>
+      {% endif %}
 
-        <div class="login-field">
-          <label for="{{ form.username.id_for_label }}">E-mail Corporativo</label>
+      <div class="login-field">
+        <label for="{{ form.username.id_for_label }}">E-mail Corporativo</label>
+        <div class="login-field-input-wrap">
+          <i data-lucide="mail" class="login-field-icon"></i>
           {{ form.username }}
         </div>
+      </div>
 
-        <div class="login-field">
-          <div class="login-field-head">
-            <label for="{{ form.password.id_for_label }}">Senha</label>
-            {# recuperação de senha não implementada — link removido #}
-          </div>
+      <div class="login-field">
+        <label for="{{ form.password.id_for_label }}">Senha</label>
+        <div class="login-field-input-wrap">
+          <i data-lucide="lock" class="login-field-icon"></i>
           {{ form.password }}
+          <button type="button" class="login-field-toggle" id="loginPasswordToggle" aria-label="Mostrar senha" aria-pressed="false">
+            <i data-lucide="eye"></i>
+          </button>
         </div>
+      </div>
 
-        <button type="submit" class="login-btn">Entrar</button>
-      </form>
-    </div>
+      <button type="submit" class="login-btn" id="loginSubmitBtn">
+        <span class="login-btn-label">
+          Entrar
+          <i data-lucide="log-in"></i>
+        </span>
+        <span class="login-btn-spinner" aria-hidden="true"></span>
+      </button>
+    </form>
 
-    <footer class="login-footer">
-      &copy; {{ system_reference_year }} &bull; SISTEMA DE VIGIL&acirc;NCIA
+    <footer class="login-panel-footer">
+      &copy; {{ system_reference_year }} &bull; {{ system_name }}
     </footer>
-  </main>
-</div>
+  </div>
+</main>
 
 <style>
-/* ===== Reset & Base ===== */
+/* ===== Base ===== */
 .login-page {
   margin: 0;
   min-height: 100vh;
-  background: #366cb0;
+  background: #0a1128;
+  overflow: hidden;
 }
 
-.login-bg {
+/* ===== Particle background ===== */
+.login-particle-bg {
   position: fixed;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #366cb0;
-  overflow-y: auto;
-  padding: 24px 16px;
-}
-
-.login-bg-overlay {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
+  z-index: 0;
   background:
-    radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.10) 0%, rgba(54,108,176,0) 70%);
+    radial-gradient(rgba(56, 189, 248, 0.15) 1px, transparent 1px),
+    radial-gradient(circle at center, #1a2a5e 0%, #0a1128 100%);
+  background-size: 24px 24px, 100% 100%;
+  overflow: hidden;
+}
+
+.login-particle {
+  position: absolute;
+  bottom: 0;
+  background-color: rgba(56, 189, 248, 0.5);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: login-particle-float linear infinite;
+}
+
+@keyframes login-particle-float {
+  0%   { transform: translateY(0) translateX(0); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(-100vh) translateX(50px); opacity: 0; }
 }
 
 /* ===== Container ===== */
 .login-container {
   position: relative;
   z-index: 1;
+  min-height: 100vh;
   width: 100%;
-  max-width: 400px;
+  max-width: 440px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  animation: fadeIn 0.6s ease-out;
+  justify-content: center;
+  padding: 24px 16px;
+  box-sizing: border-box;
+  animation: login-fade-in 0.6s ease-out;
 }
 
-@keyframes fadeIn {
+@keyframes login-fade-in {
   from { opacity: 0; transform: translateY(10px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ===== Header ===== */
-.login-header {
-  text-align: center;
+/* ===== Logo ===== */
+.login-logo-wrap {
   margin-bottom: 32px;
-}
-
-.login-logo-circle {
-  width: 96px;
-  height: 96px;
-  margin: 0 auto 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255,255,255,0.10);
-  border-radius: 28px;
-  border: 1px solid rgba(255,255,255,0.20);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  text-align: center;
 }
 
 .login-logo-img {
-  width: 60px;
-  height: 60px;
+  width: 128px;
+  height: 128px;
   object-fit: contain;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  filter: drop-shadow(0 0 25px rgba(56, 189, 248, 0.6));
+  animation: login-logo-pulse 4s infinite alternate;
+  box-sizing: border-box;
 }
 
-.login-title {
-  font-size: 30px;
-  font-weight: 800;
-  color: #fff;
-  margin: 0 0 8px;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
+@keyframes login-logo-pulse {
+  0%   { filter: drop-shadow(0 0 15px rgba(56, 189, 248, 0.4)); }
+  100% { filter: drop-shadow(0 0 35px rgba(56, 189, 248, 0.8)); }
 }
 
-.login-subtitle {
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(255,255,255,0.80);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  margin: 0;
-}
-
-/* ===== Card ===== */
-.login-card {
+/* ===== Glass panel ===== */
+.login-panel {
   width: 100%;
-  background: rgba(255,255,255,0.06);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255,255,255,0.18);
-  border-radius: 36px;
-  padding: 32px 28px;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.20);
+  border-radius: 12px;
+  padding: 32px;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  box-shadow: 0 0 30px rgba(56, 189, 248, 0.1), inset 0 0 20px rgba(255, 255, 255, 0.02);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.login-panel:hover {
+  box-shadow: 0 0 40px rgba(56, 189, 248, 0.2), inset 0 0 20px rgba(255, 255, 255, 0.05);
+  border-color: rgba(56, 189, 248, 0.4);
 }
 
 .login-form {
@@ -159,130 +183,297 @@
   gap: 24px;
 }
 
+.login-panel-head {
+  text-align: center;
+  margin-bottom: -8px;
+}
+
+.login-panel-head h2 {
+  font-family: 'Hanken Grotesk', 'Inter', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 28px;
+  color: rgba(255, 255, 255, 0.90);
+  margin: 0;
+}
+
+.login-panel-head p {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.50);
+  margin: 4px 0 0;
+}
+
 /* ===== Error ===== */
 .login-error-msg {
-  background: rgba(239,68,68,0.18);
-  border: 1px solid rgba(239,68,68,0.30);
-  border-radius: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(186, 26, 26, 0.18);
+  border: 1px solid rgba(186, 26, 26, 0.35);
+  border-radius: 10px;
   padding: 12px 16px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: #fff;
-  text-align: center;
+  animation: login-fade-in 0.3s ease-out;
+}
+
+.login-error-msg i {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #f87171;
+}
+
+.login-error-msg span {
+  display: block;
 }
 
 /* ===== Fields ===== */
 .login-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .login-field label {
-  font-size: 11px;
-  font-weight: 800;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.2em;
-  color: rgba(255,255,255,0.65);
-  margin-left: 4px;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.70);
 }
 
-.login-field-head {
+.login-field-input-wrap {
+  position: relative;
   display: flex;
-  justify-content: space-between;
   align-items: center;
 }
 
-.login-forgot {
-  font-size: 10px;
-  font-weight: 700;
-  color: rgba(255,255,255,0.55);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  text-decoration: none;
+.login-field-icon {
+  position: absolute;
+  left: 14px;
+  width: 18px;
+  height: 18px;
+  color: rgba(255, 255, 255, 0.40);
+  pointer-events: none;
   transition: color 0.2s;
 }
-.login-forgot:hover {
-  color: #fff;
+
+.login-field-input-wrap:focus-within .login-field-icon {
+  color: #38bdf8;
 }
 
 .login-field input {
   width: 100%;
   height: 48px;
-  padding: 0 16px;
-  background: rgba(255,255,255,0.10);
-  border: 1px solid rgba(255,255,255,0.18);
-  border-radius: 12px;
-  font-size: 15px;
+  padding: 0 16px 0 42px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
   color: #fff;
   outline: none;
-  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  transition: border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
   box-sizing: border-box;
 }
 
 .login-field input::placeholder {
-  color: rgba(255,255,255,0.28);
+  color: rgba(255, 255, 255, 0.40);
 }
 
 .login-field input:focus {
-  border-color: #fff;
-  background: rgba(255,255,255,0.14);
-  box-shadow: 0 0 0 3px rgba(255,255,255,0.08);
+  border-color: #38bdf8;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+}
+
+#id_password {
+  padding-right: 42px;
+}
+
+.login-field-toggle {
+  position: absolute;
+  right: 4px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.40);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.login-field-toggle:hover {
+  color: #fff;
+}
+
+.login-field-toggle:focus-visible {
+  outline: none;
+  color: #38bdf8;
+}
+
+.login-field-toggle i {
+  width: 18px;
+  height: 18px;
 }
 
 /* ===== Button ===== */
 .login-btn {
+  position: relative;
   width: 100%;
-  height: 48px;
+  height: 50px;
   margin-top: 4px;
-  border: none;
-  border-radius: 12px;
-  background: #fff;
-  color: #366cb0;
-  font-size: 12px;
-  font-weight: 900;
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0037b0, #1d4ed8);
+  color: #fff;
+  font-family: 'Hanken Grotesk', 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.08em;
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(29, 78, 216, 0.5);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
 }
 
 .login-btn:hover {
-  background: #f1f5f9;
-  transform: scale(0.985);
+  box-shadow: 0 0 30px rgba(56, 189, 248, 0.8);
+  border-color: #38bdf8;
+  transform: translateY(-2px);
 }
 
-.login-btn:active {
-  transform: scale(0.97);
+.login-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 30px rgba(56, 189, 248, 0.8), 0 0 0 3px rgba(56, 189, 248, 0.35);
+}
+
+.login-btn-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.login-btn-label i {
+  width: 16px;
+  height: 16px;
+}
+
+.login-btn-spinner {
+  display: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  animation: login-spin 0.7s linear infinite;
+}
+
+.login-btn.is-loading .login-btn-label {
+  visibility: hidden;
+}
+
+.login-btn.is-loading .login-btn-spinner {
+  display: block;
+  position: absolute;
+}
+
+@keyframes login-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ===== Footer ===== */
-.login-footer {
-  margin-top: 48px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: rgba(255,255,255,0.28);
+.login-panel-footer {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.40);
 }
 
 /* ===== Responsive ===== */
-@media (min-width: 640px) {
-  .login-bg { padding: 40px 24px; }
-  .login-container { max-width: 420px; }
-  .login-card { padding: 40px 32px; }
-  .login-title { font-size: 34px; }
-}
-
-@media (min-width: 1024px) {
-  .login-bg { padding: 48px 32px; }
-  .login-container { max-width: 440px; }
-  .login-logo-circle { width: 100px; height: 100px; }
-  .login-logo-img { width: 64px; height: 64px; }
-  .login-title { font-size: 36px; }
-  .login-card { border-radius: 40px; }
+@media (min-width: 768px) {
+  .login-logo-img { width: 160px; height: 160px; }
+  .login-panel { padding: 40px; }
 }
 </style>
+
+<script>
+(function() {
+    // Partículas flutuantes no fundo
+    var bg = document.getElementById('loginParticleBg');
+    if (bg) {
+        var PARTICLE_COUNT = 40;
+
+        function spawnParticle() {
+            var particle = document.createElement('div');
+            particle.className = 'login-particle';
+
+            var size = Math.random() * 4 + 1;
+            var duration = Math.random() * 20 + 10;
+            var delay = Math.random() * 5;
+
+            particle.style.width = size + 'px';
+            particle.style.height = size + 'px';
+            particle.style.left = (Math.random() * 100) + 'vw';
+            particle.style.animationDuration = duration + 's';
+            particle.style.animationDelay = delay + 's';
+            particle.style.opacity = Math.random() * 0.5 + 0.1;
+
+            bg.appendChild(particle);
+
+            window.setTimeout(function() {
+                particle.remove();
+                spawnParticle();
+            }, (duration + delay) * 1000);
+        }
+
+        for (var i = 0; i < PARTICLE_COUNT; i++) {
+            spawnParticle();
+        }
+    }
+
+    // Mostrar/ocultar senha
+    var toggle = document.getElementById('loginPasswordToggle');
+    var passwordInput = document.getElementById('id_password');
+    if (toggle && passwordInput) {
+        toggle.addEventListener('click', function() {
+            var isHidden = passwordInput.type === 'password';
+            passwordInput.type = isHidden ? 'text' : 'password';
+            toggle.setAttribute('aria-pressed', isHidden ? 'true' : 'false');
+            toggle.setAttribute('aria-label', isHidden ? 'Ocultar senha' : 'Mostrar senha');
+            toggle.innerHTML = '<i data-lucide="' + (isHidden ? 'eye-off' : 'eye') + '"></i>';
+            if (window.lucide) { lucide.createIcons({ props: { "data-lucide": true }, node: toggle }); }
+        });
+    }
+
+    // Estado de loading no submit
+    var form = document.getElementById('loginForm');
+    var submitBtn = document.getElementById('loginSubmitBtn');
+    if (form && submitBtn) {
+        form.addEventListener('submit', function() {
+            if (form.checkValidity()) {
+                submitBtn.classList.add('is-loading');
+                submitBtn.disabled = true;
+            }
+        });
+    }
+})();
+</script>
 {% endblock %}
