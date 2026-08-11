@@ -6,6 +6,22 @@
     </a>
 
     <div class="nav-main">
+        <div class="mobile-profile-card">
+            <span class="user-avatar-mini user-avatar-lg">{% if user_profile %}{{ user_profile.display_name|first }}{% else %}{{ request.user.get_short_name|default:request.user.username|first }}{% endif %}</span>
+            <div class="mobile-profile-info">
+                <strong>{% if user_profile %}{{ user_profile.display_name }}{% else %}{{ request.user.get_short_name|default:request.user.username }}{% endif %}</strong>
+                <span class="role-badge-nav {% if user_profile %}role-{{ user_profile.role }}{% else %}role-user{% endif %}">
+                    {% if user_profile %}{{ user_profile.get_role_display }}{% else %}Usuário{% endif %}
+                </span>
+            </div>
+            <form action="{% url 'accounts:logout' %}" method="post" class="mobile-logout-form">
+                {% csrf_token %}
+                <button type="submit" class="mobile-logout-btn" title="Sair">
+                    <i data-lucide="log-out"></i>
+                </button>
+            </form>
+        </div>
+
         {% if request.user.is_superuser or user_profile.role == 'admin' %}
         <a href="{% url 'core:tv-dashboard' %}" class="nav-link {% if '/tv' in request.path %}active{% endif %}">
             <i data-lucide="monitor-play"></i>
@@ -90,6 +106,7 @@
         </div>
         {% endif %}
         <div class="user-profile-mini">
+            <span class="user-avatar-mini">{% if user_profile %}{{ user_profile.display_name|first }}{% else %}{{ request.user.get_short_name|default:request.user.username|first }}{% endif %}</span>
             <div class="user-info-mini">
                 <span class="user-name-mini">{% if user_profile %}{{ user_profile.display_name }}{% else %}{{ request.user.get_short_name|default:request.user.username }}{% endif %}</span>
                 <span class="user-role-mini role-badge-nav {% if user_profile %}role-{{ user_profile.role }}{% else %}role-user{% endif %}">
@@ -192,6 +209,12 @@
     /* Reset Global para evitar rolagem lateral */
     * { box-sizing: border-box; }
 
+    /* Avatar compacto (iniciais) e cartao de perfil do menu mobile --
+       ficam ocultos no desktop por padrao, só aparecem no media query
+       abaixo (evita duplicar a info de usuario na navbar >=1025px). */
+    .user-avatar-mini { display: none; }
+    .mobile-profile-card { display: none; }
+
     /* Otimização para Tablets e Mobile */
     @media (max-width: 1024px) {
         .navbar {
@@ -237,15 +260,18 @@
         }
 
         .nav-main {
-            display: none; 
-            position: absolute;
+            display: none;
+            position: fixed;
             top: 70px;
             left: 0;
+            right: 0;
+            bottom: 0;
             width: 100%;
-            max-height: calc(100vh - 70px);
             overflow-y: auto;
             background: white;
             flex-direction: column;
+            align-items: stretch;
+            justify-content: flex-start;
             padding: 0;
             border-bottom: 1px solid #e2e8f0;
             box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
@@ -253,6 +279,12 @@
 
         .nav-main.show {
             display: flex;
+        }
+
+        .nav-group {
+            width: 100%;
+            flex-direction: column;
+            align-items: stretch;
         }
 
         .nav-link, .nav-btn {
@@ -301,34 +333,31 @@
             flex-shrink: 0;
         }
 
+        /* Cabecalho mobile fica so com o avatar (iniciais) -- nome/cargo
+           completos moram no cartao de perfil dentro do menu, evita a
+           colisao de texto com o botao de menu num espaco tao apertado. */
         .user-profile-mini {
             display: flex;
             align-items: center;
-            padding-right: 12px;
         }
 
         .user-info-mini {
+            display: none;
+        }
+
+        .user-avatar-mini {
             display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            line-height: 1.2;
-        }
-
-        .user-name-mini {
-            font-size: 12px;
-            font-weight: 700;
-            color: #1e293b !important;
-            max-width: 100px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .user-role-mini {
-            font-size: 10px;
-            text-transform: uppercase;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            flex-shrink: 0;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #1e3a8a;
+            font-size: 15px;
             font-weight: 800;
-            letter-spacing: 0.02em;
+            text-transform: uppercase;
         }
 
         .role-badge-nav {
@@ -336,6 +365,69 @@
             border-radius: 10px;
             display: inline-block;
             line-height: 1.4;
+            font-size: 10px;
+            text-transform: uppercase;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+        }
+
+        /* Cartao de perfil no topo do menu mobile */
+        .mobile-profile-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 18px 24px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .user-avatar-lg {
+            width: 46px;
+            height: 46px;
+            font-size: 18px;
+        }
+
+        .mobile-profile-info {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .mobile-profile-info strong {
+            font-size: 14px;
+            font-weight: 800;
+            color: #1e293b;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .mobile-profile-info .role-badge-nav {
+            width: fit-content;
+        }
+
+        .mobile-logout-form {
+            flex-shrink: 0;
+        }
+
+        .mobile-logout-btn {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            border: 1px solid #fecaca;
+            background: #fef2f2;
+            color: #dc2626;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .mobile-logout-btn:hover {
+            background: #fee2e2;
         }
 
         /* Role colors — same as user_list */
@@ -415,13 +507,21 @@
 <script>
     function toggleMobileMenu() {
         const nav = document.querySelector('.nav-main');
-        const icon = document.querySelector('.mobile-toggle i');
+        // Lucide substitui o <i data-lucide="menu"> por um <svg> assim que
+        // roda -- buscar por "i" aqui nunca acha nada depois do primeiro
+        // lucide.createIcons() da pagina (mesma causa do bug do icone de
+        // busca corrigido antes). Sem esse ajuste, o setAttribute() abaixo
+        // quebrava com elemento null e travava o resto da funcao no meio,
+        // antes da linha que bloqueia o scroll do body.
+        const icon = document.querySelector('.mobile-toggle svg, .mobile-toggle i');
         nav.classList.toggle('show');
-        
+
         if (nav.classList.contains('show')) {
-            icon.setAttribute('data-lucide', 'x');
+            if (icon) icon.setAttribute('data-lucide', 'x');
+            document.body.style.overflow = 'hidden';
         } else {
-            icon.setAttribute('data-lucide', 'menu');
+            if (icon) icon.setAttribute('data-lucide', 'menu');
+            document.body.style.overflow = '';
         }
         lucide.createIcons();
     }
@@ -429,7 +529,16 @@
     document.addEventListener('click', (e) => {
         const nav = document.querySelector('.nav-main');
         const toggle = document.querySelector('.mobile-toggle');
-        if (nav && nav.classList.contains('show') && !nav.contains(e.target) && !toggle.contains(e.target)) {
+        // composedPath() (nao e.target/.contains()) porque toggleMobileMenu()
+        // chama lucide.createIcons() no clique do botao, que troca o <svg>
+        // do icone por um elemento novo -- se o clique original tiver sido
+        // no icone, e.target vira um no orfao (removido do DOM) antes do
+        // evento terminar de propagar ate aqui, e toggle.contains(e.target)
+        // sempre daria falso (fechando o menu no mesmo clique que abriu).
+        // composedPath() registra o caminho no momento do disparo do
+        // evento, entao continua correto mesmo com essa troca de elemento.
+        const path = e.composedPath();
+        if (nav && nav.classList.contains('show') && !path.includes(nav) && !path.includes(toggle)) {
             toggleMobileMenu();
         }
     });
