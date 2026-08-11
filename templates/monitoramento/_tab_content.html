@@ -223,16 +223,15 @@
                         <h2>Últimas Visitas Realizadas</h2>
                         <span>{{ dashboard_visits|length }} visitas no período selecionado</span>
                     </div>
-                    <a href="{% url 'directorates:visit-create' directorate.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-primary-btn inline-link-btn">
-                        <i data-lucide="plus"></i>
-                        Nova Visita
-                    </a>
-                </div>
-
-                <div class="inline-filter-row">
-                    <div class="inline-search">
-                        <i data-lucide="search"></i>
-                        <input type="text" id="inline-visit-search" placeholder="Filtrar por OSC..." autocomplete="off">
+                    <div class="inline-header-actions">
+                        <div class="inline-search">
+                            <i data-lucide="search"></i>
+                            <input type="text" id="inline-visit-search" placeholder="Filtrar por OSC..." autocomplete="off">
+                        </div>
+                        <a href="{% url 'directorates:visit-create' directorate.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-primary-btn inline-link-btn">
+                            <i data-lucide="plus"></i>
+                            Nova Visita
+                        </a>
                     </div>
                 </div>
 
@@ -246,8 +245,6 @@
                                 {% endif %}
                                 <th>Plano de Trabalho</th>
                                 <th>Técnicos</th>
-                                <th>Status</th>
-                                <th>Registrado por</th>
                                 <th>Documentos</th>
                                 <th>Ações</th>
                             </tr>
@@ -255,12 +252,16 @@
                         <tbody>
                             {% for visit in dashboard_visits %}
                             <tr class="inline-visit-row">
-                                <td>
+                                <td data-label="Data e OSC">
                                     <strong class="inline-visit-osc">{{ visit.osc.name }}</strong>
                                     <small>{{ visit.visit_date|date:"d/m/Y" }} · salvo às {{ visit.visit_time|time:"H:i" }}</small>
+                                    <span class="inline-registered inline-registered-under">
+                                        <span>{{ visit.registered_by_name|first|default:"?" }}</span>
+                                        {{ visit.registered_by_name|title }}
+                                    </span>
                                 </td>
                                 {% if is_emendas %}
-                                <td>
+                                <td data-label="Identificador">
                                     {% if visit.identificacao.identifier %}
                                         <span style="font-size: 11px; font-weight: 700; background: #f1f5f9; color: #334155; padding: 2px 8px; border-radius: 6px;">{{ visit.identificacao.identifier }}</span>
                                     {% else %}
@@ -268,14 +269,14 @@
                                     {% endif %}
                                 </td>
                                 {% endif %}
-                                <td>
+                                <td data-label="Plano de Trabalho">
                                     {% if visit.work_plan %}
                                         <span style="font-size: 11px; font-weight: 700; background: #eff6ff; color: #1e3a8a; padding: 2px 8px; border-radius: 6px; display: inline-block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom;" title="{{ visit.work_plan.title }}">{{ visit.work_plan.title }}</span>
                                     {% else %}
                                         <span class="inline-muted">—</span>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td data-label="Técnicos">
                                     <span class="inline-techs">
                                         {% if visit.assinaturas.tecnico1_nome %}
                                             {{ visit.tecnico1_display }}
@@ -288,45 +289,28 @@
                                         {% endif %}
                                     </span>
                                 </td>
-                                <td>
-                                    <span class="inline-status-badge {% if visit.status == 'completed' or visit.status == 'finalized' %}is-finalized{% else %}is-draft{% endif %}">
-                                        <i data-lucide="{% if visit.status == 'completed' or visit.status == 'finalized' %}check-circle-2{% else %}clock-3{% endif %}"></i>
-                                        {% if visit.status == 'completed' or visit.status == 'finalized' %}Finalizado{% else %}Rascunho{% endif %}
-                                    </span>
-                                </td>
-                                <td>
-                                    <span class="inline-registered">
-                                        <span>{{ visit.registered_by_name|first|default:"?" }}</span>
-                                        {{ visit.registered_by_name|title }}
-                                    </span>
-                                </td>
-                                <td>
-                                    {% if visit.status == 'completed' or visit.status == 'finalized' %}
-                                        {% if visit.relatorio_status == 'finalized' %}
-                                        <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-doc-btn is-doc-finalized" title="Relatório de Visita finalizado">
-                                            <i data-lucide="check-circle-2"></i>
-                                            Finalizado
+                                <td data-label="Documentos">
+                                    <div class="inline-doc-icons">
+                                        <a href="{% url 'directorates:visit-instrumental' visit.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}"
+                                           class="inline-doc-icon-btn {% if visit.status == 'completed' or visit.status == 'finalized' %}is-finalized{% else %}is-draft{% endif %}"
+                                           title="{% if visit.status == 'completed' or visit.status == 'finalized' %}Ver Instrumental de Visita{% else %}Editar Instrumental de Visita{% endif %}">
+                                            <i data-lucide="clipboard-list"></i>
                                         </a>
-                                        {% elif visit.relatorio_status == 'draft' %}
-                                        <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-doc-btn is-doc-draft" title="Continuar rascunho do Relatório de Visita">
-                                            <i data-lucide="file-edit"></i>
-                                            Rascunho
+                                        {% if visit.status == 'completed' or visit.status == 'finalized' %}
+                                        <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}"
+                                           class="inline-doc-icon-btn {% if visit.relatorio_status == 'finalized' %}is-finalized{% else %}is-draft{% endif %}"
+                                           title="{% if visit.relatorio_status == 'finalized' %}Ver Relatório de Visita{% elif visit.relatorio_status == 'draft' %}Continuar Relatório de Visita{% else %}Preencher Relatório de Visita{% endif %}">
+                                            <i data-lucide="file-text"></i>
                                         </a>
                                         {% else %}
-                                        <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-doc-btn is-doc-pending" title="Preencher Relatório de Visita">
-                                            <i data-lucide="file-plus"></i>
-                                            Preencher
-                                        </a>
+                                        <span class="inline-doc-icon-btn is-disabled" title="Libera ao finalizar o Instrumental de Visita">
+                                            <i data-lucide="file-text"></i>
+                                        </span>
                                         {% endif %}
-                                    {% else %}
-                                    <span class="inline-muted">Liberado ao finalizar</span>
-                                    {% endif %}
+                                    </div>
                                 </td>
-                                <td class="inline-actions inline-visit-actions">
+                                <td class="inline-actions inline-visit-actions" data-label="Ações">
                                     {% if visit.status == 'completed' or visit.status == 'finalized' %}
-                                    <a href="{% url 'directorates:visit-instrumental' visit.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-view-action" title="Visualizar">
-                                        <i data-lucide="eye"></i>
-                                    </a>
                                     <form action="{% url 'directorates:visit-revert' visit.pk %}" method="post" onsubmit="return confirm('Deseja reverter para rascunho?')">
                                         {% csrf_token %}
                                         <input type="hidden" name="next" value="{% url 'monitoramento:home' directorate.pk %}?tab=visits&bimestre={{ selected_bimester }}&year={{ selected_year }}">
@@ -334,10 +318,6 @@
                                             <i data-lucide="undo-2"></i>
                                         </button>
                                     </form>
-                                    {% else %}
-                                    <a href="{% url 'directorates:visit-instrumental' visit.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-edit-action" title="Editar">
-                                        <i data-lucide="square-pen"></i>
-                                    </a>
                                     {% endif %}
 
                                     {% if can_delete %}
@@ -353,7 +333,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="{% if is_emendas %}8{% else %}7{% endif %}" class="inline-empty-cell">
+                                <td colspan="{% if is_emendas %}6{% else %}5{% endif %}" class="inline-empty-cell">
                                     <i data-lucide="clipboard-x"></i>
                                     <p>Nenhuma visita registrada neste período.</p>
                                     <a href="{% url 'directorates:visit-create' directorate.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-primary-btn inline-link-btn">

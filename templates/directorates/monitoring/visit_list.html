@@ -49,7 +49,7 @@
                 <i data-lucide="file-check-2"></i> Relatórios e Pareceres
             </a>
             {% endif %}
-            <a href="{% url 'directorates:visit-create' directorate.pk %}" class="btn-primary-premium">
+            <a href="{% url 'directorates:visit-create' directorate.pk %}" class="btn-primary-premium btn-nova-visita">
                 <i data-lucide="plus"></i> Nova Visita
             </a>
         </div>
@@ -79,10 +79,9 @@
                 {% endif %}
                 <th class="no-tablet" style="width: 10%;">PLANO DE TRABALHO</th>
                 <th class="no-tablet" style="width: 12%;">TÉCNICOS</th>
-                <th class="no-tablet" style="width: 8%;">STATUS</th>
-                <th class="no-tablet" style="width: 12%;">REGISTRADO POR</th>
+                <th class="no-tablet" style="width: 13%;">STATUS</th>
                 <th class="no-tablet" style="width: 17%; text-align: right;">DOCUMENTOS</th>
-                <th style="width: 25%; text-align: right;">AÇÕES</th>
+                <th style="width: 20%; text-align: right;">AÇÕES</th>
             </tr>
         </thead>
         <tbody>
@@ -105,11 +104,15 @@
                         {% else %}
                             <span class="status-dot-tablet {% if visit.status == 'completed' or visit.status == 'finalized' %}dot-finalized{% else %}dot-draft{% endif %}" title="{% if visit.status == 'completed' or visit.status == 'finalized' %}Finalizado{% else %}{{ visit.get_status_display|title }}{% endif %}"></span>
                         {% endif %}
-                        <div style="overflow:hidden;">
+                        <div style="overflow:hidden; width: 100%;">
                             <span class="osc-name">{{ visit.osc.name }}</span>
-                            <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-top: 3px;">
                                 <i data-lucide="calendar" style="width: 12px; color: #94a3b8; flex-shrink:0;"></i>
                                 <span class="visit-date-text">{{ visit.visit_date|date:"d/m/Y" }}</span>
+                            </div>
+                            <div class="registered-by-pill">
+                                <div class="registered-by-avatar">{{ visit.registered_by_name|first|default:"?" }}</div>
+                                <span title="{{ visit.registered_by_name|title }}">{{ visit.registered_by_name|title }}</span>
                             </div>
                         </div>
                     </div>
@@ -166,18 +169,10 @@
                         {% endif %}
                     {% else %}
                         <span class="visit-status-badge {% if visit.status == 'completed' or visit.status == 'finalized' %}status-finalized{% else %}status-draft{% endif %}">
-                            <i data-lucide="check-circle"></i>
+                            <i data-lucide="{% if visit.status == 'completed' or visit.status == 'finalized' %}check-circle{% else %}clock{% endif %}"></i>
                             {% if visit.status == 'completed' or visit.status == 'finalized' %}Finalizado{% else %}{{ visit.get_status_display|title }}{% endif %}
                         </span>
                     {% endif %}
-                </td>
-                <td class="no-tablet">
-                    <div class="registered-by-pill">
-                        <div class="registered-by-avatar">
-                            {{ visit.registered_by_name|first|default:"?" }}
-                        </div>
-                        <span>{{ visit.registered_by_name|title }}</span>
-                    </div>
                 </td>
                 <td class="no-tablet visit-docs-cell">
                     <div class="visit-doc-actions">
@@ -277,7 +272,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="{% if is_emendas %}8{% else %}7{% endif %}" style="text-align: center; padding: 100px 0; color: #94a3b8; font-weight: 800; text-transform: uppercase;">
+                <td colspan="{% if is_emendas %}7{% else %}6{% endif %}" style="text-align: center; padding: 100px 0; color: #94a3b8; font-weight: 800; text-transform: uppercase;">
                     Nenhuma visita registrada neste período.
                 </td>
             </tr>
@@ -399,7 +394,7 @@
         margin-left: auto;
     }
 
-    .visit-card-search i {
+    .visit-card-search svg {
         position: absolute;
         left: 10px;
         top: 50%;
@@ -415,6 +410,22 @@
         height: 32px;
         padding-left: 30px;
         font-size: 11px;
+        border-radius: 999px;
+    }
+
+    .btn-nova-visita {
+        background: #00a884 !important;
+        box-shadow: 0 4px 10px rgba(0, 168, 132, 0.25) !important;
+    }
+    .btn-nova-visita:hover {
+        background: #008f6f !important;
+    }
+
+    .table-monitoring tbody tr {
+        transition: background-color 0.15s ease;
+    }
+    .table-monitoring tbody tr:hover {
+        background-color: #f8fafc;
     }
 
     .monitoring-main-card {
@@ -444,8 +455,8 @@
     }
 
     .osc-name {
-        font-size: 12px !important;
-        line-height: 1.2;
+        font-size: 13px !important;
+        line-height: 1.25;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -466,7 +477,9 @@
     .visit-status-badge {
         font-size: 10px !important;
         text-transform: capitalize;
-        white-space: nowrap;
+        white-space: normal;
+        line-height: 1.3;
+        text-align: left;
     }
 
     .doc-list {
@@ -478,32 +491,18 @@
         font-size: 9px; font-weight: 600;
     }
 
-    .table-monitoring th:nth-child(1),
-    .table-monitoring td:nth-child(1) { width: 22%; }
-    .table-monitoring th:nth-child(2),
-    .table-monitoring td:nth-child(2) { width: 6%; }
-    .table-monitoring th:nth-child(3),
-    .table-monitoring td:nth-child(3) { width: 14%; }
-    .table-monitoring th:nth-child(4),
-    .table-monitoring td:nth-child(4) { width: 10%; }
-    .table-monitoring th:nth-child(5),
-    .table-monitoring td:nth-child(5) { width: 14%; }
-    .table-monitoring th:nth-child(6),
-    .table-monitoring td:nth-child(6) { width: 16%; }
-    .table-monitoring th:nth-child(7),
-    .table-monitoring td:nth-child(7) { width: 18%; }
-
     .registered-by-pill {
         display: inline-flex;
         align-items: center;
-        gap: 7px;
+        gap: 6px;
         max-width: 100%;
+        margin-top: 5px;
     }
 
     .registered-by-avatar {
-        width: 20px;
-        height: 20px;
-        flex: 0 0 20px;
+        width: 18px;
+        height: 18px;
+        flex: 0 0 18px;
         background: #eff6ff;
         border-radius: 6px;
         display: inline-flex;
@@ -516,13 +515,14 @@
     }
 
     .registered-by-pill span {
-        color: #475569;
+        color: #94a3b8;
         font-size: 9px;
-        font-weight: 800;
+        font-weight: 700;
         line-height: 1.2;
         text-transform: capitalize;
         overflow: hidden;
         text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .visit-docs-cell {
