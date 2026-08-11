@@ -33,14 +33,20 @@ class CeaiDashboardView(TvTemplateMixin, CeaiBaseMixin, RoleRequiredMixin, Templ
         context = super().get_context_data(**kwargs)
         directorate = get_object_or_404(Directorate, name__icontains="CEAI")
         context["directorate"] = directorate
-        context["units"] = CEAI_UNITS
-        
+        context["units"] = self.filter_units(CEAI_UNITS)
+        context["can_access_condominio"] = self.require_unit_access("Condomínio do Idoso")
+        allowed_units = self.get_allowed_units()  # None = acesso total; senao, lista das unidades permitidas
+
         # Filters
         now = timezone.now()
         selected_year = int(self.request.GET.get("year", now.year))
         selected_month = self.request.GET.get("month", "all")
         selected_unit = self.request.GET.get("unit", "all")
-        
+        if allowed_units is not None and selected_unit != "all" and selected_unit not in allowed_units:
+            # Unidade fora da permissao do usuario (inclusive via URL manual):
+            # cai pra "all", que o loop abaixo ja restringe as unidades permitidas.
+            selected_unit = "all"
+
         context["selected_year"] = selected_year
         context["selected_month"] = selected_month
         context["selected_unit"] = selected_unit
@@ -112,6 +118,10 @@ class CeaiDashboardView(TvTemplateMixin, CeaiBaseMixin, RoleRequiredMixin, Templ
             for u_name, u_data in units_in_sub:
                 # Apply unit filter if not "all"
                 if selected_unit != "all" and u_name != selected_unit:
+                    continue
+                # Nunca soma/mostra unidade fora da permissao do usuario,
+                # mesmo no modo "all" (agregado).
+                if allowed_units is not None and u_name not in allowed_units:
                     continue
 
                 # Accumulate for chart
@@ -309,6 +319,8 @@ class CeaiCategoryApiView(CeaiBaseMixin, RoleRequiredMixin, View):
 
     def get(self, request):
         unit = request.GET.get("unit")
+        if not self.require_unit_access(unit):
+            return JsonResponse({"success": False, "error": "Você não tem acesso a esta unidade."}, status=403)
         categories = CeaiCategory.objects.filter(unit=unit).order_by("name")
         data = [{"id": str(c.id), "name": c.name} for c in categories]
         return JsonResponse(data, safe=False)
@@ -320,19 +332,27 @@ class CeaiCategoryApiView(CeaiBaseMixin, RoleRequiredMixin, View):
         cat_id = data.get("id")
 
         if cat_id:
-            # Update
+            # Update: a unidade dona da categoria e' a que ja esta salva no
+            # banco, nao a que veio no corpo do POST (nao editavel aqui, mas
+            # nunca confiar no valor do cliente pra decidir permissao).
             category = get_object_or_404(CeaiCategory, id=cat_id)
+            if not self.require_unit_access(category.unit):
+                return JsonResponse({"success": False, "error": "Você não tem acesso a esta unidade."}, status=403)
             category.name = name
             category.save()
         else:
             # Create
+            if not self.require_unit_access(unit):
+                return JsonResponse({"success": False, "error": "Você não tem acesso a esta unidade."}, status=403)
             CeaiCategory.objects.create(unit=unit, name=name)
-        
+
         return JsonResponse({"success": True})
 
     def delete(self, request):
         cat_id = request.GET.get("id")
         category = get_object_or_404(CeaiCategory, id=cat_id)
+        if not self.require_unit_access(category.unit):
+            return JsonResponse({"success": False, "error": "Você não tem acesso a esta unidade."}, status=403)
         # Check for linked offices before deleting
         if CeaiOficina.objects.filter(category=category).exists():
             return JsonResponse({"success": False, "error": "Existem oficinas vinculadas a esta categoria."}, status=400)
@@ -344,6 +364,8 @@ class CeaiOficinaApiView(CeaiBaseMixin, RoleRequiredMixin, View):
 
     def get(self, request):
         unit = request.GET.get("unit")
+        if not self.require_unit_access(unit):
+            return JsonResponse({"success": False, "error": "Você não tem acesso a esta unidade."}, status=403)
         oficinas = CeaiOficina.objects.filter(unit=unit).select_related("category").order_by("activity_name")
         data = [{
             "id": str(o.id),
@@ -365,13 +387,18 @@ class CeaiOficinaApiView(CeaiBaseMixin, RoleRequiredMixin, View):
             category = get_object_or_404(CeaiCategory, id=category_id)
 
         if ofi_id:
-            # Update
+            # Update: a unidade dona da oficina e' a que ja esta salva no
+            # banco, nunca a que veio no corpo do POST.
             oficina = get_object_or_404(CeaiOficina, id=ofi_id)
+            if not self.require_unit_access(oficina.unit):
+                return JsonResponse({"success": False, "error": "Você não tem acesso a esta unidade."}, status=403)
             oficina.activity_name = activity_name
             oficina.category = category
             oficina.save()
         else:
             # Create
+            if not self.require_unit_access(unit):
+                return JsonResponse({"success": False, "error": "Você não tem acesso a esta unidade."}, status=403)
             CeaiOficina.objects.create(
                 unit=unit,
                 activity_name=activity_name,
@@ -379,18 +406,26 @@ class CeaiOficinaApiView(CeaiBaseMixin, RoleRequiredMixin, View):
                 total_vacancies=0,
                 vacancies=0
             )
-        
+
         return JsonResponse({"success": True})
 
     def delete(self, request):
         ofi_id = request.GET.get("id")
         oficina = get_object_or_404(CeaiOficina, id=ofi_id)
+        if not self.require_unit_access(oficina.unit):
+            return JsonResponse({"success": False, "error": "Você não tem acesso a esta unidade."}, status=403)
         oficina.delete()
         return JsonResponse({"success": True})
 
 class CeaiOficinasView(CeaiBaseMixin, RoleRequiredMixin, TemplateView):
     template_name = "ceai/oficinas.html"
     allowed_roles = ["admin", "diretor", "agente"]
+
+    def get(self, request, *args, **kwargs):
+        if not self.require_unit_access(kwargs.get("unit")):
+            messages.error(request, "Você não tem acesso a esta unidade.")
+            return redirect("ceai:dashboard")
+        return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -403,6 +438,12 @@ class CeaiOficinasView(CeaiBaseMixin, RoleRequiredMixin, TemplateView):
 class CeaiCategoriesView(CeaiBaseMixin, RoleRequiredMixin, TemplateView):
     template_name = "ceai/categories.html"
     allowed_roles = ["admin", "diretor", "agente"]
+
+    def get(self, request, *args, **kwargs):
+        if not self.require_unit_access(kwargs.get("unit")):
+            messages.error(request, "Você não tem acesso a esta unidade.")
+            return redirect("ceai:dashboard")
+        return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -521,7 +562,12 @@ class CeaiDataListView(ExcelExportMixin, CeaiBaseMixin, RoleRequiredMixin, Templ
         ).order_by("month")
 
         all_territorial_units = ["Brasil", "Laranjeiras", "Luizote", "Guarani", "Morumbi", "Condomínio do Idoso"]
-        units_to_process = all_territorial_units if unit_filter == "all" else [unit_filter]
+        all_visible_units = self.filter_units(all_territorial_units)
+        if unit_filter != "all" and unit_filter not in all_visible_units:
+            # Unidade fora da permissao do usuario (ou inexistente): cai pra
+            # "all", que ja e' limitado as unidades visiveis logo abaixo.
+            unit_filter = "all"
+        units_to_process = all_visible_units if unit_filter == "all" else [unit_filter]
 
         is_condominio = (unit_filter == "Condomínio do Idoso" or (
             unit_filter == "all" and "Condomínio do Idoso" in units_to_process
@@ -603,12 +649,13 @@ class CeaiDataListView(ExcelExportMixin, CeaiBaseMixin, RoleRequiredMixin, Templ
 
         context["units_data"] = units_data
         context["unit_filter"] = unit_filter
+        context["visible_units"] = all_visible_units
         context["category_filters"] = category_filters
         context["selected_year"] = year
         context["directorate"] = directorate
         context["month_headers"] = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
         context["years_range"] = range(2023, timezone.now().year + 1)
-        context["all_categories"] = CeaiCategory.objects.values_list("name", flat=True).distinct().order_by("name")
+        context["all_categories"] = CeaiCategory.objects.filter(unit__in=all_visible_units).values_list("name", flat=True).distinct().order_by("name")
         context["can_delete"] = self.is_admin()
         return context
 

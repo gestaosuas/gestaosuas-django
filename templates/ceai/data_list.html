@@ -24,12 +24,9 @@
                             <span>Unidade</span>
                             <select name="unit" onchange="this.form.submit()">
                                 <option value="all" {% if unit_filter == 'all' %}selected{% endif %}>Todas as Unidades</option>
-                                <option value="Brasil" {% if unit_filter == 'Brasil' %}selected{% endif %}>CEAI Brasil</option>
-                                <option value="Laranjeiras" {% if unit_filter == 'Laranjeiras' %}selected{% endif %}>CEAI Laranjeiras</option>
-                                <option value="Luizote" {% if unit_filter == 'Luizote' %}selected{% endif %}>CEAI Luizote</option>
-                                <option value="Guarani" {% if unit_filter == 'Guarani' %}selected{% endif %}>CEAI Guarani</option>
-                                <option value="Morumbi" {% if unit_filter == 'Morumbi' %}selected{% endif %}>CEAI Morumbi</option>
-                                <option value="Condomínio do Idoso" {% if unit_filter == 'Condomínio do Idoso' %}selected{% endif %}>Condomínio do Idoso</option>
+                                {% for unit in visible_units %}
+                                <option value="{{ unit }}" {% if unit_filter == unit %}selected{% endif %}>{% if unit == 'Condomínio do Idoso' %}Condomínio do Idoso{% else %}CEAI {{ unit }}{% endif %}</option>
+                                {% endfor %}
                             </select>
                         </label>
                         <div class="pill-select multi-select-pill" id="categoryFilterWrap">
