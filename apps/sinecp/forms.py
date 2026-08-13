@@ -1,3 +1,5 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from django import forms
 from apps.core.forms import StyledMonitoringForm
 from .models import SineReport, QualificacaoReport
@@ -170,3 +172,14 @@ class QualificacaoReportForm(StyledMonitoringForm):
         if "resumo_taxa_ocupacao" in self.fields:
             self.fields["resumo_taxa_ocupacao"].disabled = True
             self.fields["resumo_taxa_ocupacao"].widget.attrs["readonly"] = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+        vagas = cleaned_data.get("resumo_vagas") or 0
+        ocupadas = cleaned_data.get("resumo_vagas_ocupadas") or 0
+        if vagas:
+            taxa = (Decimal(ocupadas) / Decimal(vagas) * 100).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        else:
+            taxa = Decimal("0.00")
+        cleaned_data["resumo_taxa_ocupacao"] = taxa
+        return cleaned_data

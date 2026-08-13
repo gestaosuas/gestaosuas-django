@@ -81,6 +81,15 @@ O banco para `cras_reports` tem `directorate_id uuid` nullable. O banco para `na
 
 **Status**: Templates existem mas podem estar incompletos. Models existem, views existem. `poprua` não tem `admin.py` (vazio). `casamulher` não tem `admin.py`.
 
+### B.7 Campos calculados automaticamente no formulário (não editáveis diretamente)
+
+Alguns campos numéricos não são preenchidos manualmente — são somas/razões de outros campos do mesmo relatório, calculadas ao vivo em JS (para exibição) e sempre recalculadas de novo em `Form.clean()` no servidor (o valor vindo do POST é ignorado, mesmo que o campo já esteja `disabled` no HTML).
+
+- **`beneficios_reports.total_visitas`** — Confirmado (2026-08-13, decisão explícita do usuário): soma de `visitas_cadunico + visita_nucleo_habitacao + visita_cesta_fraldas_colchoes + visita_dmae + visitas_pro_pao`. Ver `BeneficiosReportForm.clean()`.
+- **`qualificacao_reports.resumo_taxa_ocupacao`** — Confirmado (2026-08-13, pergunta de alinhamento respondida pelo usuário): `resumo_vagas_ocupadas / resumo_vagas × 100`, arredondado a 2 casas decimais; `0.00` quando `resumo_vagas` é 0 (evita divisão por zero). Ver `QualificacaoReportForm.clean()`.
+
+**Observação**: a edição rápida (quick-edit, inline na tabela "Ver Dados") NÃO passa por esse recálculo — só o formulário principal (`*CreateUpdateView`) garante o valor correto. Um admin editando um dos campos-fonte via quick-edit pode deixar o total/taxa dessincronizado até o próximo salvamento pelo formulário.
+
 ---
 
 ## C) Perguntas de Alinhamento
@@ -156,3 +165,4 @@ Então [definir após alinhamento]
 |------|---------|--------|
 | 2026-07-21 | Criação do arquivo | Mapeamento de models de report por diretoria |
 | 2026-07-21 | Respostas Q1-Q4 confirmadas | Unidades CRAS fixas, apps com diretoria fixa confirmados, abertura para campo type |
+| 2026-08-13 | Adicionada seção B.7 (campos calculados: `beneficios_reports.total_visitas`, `qualificacao_reports.resumo_taxa_ocupacao`) | Fórmulas confirmadas com o usuário ao implementar o cálculo automático desses campos no formulário |

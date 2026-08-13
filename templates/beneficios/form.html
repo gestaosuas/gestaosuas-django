@@ -2,7 +2,7 @@
 
 {% block title %}Preencher Beneficios | {{ directorate.name }}{% endblock %}
 
-{% block body_class %}dashboard-fit-vh theme-blue{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
 
 {% block content %}
 <div class="app-shell">
@@ -116,7 +116,71 @@
                 });
             </script>
             {% else %}
-            <form method="post" class="report-form-shell" onsubmit="return confirm('Confirma o envio dos dados deste mês? Depois de enviado, só um administrador pode reabrir para edição.')">
+            <div id="referenceMonthModal" class="modal-overlay is-active">
+                <div class="modal-content" style="max-width: 420px;">
+                    <div class="modal-header">
+                        <h2>Mês de referência</h2>
+                    </div>
+                    <div class="modal-body">
+                        <p style="color: #475569; font-size: 13px; margin-bottom: 20px;">Selecione o mês e o ano de referência deste lançamento antes de continuar.</p>
+                        <div class="field-group" style="margin-bottom: 16px;">
+                            <label style="display: block; font-size: 11px; font-weight: 800; color: #475569; text-transform: uppercase; margin-bottom: 6px;">Mês</label>
+                            <select id="referenceMonthSelect" class="form-input">
+                                {% for m_num, m_label in month_options %}
+                                    <option value="{{ m_num }}" {% if m_num == selected_month %}selected{% endif %}>{{ m_label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="field-group" style="margin-bottom: 24px;">
+                            <label style="display: block; font-size: 11px; font-weight: 800; color: #475569; text-transform: uppercase; margin-bottom: 6px;">Ano</label>
+                            <input type="number" id="referenceYearInput" class="form-input" min="2020" value="{{ selected_year }}">
+                        </div>
+                        <button type="button" id="referenceMonthContinueBtn" class="btn-primary-premium" style="width: 100%; justify-content: center; background: #10b981; border-color: #059669;">
+                            <i data-lucide="arrow-right"></i> Continuar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="confirmSubmitModal" class="modal-overlay">
+                <div class="modal-content" style="max-width: 420px;">
+                    <div class="modal-header">
+                        <h2>Confirmar envio</h2>
+                    </div>
+                    <div class="modal-body">
+                        <p style="color: #475569; font-size: 13px; margin-bottom: 20px;">Confirma o envio dos dados deste mês? Depois de enviado, só um administrador pode reabrir para edição.</p>
+                        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                            <button type="button" id="confirmSubmitCancelBtn" class="btn-outline-monitoring">Cancelar</button>
+                            <button type="button" id="confirmSubmitOkBtn" class="btn-primary-premium" style="background: #10b981; border-color: #059669;">
+                                <i data-lucide="save"></i> Confirmar envio
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <style>
+                .modal-overlay {
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                    background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);
+                    display: none; align-items: center; justify-content: center;
+                    z-index: 2000; padding: 24px;
+                }
+                .modal-overlay.is-active { display: flex; }
+                .modal-content {
+                    background: white; width: min(420px, 100%); max-height: 85vh;
+                    border-radius: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.1);
+                    display: flex; flex-direction: column; overflow: hidden;
+                }
+                .modal-header {
+                    padding: 20px 24px; background: #f8fafc;
+                    border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
+                }
+                .modal-header h2 { font-size: 16px; font-weight: 800; color: #1e3a8a; margin: 0; }
+                .modal-body { padding: 20px 24px; overflow-y: auto; }
+            </style>
+
+            <form method="post" class="report-form-shell" id="beneficiosReportForm">
                 {% csrf_token %}
                 {% if form.non_field_errors %}
                     <div class="error-text" style="background: #fef2f2; color: #b91c1c; padding: 12px; border-radius: 12px; margin-bottom: 20px;">
@@ -179,6 +243,66 @@
                 }
                 if (monthEl) monthEl.addEventListener("change", reloadWithPeriod);
                 if (yearEl) yearEl.addEventListener("change", reloadWithPeriod);
+            });
+            </script>
+
+            <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                var continueBtn = document.getElementById("referenceMonthContinueBtn");
+                if (continueBtn) {
+                    continueBtn.addEventListener("click", function () {
+                        var month = document.getElementById("referenceMonthSelect").value;
+                        var year = document.getElementById("referenceYearInput").value;
+                        if (String(month) === "{{ selected_month }}" && String(year) === "{{ selected_year }}") {
+                            document.getElementById("referenceMonthModal").classList.remove("is-active");
+                        } else {
+                            var url = new URL(window.location.href);
+                            url.searchParams.set("month", month);
+                            url.searchParams.set("year", year);
+                            window.location.href = url.toString();
+                        }
+                    });
+                }
+
+                var form = document.getElementById("beneficiosReportForm");
+                var confirmModal = document.getElementById("confirmSubmitModal");
+                if (form && confirmModal) {
+                    form.addEventListener("submit", function (e) {
+                        e.preventDefault();
+                        confirmModal.classList.add("is-active");
+                    });
+                    document.getElementById("confirmSubmitCancelBtn").addEventListener("click", function () {
+                        confirmModal.classList.remove("is-active");
+                    });
+                    document.getElementById("confirmSubmitOkBtn").addEventListener("click", function () {
+                        confirmModal.classList.remove("is-active");
+                        form.submit();
+                    });
+                }
+
+                var visitSourceIds = [
+                    "id_visitas_cadunico",
+                    "id_visita_nucleo_habitacao",
+                    "id_visita_cesta_fraldas_colchoes",
+                    "id_visita_dmae",
+                    "id_visitas_pro_pao",
+                ];
+                var totalEl = document.getElementById("id_total_visitas");
+                if (totalEl) {
+                    var recalcTotal = function () {
+                        var sum = visitSourceIds.reduce(function (acc, id) {
+                            var el = document.getElementById(id);
+                            var val = el ? parseInt(el.value, 10) : 0;
+                            return acc + (isNaN(val) ? 0 : val);
+                        }, 0);
+                        totalEl.value = sum;
+                    };
+                    visitSourceIds.forEach(function (id) {
+                        var el = document.getElementById(id);
+                        if (el) el.addEventListener("input", recalcTotal);
+                    });
+                    recalcTotal();
+                }
             });
             </script>
             {% endif %}

@@ -4,12 +4,27 @@ from .models import BeneficiosReport
 
 
 class BeneficiosReportForm(StyledMonitoringForm):
+    total_visitas = forms.IntegerField(required=False, min_value=0, disabled=True)
+
+    VISIT_SUM_FIELDS = [
+        "visitas_cadunico",
+        "visita_nucleo_habitacao",
+        "visita_cesta_fraldas_colchoes",
+        "visita_dmae",
+        "visitas_pro_pao",
+    ]
+
     class Meta:
         model = BeneficiosReport
         exclude = ("id", "directorate", "user_external_id", "created_at", "updated_at")
         widgets = {
             "year": forms.NumberInput(attrs={"class": "form-input", "min": 2020}),
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        cleaned_data["total_visitas"] = sum(cleaned_data.get(f) or 0 for f in self.VISIT_SUM_FIELDS)
+        return cleaned_data
 
     section_map = [
         (

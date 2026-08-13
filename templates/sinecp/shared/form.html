@@ -434,6 +434,27 @@
         var realYearSelect = document.querySelector('select[name="year"]');
         if (realMonthSelect) realMonthSelect.addEventListener("change", reloadWithPeriod);
         if (realYearSelect) realYearSelect.addEventListener("change", reloadWithPeriod);
+
+        // RESUMO CP: Taxa de ocupação (%) = Vagas ocupadas / Vagas oferecidas.
+        // Só existe no formulário de Qualificação (CP) — no-op no formulário do SINE.
+        var vagasEl = document.getElementById("id_resumo_vagas");
+        var ocupadasEl = document.getElementById("id_resumo_vagas_ocupadas");
+        var taxaEl = document.getElementById("id_resumo_taxa_ocupacao");
+        if (vagasEl && ocupadasEl && taxaEl) {
+            var recalcTaxaOcupacao = function () {
+                var vagas = parseInt(vagasEl.value, 10);
+                var ocupadas = parseInt(ocupadasEl.value, 10);
+                if (isNaN(vagas) || vagas <= 0) {
+                    taxaEl.value = "0.00";
+                    return;
+                }
+                var taxa = (isNaN(ocupadas) ? 0 : ocupadas) / vagas * 100;
+                taxaEl.value = taxa.toFixed(2);
+            };
+            vagasEl.addEventListener("input", recalcTaxaOcupacao);
+            ocupadasEl.addEventListener("input", recalcTaxaOcupacao);
+            recalcTaxaOcupacao();
+        }
     });
 </script>
 {% endblock %}

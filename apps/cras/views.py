@@ -313,15 +313,18 @@ class CrasDataView(ExcelExportMixin, CrasBaseMixin, TemplateView):
         available_years = sorted(list(set(CrasReport.objects.filter(directorate=directorate).values_list("year", flat=True))), reverse=True)
         if not available_years: available_years = [selected_year]
         reports = {}
-        rma_data = {}
         for r in CrasReport.objects.filter(directorate=directorate, year=selected_year):
             key = (strip_accents(r.unit_name).upper(), r.month)
             if key not in reports:
                 reports[key] = r
-            unit_upper = strip_accents(r.unit_name).upper()
-            if unit_upper not in rma_data:
-                rma_data[unit_upper] = {}
-            rma_data[unit_upper][r.month] = {"url": r.rma_url, "name": r.anexo_rma}
+        # rma_data e' derivado do mesmo "reports" ja' deduplicado (nao de uma
+        # segunda passagem independente na queryset) para nunca divergir sobre
+        # qual linha "venceu" quando duas linhas colidem no mesmo unidade/mes
+        # normalizados (ex.: residuo do Supabase com unit_name em Title Case
+        # coexistindo com a linha atual em CAIXA ALTA) - ver CLAUDE.md 2026-08-13.
+        rma_data = {}
+        for (unit_upper, month), r in reports.items():
+            rma_data.setdefault(unit_upper, {})[month] = {"url": r.rma_url, "name": r.anexo_rma}
         units_tables = []
         for unit in visible_units:
             unit_key = strip_accents(unit).upper()
