@@ -1,9 +1,10 @@
 from django.urls import path
 
 from .views import (LandingView, MapManagementView, MapView,
-                     NarrativeReportDeleteView, NotificationsMarkReadView,
-                     NotificationsUnreadView, ProtectedMediaView,
-                     SystemSettingsView, TvApiUrlsView, TvDashboardView)
+                     NarrativeReportDeleteView, NotificationsListView,
+                     NotificationsMarkReadView, NotificationsUnreadView,
+                     ProtectedMediaView, SystemSettingsView, TvApiUrlsView,
+                     TvDashboardView)
 
 
 app_name = "core"
@@ -15,6 +16,7 @@ urlpatterns = [
     path("mapas/", MapView.as_view(), name="map"),
     path("tv/", TvDashboardView.as_view(), name="tv-dashboard"),
     path("tv-api/urls/", TvApiUrlsView.as_view(), name="tv-api-urls"),
+    path("notifications/", NotificationsListView.as_view(), name="notifications-list"),
     path("notifications/unread/", NotificationsUnreadView.as_view(), name="notifications-unread"),
     path("notifications/mark-read/", NotificationsMarkReadView.as_view(), name="notifications-mark-read"),
     path("media-protegido/<path:file_path>/", ProtectedMediaView.as_view(), name="protected-media"),

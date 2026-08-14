@@ -23,10 +23,21 @@
         </div>
 
         {% if request.user.is_superuser or user_profile.role == 'admin' %}
-        <a href="{% url 'core:tv-dashboard' %}" class="nav-link {% if '/tv' in request.path %}active{% endif %}">
-            <i data-lucide="monitor-play"></i>
-            <span>Dashboard Diretorias</span>
-        </a>
+        <div class="nav-group">
+            <button class="nav-btn {% if '/tv' in request.path or request.resolver_match.url_name == 'notifications-list' %}active{% endif %}">
+                <i data-lucide="monitor-play"></i>
+                <span>Dashboard</span>
+                <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
+            </button>
+            <div class="nav-dropdown">
+                <a href="{% url 'core:tv-dashboard' %}" class="dropdown-item">
+                    <span>Dashboard Diretorias</span>
+                </a>
+                <a href="{% url 'core:notifications-list' %}" class="dropdown-item">
+                    <span>Notificações</span>
+                </a>
+            </div>
+        </div>
         {% endif %}
 
         <div class="nav-group">
@@ -299,7 +310,8 @@
             font-weight: 600;
         }
 
-        .nav-link.active {
+        .nav-link.active,
+        .nav-btn.active {
             background: #f0f7ff !important;
             color: #2563eb !important;
         }
@@ -488,7 +500,8 @@
             color: #fff !important;
         }
         
-        #main-navbar .nav-link.active {
+        #main-navbar .nav-link.active,
+        #main-navbar .nav-btn.active {
             background: rgba(255, 255, 255, 0.25) !important;
             color: #fff !important;
         }

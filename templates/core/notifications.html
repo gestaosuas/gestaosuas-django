@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Notificações | {{ system_name }}{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    {% include "partials/navbar.html" %}
+
+    <main class="dashboard-main">
+        <header class="dashboard-header">
+            <div class="header-content">
+                <p class="eyebrow">Administração</p>
+                <h1>Notificações</h1>
+                <p class="header-description">Histórico de alterações no sistema dos últimos {{ window_days }} dias, agrupado por dia.</p>
+            </div>
+        </header>
+
+        <section class="notif-page-section animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {% if days %}
+                {% for day in days %}
+                <div class="notif-day-card">
+                    <div class="notif-day-header">
+                        <span class="notif-day-label">{{ day.label }}</span>
+                        <span class="notif-day-count">{{ day.items|length }} alteraç{{ day.items|length|pluralize:"ão,ões" }}</span>
+                    </div>
+                    <div class="notif-day-list">
+                        {% for item in day.items %}
+                            {% if item.url %}
+                            <a href="{{ item.url }}" class="notif-page-item">
+                                <div class="notif-page-item-main">
+                                    <span class="notif-page-item-message">{{ item.message }}</span>
+                                    {% if item.directorate_name %}
+                                        <span class="notif-page-item-dir">{{ item.directorate_name }}</span>
+                                    {% endif %}
+                                </div>
+                                <span class="notif-page-item-time">{{ item.time }}</span>
+                            </a>
+                            {% else %}
+                            <div class="notif-page-item notif-page-item-static">
+                                <div class="notif-page-item-main">
+                                    <span class="notif-page-item-message">{{ item.message }}</span>
+                                    {% if item.directorate_name %}
+                                        <span class="notif-page-item-dir">{{ item.directorate_name }}</span>
+                                    {% endif %}
+                                </div>
+                                <span class="notif-page-item-time">{{ item.time }}</span>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="notif-page-empty">
+                    <i data-lucide="bell-off"></i>
+                    <p>Nenhuma alteração registrada nos últimos {{ window_days }} dias.</p>
+                </div>
+            {% endif %}
+        </section>
+    </main>
+</div>
+
+<style>
+    .notif-page-section {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        padding: 0 40px 60px;
+    }
+
+    .notif-day-card {
+        background: #fff;
+        border: 1px solid #f1f5f9;
+        border-radius: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        overflow: hidden;
+    }
+
+    .notif-day-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 24px;
+        background: #f8fafc;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .notif-day-label {
+        font-size: 14px;
+        font-weight: 800;
+        color: #1e3a8a;
+    }
+
+    .notif-day-count {
+        font-size: 11px;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .notif-day-list {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .notif-page-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 24px;
+        border-bottom: 1px solid #f8fafc;
+        text-decoration: none;
+        color: inherit;
+        transition: background 0.15s;
+    }
+
+    .notif-day-list .notif-page-item:last-child {
+        border-bottom: none;
+    }
+
+    a.notif-page-item:hover {
+        background: #f8fafc;
+    }
+
+    .notif-page-item-static {
+        cursor: default;
+    }
+
+    .notif-page-item-main {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        flex-wrap: wrap;
+    }
+
+    .notif-page-item-message {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    .notif-page-item-dir {
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #2563eb;
+        background: #eff6ff;
+        padding: 2px 8px;
+        border-radius: 999px;
+        flex-shrink: 0;
+    }
+
+    .notif-page-item-time {
+        font-size: 12px;
+        font-weight: 700;
+        color: #94a3b8;
+        flex-shrink: 0;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .notif-page-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 60px 24px;
+        color: #94a3b8;
+        background: #f8fafc;
+        border: 2px dashed #e2e8f0;
+        border-radius: 20px;
+    }
+
+    .notif-page-empty i {
+        width: 40px;
+        height: 40px;
+        color: #cbd5e1;
+    }
+
+    @media (max-width: 640px) {
+        .notif-page-section { padding: 0 16px 40px; }
+        .notif-page-item { flex-wrap: wrap; }
+    }
+</style>
+{% endblock %}

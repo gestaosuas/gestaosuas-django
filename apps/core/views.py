@@ -166,6 +166,54 @@ class NotificationsMarkReadView(LoginRequiredMixin, View):
         return JsonResponse({"status": "success"})
 
 
+class NotificationsListView(LoginRequiredMixin, RoleRequiredMixin, TemplateView):
+    """Página com o histórico completo do sininho, agrupado por dia (não só
+    as não lidas — o dropdown do sininho mostra só as pendentes)."""
+    template_name = "core/notifications.html"
+    allowed_roles = ["admin"]
+
+    def get_context_data(self, **kwargs):
+        from itertools import groupby
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.core.models import ActivityLog
+        from apps.core.notifications import ACTION_VERBS
+
+        context = super().get_context_data(**kwargs)
+        window_days = 30
+        cutoff = timezone.now() - timedelta(days=window_days)
+        logs = ActivityLog.objects.filter(created_at__gte=cutoff).order_by("-created_at")
+
+        today = timezone.localtime(timezone.now()).date()
+        yesterday = today - timedelta(days=1)
+        month_names = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
+                       "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
+
+        days = []
+        for day, entries in groupby(logs, key=lambda log: timezone.localtime(log.created_at).date()):
+            if day == today:
+                label = "Hoje"
+            elif day == yesterday:
+                label = "Ontem"
+            else:
+                label = f"{day.day} de {month_names[day.month - 1]} de {day.year}"
+
+            items = []
+            for log in entries:
+                verb = ACTION_VERBS.get(log.action_type, log.action_type)
+                items.append({
+                    "message": f"{log.user_name} {verb} {log.resource_name}",
+                    "directorate_name": log.directorate_name,
+                    "url": (log.details or {}).get("url", ""),
+                    "time": timezone.localtime(log.created_at).strftime("%H:%M"),
+                })
+            days.append({"date": day, "label": label, "items": items})
+
+        context["days"] = days
+        context["window_days"] = window_days
+        return context
+
+
 class ProtectedMediaView(LoginRequiredMixin, View):
     """Serve arquivos de MEDIA_ROOT só para usuários autenticados.
 
