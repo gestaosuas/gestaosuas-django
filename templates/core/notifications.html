@@ -62,6 +62,18 @@
 </div>
 
 <style>
+    /* partials/navbar.html zera .dashboard-main { padding-top: 0 !important }
+       de proposito para paginas com banner colorido proprio (CRAS, Beneficios,
+       SINE-CP) que ja compensam a navbar (position:absolute no desktop) via
+       espacamento interno. Esta pagina nao tem banner, entao precisa
+       reafirmar o padding-top aqui (mesmo padrao de accounts/user_list.html)
+       - senao o titulo fica escondido atras da navbar em telas >=1025px. */
+    @media (min-width: 1025px) {
+        .dashboard-main {
+            padding-top: 80px !important;
+        }
+    }
+
     .notif-page-section {
         display: flex;
         flex-direction: column;
