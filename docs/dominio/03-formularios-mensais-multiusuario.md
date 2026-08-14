@@ -18,6 +18,8 @@ Cada app de relatório mensal implementa um padrão quase idêntico:
 | `*DataView` | GET | Exibe tabela com 12 meses | Todos (com filtro de unidade) |
 | `*HomeView` | GET | Dashboard com cards/KPIs | Todos |
 
+**Variação (2026-08-13, só no CRAS por enquanto)**: além do `*QuickEditView` para campos numéricos, `CrasQuickEditRmaView` (`cras:quick-edit-rma`) faz o mesmo tipo de edição inline na `*DataView`, mas para o anexo (PDF do RMA) em vez de um número — reaproveita a lógica de upload de `CrasCreateUpdateView.form_valid()`. Não é (ainda) um padrão replicado em outros apps; se outra diretoria ganhar upload de anexo na tabela de dados, vale generalizar em vez de duplicar por app.
+
 ### A.2 Padrão `get_or_create` no POST
 
 **Todos** os apps seguem este padrão no `form_valid()`:
@@ -296,5 +298,6 @@ A partir de 2026-07-21, as tabelas de violação do CREAS foram reestruturadas.
 |------|---------|--------|
 | 2026-07-21 | Criação do arquivo | Mapeamento do fluxo de preenchimento mensal multi-usuário |
 | 2026-07-21 | Respostas Q1-Q5, Q7, Q8, Q9, Q11, Q12 confirmadas | Concorrência, bloqueio, admin-only, bug beneficios user_id, permissões |
+| 2026-08-13 | Documentada `CrasQuickEditRmaView` (A.1) | Novo endpoint de upload de anexo inline em "Ver Dados", só no CRAS |
 | 2026-07-21 | Débito técnico #6 adicionado ao CLAUDE.md | Bug beneficios_reports.user_id = None |
 | 2026-07-21 | Seção E: convenção de estratificação | Idoso e PCD ganharam estratificação por gênero; Protetivo por gênero + faixa etária |

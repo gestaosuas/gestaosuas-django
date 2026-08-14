@@ -129,11 +129,23 @@
                                 <tr>
                                     <td><strong style="color: #334155;">RMA</strong></td>
                                     {% for rma in unit_table.rma %}
-                                    <td style="text-align: center;">
-                                        {% if rma.url %}
-                                        <a href="{{ rma.url }}" target="_blank" title="{{ rma.name }}" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #ef4444; text-decoration: none;">
-                                            <i data-lucide="file-text" style="width: 14px; height: 14px;"></i> PDF
-                                        </a>
+                                    <td class="rma-cell" style="text-align: center;"
+                                        data-sub-id="{{ rma.sub_id|default:'' }}"
+                                        data-month="{{ rma.month }}"
+                                        data-year="{{ rma.year }}"
+                                        data-unit="{{ rma.unit }}">
+                                        <span class="rma-link-wrap">
+                                            {% if rma.url %}
+                                            <a href="{{ rma.url }}" target="_blank" title="{{ rma.name }}" class="rma-link" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #ef4444; text-decoration: none;">
+                                                <i data-lucide="file-text" style="width: 14px; height: 14px;"></i> PDF
+                                            </a>
+                                            {% endif %}
+                                        </span>
+                                        {% if request.user.profile.role == 'admin' %}
+                                        <button type="button" class="rma-upload-btn" title="{% if rma.url %}Substituir PDF{% else %}Anexar PDF{% endif %}">
+                                            <i data-lucide="{% if rma.url %}refresh-cw{% else %}upload{% endif %}"></i>
+                                        </button>
+                                        <input type="file" class="rma-file-input" accept=".pdf" style="display:none;">
                                         {% endif %}
                                     </td>
                                     {% endfor %}
@@ -157,6 +169,16 @@
 .delete-month-btn { background: none; border: none; cursor: pointer; color: #ef4444; padding: 2px; margin-left: 4px; vertical-align: middle; opacity: 0.6; }
 .delete-month-btn:hover { opacity: 1; }
 .delete-month-btn i { width: 14px; height: 14px; }
+.rma-cell { position: relative; }
+.rma-link-wrap { display: inline-flex; align-items: center; }
+.rma-upload-btn {
+    background: none; border: none; cursor: pointer; color: #10b981;
+    padding: 2px; margin-left: 4px; vertical-align: middle; opacity: 0.5;
+    display: inline-flex; align-items: center;
+}
+.rma-upload-btn:hover { opacity: 1; }
+.rma-upload-btn i { width: 13px; height: 13px; }
+.rma-cell.uploading { opacity: 0.5; pointer-events: none; }
 </style>
 
 <script>
@@ -218,6 +240,64 @@
                 });
             });
         });
+
+        document.querySelectorAll('.rma-upload-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const cell = this.closest('.rma-cell');
+                cell.querySelector('.rma-file-input').click();
+            });
+        });
+
+        document.querySelectorAll('.rma-file-input').forEach(input => {
+            input.addEventListener('change', function () {
+                const file = this.files[0];
+                if (!file) return;
+                const cell = this.closest('.rma-cell');
+                uploadRma(cell, file);
+                this.value = '';
+            });
+        });
+
+        function uploadRma(cell, file) {
+            cell.classList.add('uploading');
+
+            const formData = new FormData();
+            formData.append('rma_file', file);
+            formData.append('sub_id', cell.dataset.subId);
+            formData.append('month', cell.dataset.month);
+            formData.append('year', cell.dataset.year);
+            formData.append('unit', cell.dataset.unit);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('{% url "cras:quick-edit-rma" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                cell.classList.remove('uploading');
+                if (data.status === 'success') {
+                    cell.dataset.subId = data.sub_id;
+                    cell.querySelector('.rma-link-wrap').innerHTML =
+                        '<a href="' + data.url + '" target="_blank" title="' + data.name + '" class="rma-link" ' +
+                        'style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #ef4444; text-decoration: none;">' +
+                        '<i data-lucide="file-text" style="width: 14px; height: 14px;"></i> PDF</a>';
+                    const uploadBtn = cell.querySelector('.rma-upload-btn');
+                    uploadBtn.title = 'Substituir PDF';
+                    uploadBtn.innerHTML = '<i data-lucide="refresh-cw"></i>';
+                    lucide.createIcons();
+                    window.showToast('Salvo', 'RMA anexado com sucesso!', 'success');
+                } else {
+                    alert(data.error || 'Erro ao anexar o RMA.');
+                }
+            })
+            .catch(err => {
+                cell.classList.remove('uploading');
+                console.error(err);
+                alert('Erro ao anexar o RMA.');
+            });
+        }
 
         function saveCell(cell) {
             const inner = cell.querySelector('.val-inner');

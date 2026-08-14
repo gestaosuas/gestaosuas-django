@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     CrasHomeView, CrasCreateUpdateView, CrasDataView,
     CrasMonthlyNarrativeView, CrasNarrativeEditorView,
-    CrasQuickEditView, CrasDeleteMonthView
+    CrasQuickEditView, CrasQuickEditRmaView, CrasDeleteMonthView
 )
 
 app_name = "cras"
@@ -11,6 +11,7 @@ urlpatterns = [
     # quick-edit/ precisa vir ANTES de <dir_slug:pk>/, senão o converter
     # captura "quick-edit" como slug de diretoria (ver apps/creasidoso/urls.py).
     path("quick-edit/", CrasQuickEditView.as_view(), name="quick-edit"),
+    path("quick-edit-rma/", CrasQuickEditRmaView.as_view(), name="quick-edit-rma"),
     path("<dir_slug:pk>/", CrasHomeView.as_view(), name="home"),
     path("<dir_slug:pk>/preencher/", CrasCreateUpdateView.as_view(), name="form"),
     path("<dir_slug:pk>/dados/", CrasDataView.as_view(), name="data"),

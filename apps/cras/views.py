@@ -324,7 +324,7 @@ class CrasDataView(ExcelExportMixin, CrasBaseMixin, TemplateView):
         # coexistindo com a linha atual em CAIXA ALTA) - ver CLAUDE.md 2026-08-13.
         rma_data = {}
         for (unit_upper, month), r in reports.items():
-            rma_data.setdefault(unit_upper, {})[month] = {"url": r.rma_url, "name": r.anexo_rma}
+            rma_data.setdefault(unit_upper, {})[month] = {"url": r.rma_url, "name": r.anexo_rma, "sub_id": r.id}
         units_tables = []
         for unit in visible_units:
             unit_key = strip_accents(unit).upper()
@@ -339,7 +339,8 @@ class CrasDataView(ExcelExportMixin, CrasBaseMixin, TemplateView):
                 groups.append({"title": title, "rows": rows})
             rma_row = []
             for m in range(1, 13):
-                rm = rma_data.get(unit_key, {}).get(m, {})
+                rm = dict(rma_data.get(unit_key, {}).get(m, {}))
+                rm.update({"month": m, "year": selected_year, "unit": unit})
                 rma_row.append(rm)
             units_tables.append({"unit": unit, "groups": groups, "rma": rma_row})
         context.update({
@@ -460,3 +461,51 @@ class CrasQuickEditView(LoginRequiredMixin, RoleRequiredMixin, View):
         report.updated_at = timezone.now()
         report.save()
         return JsonResponse({"status": "success", "value": value, "sub_id": report.id})
+
+
+class CrasQuickEditRmaView(LoginRequiredMixin, RoleRequiredMixin, View):
+    """Anexa/substitui o RMA (PDF) direto da tabela "Ver Dados", sem passar
+    pelo formulário mensal inteiro. Mesma logica de upload de CrasCreateUpdateView.form_valid()."""
+    allowed_roles = ["admin"]
+
+    def post(self, request):
+        rma_file = request.FILES.get("rma_file")
+        if not rma_file:
+            return JsonResponse({"error": "Nenhum arquivo enviado"}, status=400)
+        if not rma_file.name.lower().endswith(".pdf"):
+            return JsonResponse({"error": "Envie um arquivo PDF"}, status=400)
+
+        sub_id = request.POST.get("sub_id")
+        month = int(request.POST.get("month"))
+        year = int(request.POST.get("year"))
+        unit_name = request.POST.get("unit")
+        directorate = Directorate.objects.filter(name__icontains="CRAS").first()
+        if not directorate:
+            directorate = Directorate.objects.filter(name__icontains="Proteção Social Básica").first()
+
+        if sub_id and sub_id != "None" and sub_id != "":
+            report = get_object_or_404(CrasReport, id=sub_id)
+        else:
+            report, _ = CrasReport.objects.get_or_create(
+                directorate=directorate,
+                month=month,
+                year=year,
+                unit_name=unit_name,
+                defaults={'created_at': timezone.now(), 'updated_at': timezone.now()}
+            )
+
+        import os
+        from django.core.files.storage import default_storage
+        ext = os.path.splitext(rma_file.name)[1]
+        filename = f"rma/{directorate.pk}/{unit_name}/{year}_{month:02d}_{uuid.uuid4().hex[:8]}{ext}"
+        saved_path = default_storage.save(filename, rma_file)
+        report.rma_url = reverse("core:protected-media", kwargs={"file_path": saved_path})
+        report.anexo_rma = rma_file.name
+        report.updated_at = timezone.now()
+        report.save()
+        return JsonResponse({
+            "status": "success",
+            "url": report.rma_url,
+            "name": report.anexo_rma,
+            "sub_id": report.id,
+        })
