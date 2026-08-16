@@ -110,9 +110,19 @@
                                 <input type="text" id="vigencia" value="{{ report_data.vigencia|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-field">
                             </div>
                             <div style="grid-column: span 2;">
-                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Valor autorizado por lei e repassado</label>
+                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Valor autorizado por lei para o exercício de {{ system_reference_year }}</label>
                                 <input type="text" id="valor_autorizado" value="{{ report_data.valor_autorizado|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-field">
                             </div>
+                            {% if report_data.status != 'finalized' or report_data.anotacoes %}
+                            <div style="grid-column: span 2;">
+                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Anotações</label>
+                                {% if report_data.status != 'finalized' %}
+                                    <textarea id="anotacoes" class="doc-textarea" style="min-height: 60px;" placeholder="Observações adicionais (opcional)...">{{ report_data.anotacoes }}</textarea>
+                                {% else %}
+                                    <div style="font-size: 12.5px; color: #334155; line-height: 1.6; font-weight: 600; white-space: pre-wrap;">{{ report_data.anotacoes }}</div>
+                                {% endif %}
+                            </div>
+                            {% endif %}
                         </div>
                     </section>
 
@@ -128,9 +138,9 @@
                         <textarea id="referencias" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.referencias }}</textarea>
                     </section>
 
-                    <!-- Section 4: DESCRIÇÃO DOS OBJETIVOS, METAS PREVISTAS E EXECUÇÃO FINANCEIRA -->
+                    <!-- Section 4: DESCRIÇÃO DOS OBJETIVOS, METAS, ATIVIDADES PREVISTAS, RESULTADOS E EXECUÇÃO FINANCEIRA -->
                     <section style="display: flex; flex-direction: column; gap: 20px;">
-                        <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 0px; letter-spacing: 0.05em;">4. DESCRIÇÃO DOS OBJETIVOS, METAS PREVISTAS E EXECUÇÃO FINANCEIRA</h3>
+                        <h3 style="font-size: 13px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 0px; letter-spacing: 0.05em;">4. Descrição dos Objetivos, Metas, Atividades Previstas, Resultados e Execução Financeira</h3>
                         <div>
                             <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">a) Dos objetivos:</label>
                             <textarea id="objetivos" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.objetivos }}</textarea>
@@ -139,16 +149,16 @@
                             <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">b) Das metas estabelecidas:</label>
                             <textarea id="metas" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.metas }}</textarea>
                         </div>
-                        <div style="margin-left: 20px;">
-                            <label style="font-size: 11px; font-weight: 800; color: #475569; display: block; margin-bottom: 6px;">Quantitativas:</label>
-                            <textarea id="metas_quantitativas" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.metas_quantitativas }}</textarea>
+                        <div>
+                            <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">c) Das atividades:</label>
+                            <textarea id="atividades" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.atividades }}</textarea>
                         </div>
                         <div>
-                            <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">c) Dos resultados:</label>
+                            <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">d) Dos resultados:</label>
                             <textarea id="resultados" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.resultados }}</textarea>
                         </div>
                         <div>
-                            <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">e) Da execução financeira e análise dos documentos comprobatórios das despesas:</label>
+                            <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">e) Da execução financeira:</label>
                             <textarea id="execucao_financeira" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.execucao_financeira }}</textarea>
                         </div>
                     </section>
@@ -522,44 +532,59 @@
                                             <th style="padding: 10px; font-weight: 900; text-transform: uppercase; border-right: 1.5px solid #0f172a;">Situação Encontrada</th>
                                             <th style="padding: 10px; font-weight: 900; text-transform: uppercase; border-right: 1.5px solid #0f172a;">Recomendações</th>
                                             <th style="padding: 10px; font-weight: 900; text-transform: uppercase;">Observação</th>
+                                            {% if report_data.status != 'finalized' %}
+                                            <th style="padding: 10px; font-weight: 900; text-transform: uppercase; width: 40px; text-align: center; border-left: 1.5px solid #0f172a;"></th>
+                                            {% endif %}
                                         </tr>
                                     </thead>
-                                    <tbody>
+                                    <tbody id="qualTableBody">
                                         {% for row in report_data.item5_qualitativos %}
-                                            <tr style="border-bottom: 1.5px solid #0f172a;">
+                                            <tr class="qual-row" style="border-bottom: 1.5px solid #0f172a;">
                                                 <td style="padding: 0; border-right: 1.5px solid #0f172a; background: #f8fafc;">
                                                     {% if report_data.status != 'finalized' %}
-                                                        <input type="text" id="qual-data-{{ forloop.index0 }}" value="{{ row.data }}" style="width: 100%; border: none; background: transparent; padding: 12px 8px; font-size: 11.5px; font-weight: 700; text-align: center; font-family: inherit;">
+                                                        <input type="text" class="qual-data-field" value="{{ row.data }}" style="width: 100%; border: none; background: transparent; padding: 12px 8px; font-size: 11.5px; font-weight: 700; text-align: center; font-family: inherit;">
                                                     {% else %}
                                                         <div style="padding: 12px 8px; font-weight: 700; text-align: center; color: #0f172a;">{{ row.data }}</div>
                                                     {% endif %}
                                                 </td>
                                                 <td style="padding: 0; border-right: 1.5px solid #0f172a;">
                                                     {% if report_data.status != 'finalized' %}
-                                                        <textarea id="qual-situacao-{{ forloop.index0 }}" style="width: 100%; border: none; background: transparent; padding: 10px 8px; font-size: 11.5px; font-weight: 600; font-family: inherit; resize: none; min-height: 50px; line-height: 1.4;">{{ row.situacao }}</textarea>
+                                                        <textarea class="qual-situacao-field" style="width: 100%; border: none; background: transparent; padding: 10px 8px; font-size: 11.5px; font-weight: 600; font-family: inherit; resize: none; min-height: 50px; line-height: 1.4;">{{ row.situacao }}</textarea>
                                                     {% else %}
                                                         <div style="padding: 10px 8px; font-weight: 700; color: #0f172a; white-space: pre-wrap; text-align: justify;">{{ row.situacao }}</div>
                                                     {% endif %}
                                                 </td>
                                                 <td style="padding: 0; border-right: 1.5px solid #0f172a;">
                                                     {% if report_data.status != 'finalized' %}
-                                                        <textarea id="qual-recomendacoes-{{ forloop.index0 }}" style="width: 100%; border: none; background: transparent; padding: 10px 8px; font-size: 11.5px; font-weight: 600; font-family: inherit; resize: none; min-height: 50px; line-height: 1.4;">{{ row.recomendacoes }}</textarea>
+                                                        <textarea class="qual-recomendacoes-field" style="width: 100%; border: none; background: transparent; padding: 10px 8px; font-size: 11.5px; font-weight: 600; font-family: inherit; resize: none; min-height: 50px; line-height: 1.4;">{{ row.recomendacoes }}</textarea>
                                                     {% else %}
                                                         <div style="padding: 10px 8px; font-weight: 700; color: #0f172a; white-space: pre-wrap; text-align: justify;">{{ row.recomendacoes }}</div>
                                                     {% endif %}
                                                 </td>
                                                 <td style="padding: 0;">
                                                     {% if report_data.status != 'finalized' %}
-                                                        <textarea id="qual-observacao-{{ forloop.index0 }}" style="width: 100%; border: none; background: transparent; padding: 10px 8px; font-size: 11.5px; font-weight: 600; font-family: inherit; resize: none; min-height: 50px; line-height: 1.4;">{{ row.observacao }}</textarea>
+                                                        <textarea class="qual-observacao-field" style="width: 100%; border: none; background: transparent; padding: 10px 8px; font-size: 11.5px; font-weight: 600; font-family: inherit; resize: none; min-height: 50px; line-height: 1.4;">{{ row.observacao }}</textarea>
                                                     {% else %}
                                                         <div style="padding: 10px 8px; font-weight: 700; color: #0f172a; white-space: pre-wrap; text-align: justify;">{{ row.observacao }}</div>
                                                     {% endif %}
                                                 </td>
+                                                {% if report_data.status != 'finalized' %}
+                                                <td style="padding: 0; text-align: center; border-left: 1.5px solid #0f172a;">
+                                                    <button type="button" onclick="removeQualRow(this)" title="Excluir linha" style="background: transparent; border: none; color: #ef4444; cursor: pointer; padding: 8px;">
+                                                        <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                                                    </button>
+                                                </td>
+                                                {% endif %}
                                             </tr>
                                         {% endfor %}
                                     </tbody>
                                 </table>
                             </div>
+                            {% if report_data.status != 'finalized' %}
+                            <button type="button" onclick="addQualRow()" class="no-print" style="margin-top: 10px; border: 1.5px dashed #cbd5e1; background: #f8fafc; border-radius: 8px; padding: 8px 14px; font-size: 11px; font-weight: 800; text-transform: uppercase; color: #475569; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                                <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Adicionar linha
+                            </button>
+                            {% endif %}
                         </div>
 
                         <!-- b) Quantitativos -->
@@ -1320,6 +1345,39 @@
         }
     }
 
+    function addQualRow() {
+        var tbody = document.getElementById('qualTableBody');
+        if (!tbody) return;
+        var tr = document.createElement('tr');
+        tr.className = 'qual-row';
+        tr.style.borderBottom = '1.5px solid #0f172a';
+        tr.innerHTML =
+            '<td style="padding: 0; border-right: 1.5px solid #0f172a; background: #f8fafc;">' +
+                '<input type="text" class="qual-data-field" style="width: 100%; border: none; background: transparent; padding: 12px 8px; font-size: 11.5px; font-weight: 700; text-align: center; font-family: inherit;">' +
+            '</td>' +
+            '<td style="padding: 0; border-right: 1.5px solid #0f172a;">' +
+                '<textarea class="qual-situacao-field" style="width: 100%; border: none; background: transparent; padding: 10px 8px; font-size: 11.5px; font-weight: 600; font-family: inherit; resize: none; min-height: 50px; line-height: 1.4;"></textarea>' +
+            '</td>' +
+            '<td style="padding: 0; border-right: 1.5px solid #0f172a;">' +
+                '<textarea class="qual-recomendacoes-field" style="width: 100%; border: none; background: transparent; padding: 10px 8px; font-size: 11.5px; font-weight: 600; font-family: inherit; resize: none; min-height: 50px; line-height: 1.4;"></textarea>' +
+            '</td>' +
+            '<td style="padding: 0;">' +
+                '<textarea class="qual-observacao-field" style="width: 100%; border: none; background: transparent; padding: 10px 8px; font-size: 11.5px; font-weight: 600; font-family: inherit; resize: none; min-height: 50px; line-height: 1.4;"></textarea>' +
+            '</td>' +
+            '<td style="padding: 0; text-align: center; border-left: 1.5px solid #0f172a;">' +
+                '<button type="button" onclick="removeQualRow(this)" title="Excluir linha" style="background: transparent; border: none; color: #ef4444; cursor: pointer; padding: 8px;">' +
+                    '<i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>' +
+                '</button>' +
+            '</td>';
+        tbody.appendChild(tr);
+        lucide.createIcons();
+    }
+
+    function removeQualRow(btn) {
+        var tr = btn.closest('tr');
+        if (tr) tr.remove();
+    }
+
     function canvasHasInk(canvas) {
         var context = canvas.getContext("2d");
         var pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
@@ -1392,13 +1450,14 @@
             report.termo_fomento = document.getElementById('termo_fomento') ? document.getElementById('termo_fomento').value : "";
             report.vigencia = document.getElementById('vigencia') ? document.getElementById('vigencia').value : "";
             report.valor_autorizado = document.getElementById('valor_autorizado') ? document.getElementById('valor_autorizado').value : "";
+            report.anotacoes = document.getElementById('anotacoes') ? document.getElementById('anotacoes').value : (report.anotacoes || "");
 
             report.objeto_relatorio = document.getElementById('objeto_relatorio') ? document.getElementById('objeto_relatorio').value : "";
             report.referencias = document.getElementById('referencias') ? document.getElementById('referencias').value : "";
 
             report.objetivos = document.getElementById('objetivos') ? document.getElementById('objetivos').value : "";
             report.metas = document.getElementById('metas') ? document.getElementById('metas').value : "";
-            report.metas_quantitativas = document.getElementById('metas_quantitativas') ? document.getElementById('metas_quantitativas').value : "";
+            report.atividades = document.getElementById('atividades') ? document.getElementById('atividades').value : "";
             report.resultados = document.getElementById('resultados') ? document.getElementById('resultados').value : "";
             report.execucao_financeira = document.getElementById('execucao_financeira') ? document.getElementById('execucao_financeira').value : "";
 
@@ -1533,24 +1592,22 @@
                     report.item5_periodo = periodEl.value;
                 }
 
-                if (!report.item5_qualitativos || !Array.isArray(report.item5_qualitativos)) {
-                    report.item5_qualitativos = [];
-                }
-
-                for (var i = 0; i < 4; i++) {
-                    if (!report.item5_qualitativos[i] || typeof report.item5_qualitativos[i] !== 'object') {
-                        report.item5_qualitativos[i] = { data: "", situacao: "", recomendacoes: "", observacao: "" };
-                    }
-                    var elData = document.getElementById('qual-data-' + i);
-                    var elSit = document.getElementById('qual-situacao-' + i);
-                    var elRec = document.getElementById('qual-recomendacoes-' + i);
-                    var elObs = document.getElementById('qual-observacao-' + i);
-                    
-                    if (elData) report.item5_qualitativos[i].data = elData.value;
-                    if (elSit) report.item5_qualitativos[i].situacao = elSit.value;
-                    if (elRec) report.item5_qualitativos[i].recomendacoes = elRec.value;
-                    if (elObs) report.item5_qualitativos[i].observacao = elObs.value;
-                }
+                // Le direto do DOM (nao por indice fixo) -- a tabela agora aceita
+                // adicionar/remover linhas em tempo real (addQualRow/removeQualRow),
+                // entao a quantidade de linhas nao e mais sempre 4.
+                report.item5_qualitativos = [];
+                document.querySelectorAll('#qualTableBody tr.qual-row').forEach(function(tr) {
+                    var elData = tr.querySelector('.qual-data-field');
+                    var elSit = tr.querySelector('.qual-situacao-field');
+                    var elRec = tr.querySelector('.qual-recomendacoes-field');
+                    var elObs = tr.querySelector('.qual-observacao-field');
+                    report.item5_qualitativos.push({
+                        data: elData ? elData.value : "",
+                        situacao: elSit ? elSit.value : "",
+                        recomendacoes: elRec ? elRec.value : "",
+                        observacao: elObs ? elObs.value : "",
+                    });
+                });
 
                 if (!report.item5_quantitativos || typeof report.item5_quantitativos !== 'object') {
                     report.item5_quantitativos = {};

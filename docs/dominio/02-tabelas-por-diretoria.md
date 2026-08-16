@@ -90,6 +90,17 @@ Alguns campos numéricos não são preenchidos manualmente — são somas/razõe
 
 **Observação**: a edição rápida (quick-edit, inline na tabela "Ver Dados") NÃO passa por esse recálculo — só o formulário principal (`*CreateUpdateView`) garante o valor correto. Um admin editando um dos campos-fonte via quick-edit pode deixar o total/taxa dessincronizado até o próximo salvamento pelo formulário.
 
+- **`visits.atendimento.presentes.total`** — Confirmado (2026-08-16, bug real reportado pelo usuário): soma de `presentes.manha + presentes.tarde`, calculada em `normalize_visit_attendance()` (`apps/directorates/views.py`) e em JS (`updateAttendanceTotal()`, `visit_instrumental.html`). **Diferente dos exemplos acima**: `atendimento.total_mes` é um campo *separado*, de texto livre, editado manualmente pelo usuário — antes dessa correção, o mesmo cálculo sobrescrevia `total_mes` por engano (bug), fazendo parecer que era um campo calculado quando não era.
+
+### B.8 PSE Quantitativos (Trimestral) — tabela central por OSC (Subvenção/Emendas e Fundos)
+
+Confirmado (2026-08-16, decisão explícita do usuário): diferente dos formulários mensais normais (onde cada período é um snapshot independente), o indicador "Quantitativos (Trimestral)" do PSE **acumula por OSC** em vez de reiniciar a cada visita.
+
+- **Armazenamento**: `Osc.pse_quantitativos` (JSONField, mesma forma de `Visit.atendimento.pse_quantitativos` — 4 indicadores × 12 meses). Coluna adicionada via `pending_alters.sql` (`oscs.pse_quantitativos`).
+- **Leitura**: toda vez que uma visita daquela OSC carrega a seção de PSE (visita existente via `VisitInstrumentalView.get_object()` → `merge_osc_pse_quantitativos()`; visita nova via `VisitCreateView` passando `osc_pse_map` num `json_script` + JS `updatePseQuantitativos()` no `change` do select de OSC, já que a OSC só é escolhida no navegador), o valor exibido é a tabela central **mesclada** com o que a visita específica já tinha preenchido localmente (a visita nunca perde o que já foi digitado nela).
+- **Escrita**: ao salvar a visita (rascunho ou finalizada), `write_back_osc_pse_quantitativos()` grava de volta na OSC — merge por mês/indicador, nunca um overwrite cego do objeto inteiro (então duas visitas diferentes, em épocas diferentes, editando meses diferentes, não se apagam uma à outra).
+- **Regra em aberto pra o futuro** (usuário já avisou que pode mudar): hoje qualquer visita pode editar qualquer mês, mesmo de períodos já cobertos por visitas anteriores — sem trava. Se no futuro for preciso travar dados de visitas já finalizadas (só permitindo editar a partir do mês da visita atual em diante, com o passado imutável), é uma regra nova a implementar em cima do que já existe aqui, não uma reescrita.
+
 ---
 
 ## C) Perguntas de Alinhamento
@@ -166,3 +177,4 @@ Então [definir após alinhamento]
 | 2026-07-21 | Criação do arquivo | Mapeamento de models de report por diretoria |
 | 2026-07-21 | Respostas Q1-Q4 confirmadas | Unidades CRAS fixas, apps com diretoria fixa confirmados, abertura para campo type |
 | 2026-08-13 | Adicionada seção B.7 (campos calculados: `beneficios_reports.total_visitas`, `qualificacao_reports.resumo_taxa_ocupacao`) | Fórmulas confirmadas com o usuário ao implementar o cálculo automático desses campos no formulário |
+| 2026-08-16 | B.7 ganhou `visits.atendimento.presentes.total`; nova seção B.8 (`Osc.pse_quantitativos`, tabela central por OSC) | Corrigido bug real de Total/Mês sendo sobrescrito; regra de acumulação do PSE Quantitativos confirmada explicitamente pelo usuário |

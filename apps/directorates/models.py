@@ -111,6 +111,12 @@ class Osc(models.Model):
     atividades = models.TextField(blank=True)
     user_id = models.UUIDField(null=True, blank=True)
     created_at = models.DateTimeField(null=True, blank=True)
+    # Tabela "central" de Quantitativos do PSE (Trimestral): mesma forma de
+    # Visit.atendimento["pse_quantitativos"] (4 indicadores x 12 meses), mas
+    # acumulada por OSC em vez de reiniciar a cada visita — toda visita dessa
+    # OSC que habilita o PSE carrega este valor pra edição, e ao salvar
+    # (rascunho ou finalizada) grava de volta aqui. Ver CLAUDE.md 2026-08-16.
+    pse_quantitativos = models.JSONField(default=dict, blank=True)
 
     class Meta:
         db_table = "oscs"

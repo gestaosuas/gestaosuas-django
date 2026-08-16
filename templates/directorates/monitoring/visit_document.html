@@ -94,10 +94,14 @@
                 <div class="visit-doc-card">
                     <span>Usuários Presentes</span>
                     <p>
-                        Manhã: {{ object.atendimento.presentes.manha|default:0 }} | 
+                        Manhã: {{ object.atendimento.presentes.manha|default:0 }} |
                         Tarde: {{ object.atendimento.presentes.tarde|default:0 }} |
-                        <strong>Total: {{ object.atendimento.total_mes|default:0 }}</strong>
+                        <strong>Total: {{ object.atendimento.presentes.total|default:0 }}</strong>
                     </p>
+                </div>
+                <div class="visit-doc-card">
+                    <span>Total / Mês</span>
+                    <p><strong>{{ object.atendimento.total_mes|default:0 }}</strong></p>
                 </div>
                 <div class="visit-doc-card">
                     <span>Capacidade Subvencionada</span>
@@ -129,30 +133,34 @@
         <section class="visit-document-section">
             <div class="section-doc-header">
                 <i data-lucide="users-2"></i>
-                <h2>III. Recursos Humanos / Colaboradores</h2>
+                <h2>III. {% if is_subvencao_visit %}Colaboradores{% else %}Recursos Humanos{% endif %}</h2>
             </div>
             <table class="visit-doc-table-striped">
                 <thead>
                     <tr>
                         <th align="left">Cargo / Função</th>
-                        <th align="center">Subvencionada</th>
-                        <th align="center">Voluntário</th>
                         <th align="center">Terceirizado</th>
+                        <th align="center">Outros</th>
+                        <th align="center">Subvenção</th>
                         <th align="center">Qtd.</th>
+                        <th align="left">Nomes / Observações</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for row in object.rh_data %}
+                    {% if row.cargo or row.observacoes or row.quantidade or row.terceirizado or row.outros or row.subvencao %}
                     <tr>
                         <td>{{ row.cargo }}</td>
-                        <td align="center">{% if row.subvencao %}Sim{% else %}Não{% endif %}</td>
-                        <td align="center">{% if row.voluntario %}Sim{% else %}Não{% endif %}</td>
                         <td align="center">{% if row.terceirizado %}Sim{% else %}Não{% endif %}</td>
+                        <td align="center">{% if row.outros %}Sim{% else %}Não{% endif %}</td>
+                        <td align="center">{% if row.subvencao %}Sim{% else %}Não{% endif %}</td>
                         <td align="center"><strong>{{ row.quantidade|default:0 }}</strong></td>
+                        <td>{{ row.observacoes|default:"-" }}</td>
                     </tr>
+                    {% endif %}
                     {% empty %}
                     <tr>
-                        <td colspan="5" align="center">Nenhum colaborador registrado.</td>
+                        <td colspan="6" align="center">Nenhum colaborador registrado.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -214,6 +222,46 @@
                 </tbody>
             </table>
             {% endif %}
+            {% if object.atendimento.pse_quantitativos %}
+            <h3 style="margin-top:24px; font-size:13px; font-weight:800; color:#475569; text-transform:uppercase;">Quantitativos (Trimestral)</h3>
+            <table class="visit-doc-table-striped" style="margin-top:8px;">
+                <thead>
+                    <tr>
+                        <th align="left" style="width:22%;">Indicador</th>
+                        <th align="center">Jan</th><th align="center">Fev</th><th align="center">Mar</th>
+                        <th align="center">Abr</th><th align="center">Mai</th><th align="center">Jun</th>
+                        <th align="center">Jul</th><th align="center">Ago</th><th align="center">Set</th>
+                        <th align="center">Out</th><th align="center">Nov</th><th align="center">Dez</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Total de usuários do serviço no 1º dia do mês</td>
+                        {% for month in "jan,fev,mar,abr,mai,jun,jul,ago,set,out,nov,dez"|split:"," %}
+                        <td align="center">{{ object.atendimento.pse_quantitativos|get_item:'usuarios_primeiro_dia'|get_item:month|default:'-' }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td>Total de usuários inseridos no mês (novos)</td>
+                        {% for month in "jan,fev,mar,abr,mai,jun,jul,ago,set,out,nov,dez"|split:"," %}
+                        <td align="center">{{ object.atendimento.pse_quantitativos|get_item:'usuarios_inseridos'|get_item:month|default:'-' }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td>Total de usuários desligados no mês</td>
+                        {% for month in "jan,fev,mar,abr,mai,jun,jul,ago,set,out,nov,dez"|split:"," %}
+                        <td align="center">{{ object.atendimento.pse_quantitativos|get_item:'usuarios_desligados'|get_item:month|default:'-' }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td>Total de usuários do serviço no último dia do mês</td>
+                        {% for month in "jan,fev,mar,abr,mai,jun,jul,ago,set,out,nov,dez"|split:"," %}
+                        <td align="center">{{ object.atendimento.pse_quantitativos|get_item:'usuarios_ultimo_dia'|get_item:month|default:'-' }}</td>
+                        {% endfor %}
+                    </tr>
+                </tbody>
+            </table>
+            {% endif %}
         </section>
         {% endif %}
 
@@ -242,7 +290,7 @@
                 <div class="signature-doc-item">
                     <img src="{{ object.assinaturas.tecnico1 }}" alt="Assinatura Tecnico 1">
                     <div class="signature-line"></div>
-                    <strong>{{ object.assinaturas.tecnico1_nome|default:"Técnico Responsável 1" }}</strong>
+                    <strong>{{ object.assinaturas.tecnico1_nome|default:"Técnico Responsável 1"|upper }}</strong>
                     <span>Técnico de Monitoramento</span>
                 </div>
                 {% endif %}
@@ -251,7 +299,7 @@
                 <div class="signature-doc-item">
                     <img src="{{ object.assinaturas.tecnico2 }}" alt="Assinatura Tecnico 2">
                     <div class="signature-line"></div>
-                    <strong>{{ object.assinaturas.tecnico2_nome|default:"Técnico Responsável 2" }}</strong>
+                    <strong>{{ object.assinaturas.tecnico2_nome|default:"Técnico Responsável 2"|upper }}</strong>
                     <span>Técnico de Monitoramento</span>
                 </div>
                 {% endif %}
@@ -260,7 +308,7 @@
                 <div class="signature-doc-item">
                     <img src="{{ object.assinaturas.responsavel }}" alt="Assinatura OSC">
                     <div class="signature-line"></div>
-                    <strong>{{ object.assinaturas.responsavel_nome|default:"Representante da OSC" }}</strong>
+                    <strong>{{ object.assinaturas.responsavel_nome|default:"Representante da OSC"|upper }}</strong>
                     <span>Representante da Instituição</span>
                 </div>
                 {% endif %}
@@ -312,7 +360,7 @@
     .visit-doc-table th, .visit-doc-table td { padding: 12px 15px; border: 1px solid #e2e8f0; font-size: 14px; text-align: left; }
     .visit-doc-table th { background: #f8fafc; color: #475569; font-weight: 800; }
 
-    .visit-doc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; }
+    .visit-doc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
     .visit-doc-card { padding: 15px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
     .visit-doc-card span { display: block; font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 5px; }
     .visit-doc-card p { margin: 0; font-size: 14px; color: #1e293b; font-weight: 600; }

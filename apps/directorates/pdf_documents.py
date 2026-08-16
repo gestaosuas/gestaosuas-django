@@ -15,6 +15,24 @@ _QUANT_MONTHS = [
 ]
 
 
+_ATENDIMENTO_QUANT_LABELS = [
+    ("usuarios_primeiro_dia", "Total de usuários do serviço no 1º dia do mês"),
+    ("usuarios_inseridos", "Total de usuários inseridos no mês (novos)"),
+    ("usuarios_desligados", "Total de usuários desligados no mês"),
+    ("usuarios_ultimo_dia", "Total de usuários do serviço no último dia do mês"),
+]
+
+
+def _atendimento_quant_table(pse_quantitativos, styles):
+    rows = []
+    for key, label in _ATENDIMENTO_QUANT_LABELS:
+        month_values = (pse_quantitativos or {}).get(key) or {}
+        rows.append([label] + [month_values.get(m, "-") or "-" for m, _ in _QUANT_MONTHS])
+    headers = ["Indicador"] + [label for _, label in _QUANT_MONTHS]
+    col_widths = [55 * pdfmod.mm] + [None] * 12
+    return pdfmod.styled_table(headers, rows, styles, col_widths=col_widths)
+
+
 def _format_address(osc):
     parts = [osc.address or "Nao informado"]
     if osc.number:
@@ -126,12 +144,17 @@ def render_visit_document_pdf(context):
     else:
         horario = f"{atendimento.get('horario_inicio') or '--:--'} às {atendimento.get('horario_fim') or '--:--'}"
     presentes = atendimento.get("presentes") or {}
-    presencas = f"Manhã: {presentes.get('manha', 0)} | Tarde: {presentes.get('tarde', 0)} | Total: {atendimento.get('total_mes', 0)}"
+    presencas = f"Manhã: {presentes.get('manha', 0)} | Tarde: {presentes.get('tarde', 0)} | Total: {presentes.get('total', 0)}"
     subsidized = osc.subsidized_count
     capacidade = "Conforme Demanda" if subsidized == -1 else f"{subsidized or 0} usuários"
     grid_table = pdfmod.styled_table(
         ["Campo", "Valor"],
-        [("Horário de Funcionamento", horario), ("Usuários Presentes", presencas), ("Capacidade Subvencionada", capacidade)],
+        [
+            ("Horário de Funcionamento", horario),
+            ("Usuários Presentes", presencas),
+            ("Total / Mês", atendimento.get("total_mes", 0)),
+            ("Capacidade Subvencionada", capacidade),
+        ],
         styles, col_widths=[55 * pdfmod.mm, None],
     )
     body_blocks = [grid_table]
@@ -149,23 +172,27 @@ def render_visit_document_pdf(context):
     story.extend(pdfmod.heading_with_body(Paragraph("II. Dados de Atendimento", styles["h2"]), body_blocks[0]))
     story.extend(body_blocks[1:])
 
-    # III. Recursos Humanos / Colaboradores
+    # III. Colaboradores / Recursos Humanos
     rh_rows = [
         [
             row.get("cargo", ""),
-            "Sim" if row.get("subvencao") else "Não",
-            "Sim" if row.get("voluntario") else "Não",
             "Sim" if row.get("terceirizado") else "Não",
+            "Sim" if row.get("outros") else "Não",
+            "Sim" if row.get("subvencao") else "Não",
             row.get("quantidade", 0),
+            row.get("observacoes", "") or "-",
         ]
         for row in (visit.rh_data or [])
+        if any([row.get("cargo"), row.get("observacoes"), row.get("quantidade"),
+                row.get("terceirizado"), row.get("outros"), row.get("subvencao")])
     ]
     if not rh_rows:
-        rh_rows = [["Nenhum colaborador registrado.", "", "", "", ""]]
+        rh_rows = [["Nenhum colaborador registrado.", "", "", "", "", ""]]
     rh_table = pdfmod.styled_table(
-        ["Cargo / Função", "Subvencionada", "Voluntário", "Terceirizado", "Qtd."], rh_rows, styles,
+        ["Cargo / Função", "Terceirizado", "Outros", "Subvenção", "Qtd.", "Nomes / Observações"], rh_rows, styles,
     )
-    story.extend(pdfmod.heading_with_body(Paragraph("III. Recursos Humanos / Colaboradores", styles["h2"]), rh_table))
+    rh_title = "III. Colaboradores" if is_subvencao_visit else "III. Recursos Humanos"
+    story.extend(pdfmod.heading_with_body(Paragraph(rh_title, styles["h2"]), rh_table))
 
     # IV. Observações e Recomendações Técnicas
     obs_blocks = pdfmod.glue_headings([
@@ -190,6 +217,9 @@ def render_visit_document_pdf(context):
                 for row in qualitativos
             ]
             pse_blocks.append(pdfmod.styled_table(["Data", "Situação Encontrada", "Recomendações", "Observação"], pse_rows, styles))
+        if atendimento.get("pse_quantitativos"):
+            pse_blocks.append(Paragraph("Quantitativos (Trimestral)", styles["h3"]))
+            pse_blocks.append(_atendimento_quant_table(atendimento.get("pse_quantitativos"), styles))
         story.extend(pdfmod.heading_with_body(Paragraph("V. Dados PSE (Proteção Social Especial)", styles["h2"]), pse_blocks[0]))
         story.extend(pse_blocks[1:])
 
@@ -218,7 +248,18 @@ def render_visit_document_pdf(context):
     )
 
 
-def _partnership_data_table(report_data, is_subvencao, styles):
+def _get_reference_year():
+    try:
+        from apps.core.models import SystemSetting
+        setting = SystemSetting.objects.filter(key="system_reference_year").first()
+        if setting and setting.value:
+            return setting.value
+    except Exception:
+        pass
+    return "2026"
+
+
+def _partnership_data_table(report_data, is_subvencao, styles, valor_label="Valor autorizado por lei e repassado", anotacoes=None):
     rows = [
         ("CNPJ", report_data.get("cnpj") or "-"),
     ]
@@ -226,7 +267,9 @@ def _partnership_data_table(report_data, is_subvencao, styles):
         rows.append(("Recurso", report_data.get("emenda") or "-"))
     rows.append(("Nº Termo", report_data.get("termo_fomento") or "-"))
     rows.append(("Vigência", report_data.get("vigencia") or "-"))
-    rows.append(("Valor autorizado por lei e repassado", report_data.get("valor_autorizado") or "-"))
+    rows.append((valor_label, report_data.get("valor_autorizado") or "-"))
+    if anotacoes:
+        rows.append(("Anotações", anotacoes))
     return pdfmod.styled_table(["Campo", "Valor"], rows, styles, col_widths=[60 * pdfmod.mm, None])
 
 
@@ -312,8 +355,10 @@ def render_visit_report_pdf(context):
     story = []
 
     if report_type == "relatorio_final":
+        valor_label = f"Valor autorizado por lei para o exercício de {_get_reference_year()}"
         story.extend(pdfmod.heading_with_body(
-            Paragraph("1. Dados da Parceria", styles["h2"]), _partnership_data_table(report_data, is_subvencao, styles),
+            Paragraph("1. Dados da Parceria", styles["h2"]),
+            _partnership_data_table(report_data, is_subvencao, styles, valor_label=valor_label, anotacoes=report_data.get("anotacoes")),
         ))
         story.extend(pdfmod.heading_with_body(
             Paragraph("2. Objeto do Relatório", styles["h2"]), Paragraph(report_data.get("objeto_relatorio") or "Não informado.", styles["body"]),
@@ -324,13 +369,13 @@ def render_visit_report_pdf(context):
         item4_blocks = pdfmod.glue_headings([
             Paragraph("a) Dos objetivos:", styles["h3"]), Paragraph(report_data.get("objetivos") or "Não informado.", styles["body"]),
             Paragraph("b) Das metas estabelecidas:", styles["h3"]), Paragraph(report_data.get("metas") or "Não informado.", styles["body"]),
-            Paragraph("Quantitativas:", styles["h3"]), Paragraph(report_data.get("metas_quantitativas") or "Não informado.", styles["body"]),
-            Paragraph("c) Dos resultados:", styles["h3"]), Paragraph(report_data.get("resultados") or "Não informado.", styles["body"]),
-            Paragraph("e) Da execução financeira e análise dos documentos comprobatórios das despesas:", styles["h3"]),
+            Paragraph("c) Das atividades:", styles["h3"]), Paragraph(report_data.get("atividades") or "Não informado.", styles["body"]),
+            Paragraph("d) Dos resultados:", styles["h3"]), Paragraph(report_data.get("resultados") or "Não informado.", styles["body"]),
+            Paragraph("e) Da execução financeira:", styles["h3"]),
             Paragraph(report_data.get("execucao_financeira") or "Não informado.", styles["body"]),
         ], styles)
         story.extend(pdfmod.heading_with_body(
-            Paragraph("4. Descrição dos Objetivos, Metas Previstas e Execução Financeira", styles["h2"]), item4_blocks[0],
+            Paragraph("4. Descrição dos Objetivos, Metas, Atividades Previstas, Resultados e Execução Financeira", styles["h2"]), item4_blocks[0],
         ))
         story.extend(item4_blocks[1:])
         story.extend(pdfmod.heading_with_body(

@@ -216,3 +216,10 @@ ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS read_at timestamptz;
 -- mostrando esse historico inteiro como "nao lido". Idempotente por causa do
 -- corte de data fixo (so afeta o backlog anterior ao rollout deste recurso).
 UPDATE activity_logs SET read_at = created_at WHERE read_at IS NULL AND created_at < '2026-07-28 00:00:00+00';
+
+-- ============================================================================
+-- oscs — tabela central de Quantitativos do PSE (Trimestral) (2026-08-16)
+-- Mesma forma de visits.atendimento->'pse_quantitativos' (4 indicadores x 12
+-- meses), acumulada por OSC em vez de reiniciar a cada visita.
+-- ============================================================================
+ALTER TABLE oscs ADD COLUMN IF NOT EXISTS pse_quantitativos jsonb DEFAULT '{}'::jsonb;

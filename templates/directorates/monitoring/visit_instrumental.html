@@ -78,7 +78,7 @@
             </div>
             <div class="visit-section-body">
                 {% if is_new %}
-                {% if is_emendas_visit %}
+                {% if is_subvencao_visit %}
                 <div class="visit-grid visit-grid-two">
                     <div class="visit-field">
                         <label class="premium-label">Selecione a Organizacao Social Civil (OSC)</label>
@@ -129,7 +129,7 @@
                         <input type="text" value="{{ object.osc.phone|default:'Nao informado' }}" disabled class="form-input-premium is-readonly">
                     </div>
                 </div>
-                {% if is_emendas_visit %}
+                {% if is_subvencao_visit %}
                 <div class="visit-grid visit-grid-two">
                     <div class="visit-field">
                         <label class="premium-label">Plano de Trabalho vinculado</label>
@@ -157,7 +157,6 @@
                             <option value="">Selecione...</option>
                             <option value="manha" {% if object.identificacao.visit_shift_1 == 'manha' %}selected{% endif %}>Manha</option>
                             <option value="tarde" {% if object.identificacao.visit_shift_1 == 'tarde' %}selected{% endif %}>Tarde</option>
-                            <option value="integral" {% if object.identificacao.visit_shift_1 == 'integral' %}selected{% endif %}>Integral</option>
                         </select>
                     </div>
                         {% if object.status != 'finalized' and object.status != 'completed' %}
@@ -248,8 +247,9 @@
                         <div class="attendance-present-total-col">
                             <label class="micro-label">Total</label>
                             <div class="attendance-present-total-box">
-                                <strong id="attendancePresentTotal">0</strong>
+                                <strong id="attendancePresentTotal">{{ object.atendimento.presentes.total|default:0 }}</strong>
                             </div>
+                            <input type="hidden" name="atendimento[presentes][total]" id="attendancePresentTotalInput" value="{{ object.atendimento.presentes.total|default:0 }}">
                         </div>
                     </div>
                 </div>
@@ -508,20 +508,45 @@
                                 <th>Situação Encontrada</th>
                                 <th>Recomendações</th>
                                 <th>Observação</th>
+                                {% if object.status != 'finalized' and object.status != 'completed' %}
+                                <th style="width:36px;"></th>
+                                {% endif %}
                             </tr>
                         </thead>
-                        <tbody>
-                            {% for row in "1234" %}
-                            <tr>
-                                <td><input type="text" name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][data]" value="{{ object.atendimento.pse_qualitativos|get_item:forloop.counter0|get_item:'data'|default:'' }}" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></td>
-                                <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][situacao]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.pse_qualitativos|get_item:forloop.counter0|get_item:'situacao'|default:'' }}</textarea></td>
-                                <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][recomendacoes]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.pse_qualitativos|get_item:forloop.counter0|get_item:'recomendacoes'|default:'' }}</textarea></td>
-                                <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][observacao]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.pse_qualitativos|get_item:forloop.counter0|get_item:'observacao'|default:'' }}</textarea></td>
-                            </tr>
-                            {% endfor %}
+                        <tbody id="pseQualTableBody">
+                            {% if object.atendimento.pse_qualitativos %}
+                                {% for row in object.atendimento.pse_qualitativos %}
+                                <tr class="pse-qual-row">
+                                    <td><input type="text" name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][data]" value="{{ row.data|default:'' }}" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></td>
+                                    <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][situacao]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ row.situacao|default:'' }}</textarea></td>
+                                    <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][recomendacoes]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ row.recomendacoes|default:'' }}</textarea></td>
+                                    <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][observacao]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ row.observacao|default:'' }}</textarea></td>
+                                    {% if object.status != 'finalized' and object.status != 'completed' %}
+                                    <td style="text-align:center;"><button type="button" onclick="removePseQualRow(this)" class="visit-delete-row-btn"><i data-lucide="trash-2"></i></button></td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                {% for row in "1234" %}
+                                <tr class="pse-qual-row">
+                                    <td><input type="text" name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][data]" value="" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></td>
+                                    <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][situacao]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></textarea></td>
+                                    <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][recomendacoes]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></textarea></td>
+                                    <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][observacao]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></textarea></td>
+                                    {% if object.status != 'finalized' and object.status != 'completed' %}
+                                    <td style="text-align:center;"><button type="button" onclick="removePseQualRow(this)" class="visit-delete-row-btn"><i data-lucide="trash-2"></i></button></td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            {% endif %}
                         </tbody>
                     </table>
                 </div>
+                {% if object.status != 'finalized' and object.status != 'completed' %}
+                <button type="button" onclick="addPseQualRow()" class="btn-outline-monitoring visit-add-row-btn" style="margin-top:10px;">
+                    <i data-lucide="plus"></i> Adicionar linha
+                </button>
+                {% endif %}
 
                 <div class="pse-subsection-title">Quantitativos (Trimestral)</div>
                 <div class="pse-table-wrap">
@@ -900,7 +925,7 @@
 
 {{ object.rh_data|json_script:"rh-data-json" }}
 {{ object.identificacao|json_script:"identificacao-json" }}
-{% if is_new and is_emendas_visit %}{{ osc_plans|json_script:"oscPlansData" }}{% endif %}
+{% if is_new and is_subvencao_visit %}{{ osc_plans|json_script:"oscPlansData" }}{{ osc_pse_map|json_script:"oscPseData" }}{% endif %}
 <script>
     // --- Lightbox com navegação e zoom ---
     var lbImages = [], lbIdx = 0, lbScale = 1;
@@ -1059,10 +1084,14 @@
     }
 
     function updateAttendanceTotal() {
+        // "Total automatico" (soma manha+tarde) -- NAO mexe em total_mes, que
+        // e um campo de texto livre editado pelo usuario (ver CLAUDE.md
+        // 2026-08-16: bug real onde digitar a manha tambem recalculava o
+        // Total/Mes).
         var manhaInput = document.getElementsByName("atendimento[presentes][manha]")[0];
         var tardeInput = document.getElementsByName("atendimento[presentes][tarde]")[0];
-        var totalMonthInput = document.getElementsByName("atendimento[total_mes]")[0];
         var totalElement = document.getElementById("attendancePresentTotal");
+        var totalInput = document.getElementById("attendancePresentTotalInput");
         var manha = Number(manhaInput ? manhaInput.value || 0 : 0);
         var tarde = Number(tardeInput ? tardeInput.value || 0 : 0);
         var total = manha + tarde;
@@ -1071,8 +1100,8 @@
             totalElement.textContent = total;
         }
 
-        if (totalMonthInput) {
-            totalMonthInput.value = total;
+        if (totalInput) {
+            totalInput.value = total;
         }
     }
 
@@ -1136,11 +1165,35 @@
         }
     }
 
-    // --- Plano de trabalho vinculado (Emendas e Fundos) ---
+    // --- Plano de trabalho vinculado (Subvencao / Emendas e Fundos) ---
     var oscPlansData = null;
     var oscPlansEl = document.getElementById("oscPlansData");
     if (oscPlansEl) {
         try { oscPlansData = JSON.parse(oscPlansEl.textContent) || {}; } catch (e) { oscPlansData = {}; }
+    }
+
+    // --- Quantitativos do PSE (tabela central por OSC -- traz o que outras
+    // visitas dessa OSC ja preencheram ao criar uma visita nova) ---
+    var oscPseData = null;
+    var oscPseEl = document.getElementById("oscPseData");
+    if (oscPseEl) {
+        try { oscPseData = JSON.parse(oscPseEl.textContent) || {}; } catch (e) { oscPseData = {}; }
+    }
+
+    function updatePseQuantitativos() {
+        if (!oscPseData) return;
+        var oscId = getSelectedOscId();
+        var data = (oscId && oscPseData[oscId]) || {};
+        var keys = ["usuarios_primeiro_dia", "usuarios_inseridos", "usuarios_desligados", "usuarios_ultimo_dia"];
+        var months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+        keys.forEach(function (key) {
+            months.forEach(function (month) {
+                var input = document.querySelector('[name="atendimento[pse_quantitativos][' + key + '][' + month + ']"]');
+                if (input && !input.value && data[key] && data[key][month]) {
+                    input.value = data[key][month];
+                }
+            });
+        });
     }
 
     function updateWorkPlanOptions() {
@@ -1223,6 +1276,32 @@
     function updateRh(index, field, value) {
         rhData[index][field] = value;
         document.getElementById("id_rh_data").value = JSON.stringify(rhData);
+    }
+
+    // PSE Qualitativos: os inputs usam name="atendimento[pse_qualitativos][N][campo]"
+    // direto (o POST ja faz parsing generico de indices via set_nested_value/
+    // read_bracket_parts em views.py), entao adicionar linha e so anexar um
+    // <tr> novo com o proximo indice -- sem precisar de um array JS espelho
+    // feito manualmente, o navegador submete os campos nomeados como estao.
+    function addPseQualRow() {
+        var tbody = document.getElementById("pseQualTableBody");
+        if (!tbody) return;
+        var index = tbody.querySelectorAll("tr.pse-qual-row").length;
+        var tr = document.createElement("tr");
+        tr.className = "pse-qual-row";
+        tr.innerHTML =
+            '<td><input type="text" name="atendimento[pse_qualitativos][' + index + '][data]"></td>' +
+            '<td><textarea name="atendimento[pse_qualitativos][' + index + '][situacao]"></textarea></td>' +
+            '<td><textarea name="atendimento[pse_qualitativos][' + index + '][recomendacoes]"></textarea></td>' +
+            '<td><textarea name="atendimento[pse_qualitativos][' + index + '][observacao]"></textarea></td>' +
+            '<td style="text-align:center;"><button type="button" onclick="removePseQualRow(this)" class="visit-delete-row-btn"><i data-lucide="trash-2"></i></button></td>';
+        tbody.appendChild(tr);
+        lucide.createIcons();
+    }
+
+    function removePseQualRow(btn) {
+        var tr = btn.closest("tr");
+        if (tr) tr.remove();
     }
 
     function drawExistingSignature(pad, dataUrl) {
@@ -1501,7 +1580,6 @@
                         '<option value="">Selecione...</option>' +
                         '<option value="manha"' + (v.shift === "manha" ? " selected" : "") + '>Manhã</option>' +
                         '<option value="tarde"' + (v.shift === "tarde" ? " selected" : "") + '>Tarde</option>' +
-                        '<option value="integral"' + (v.shift === "integral" ? " selected" : "") + '>Integral</option>' +
                     '</select>' +
                 '</div>' +
                 (!readOnlyVisit
@@ -1675,6 +1753,7 @@
         oscSelectField.addEventListener("change", updatePlanButtonLink);
         oscSelectField.addEventListener("change", updateSubsidizedFromOsc);
         oscSelectField.addEventListener("change", updateWorkPlanOptions);
+        oscSelectField.addEventListener("change", updatePseQuantitativos);
     }
     updateWorkPlanOptions();
 

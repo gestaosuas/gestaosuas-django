@@ -374,13 +374,58 @@ def normalize_visit_attendance(visit, atendimento):
     except (TypeError, ValueError):
         tarde = 0
 
-    atendimento["total_mes"] = str(manha + tarde)
+    # "Total automatico" (soma manha+tarde no momento da visita) e o UNICO
+    # campo calculado aqui -- fica em presentes.total, nao em total_mes.
+    # total_mes e um campo de texto livre, editado pelo usuario, e nunca deve
+    # ser sobrescrito (bug real reportado em 2026-08-16: digitar a quantidade
+    # da manha tambem recalculava o Total/Mes).
+    presentes["total"] = str(manha + tarde)
+    atendimento["presentes"] = presentes
     subsidized_count = getattr(visit.osc, "subsidized_count", 0)
     atendimento["subvencionados"] = "Conforme Demanda" if subsidized_count == -1 else str(subsidized_count or 0)
-    
+
     # Sync PSE fields dynamically
     atendimento = sync_atendimento_pse_fields(atendimento)
     return atendimento
+
+
+def merge_osc_pse_quantitativos(osc, atendimento):
+    """Sobrepoe a tabela central de Quantitativos do PSE (Osc.pse_quantitativos)
+    na atendimento.pse_quantitativos da visita, pra exibir/editar -- a central
+    entra como base (traz o que outras visitas dessa OSC ja preencheram) e o
+    que essa visita especifica ja tinha preenchido localmente tem prioridade
+    por mes/indicador (nunca perde o que o usuario ja digitou nesta visita)."""
+    central = osc.pse_quantitativos if isinstance(osc.pse_quantitativos, dict) else {}
+    if not central:
+        return atendimento
+    own = atendimento.get("pse_quantitativos")
+    own = own if isinstance(own, dict) else {}
+    merged = {}
+    for key in set(list(central.keys()) + list(own.keys())):
+        central_months = central.get(key) if isinstance(central.get(key), dict) else {}
+        own_months = own.get(key) if isinstance(own.get(key), dict) else {}
+        merged[key] = {**central_months, **own_months}
+    atendimento["pse_quantitativos"] = merged
+    return atendimento
+
+
+def write_back_osc_pse_quantitativos(osc, atendimento):
+    """Contrapartida de merge_osc_pse_quantitativos(): grava o que foi editado
+    nesta visita de volta na tabela central da OSC (merge por mes/indicador,
+    nunca um overwrite cego -- assim visitas diferentes em epocas diferentes
+    va acumulando dados em vez de se apagarem)."""
+    quant = atendimento.get("pse_quantitativos") if isinstance(atendimento, dict) else None
+    if not isinstance(quant, dict) or not quant:
+        return
+    central = osc.pse_quantitativos if isinstance(osc.pse_quantitativos, dict) else {}
+    for key, months in quant.items():
+        if not isinstance(months, dict):
+            continue
+        central_months = central.get(key) if isinstance(central.get(key), dict) else {}
+        non_empty = {m: v for m, v in months.items() if str(v or "").strip()}
+        central[key] = {**central_months, **non_empty}
+    osc.pse_quantitativos = central
+    osc.save(update_fields=["pse_quantitativos"])
 
 
 def set_nested_value(target, parts, value):
@@ -1263,9 +1308,10 @@ class VisitReportView(VisitAccessMixin, DetailView):
                     "valor_autorizado": "",
                     "objeto_relatorio": report_texts["objeto"],
                     "referencias": "",
+                    "anotacoes": "",
                     "objetivos": report_texts["objetivos"],
                     "metas": report_texts["metas"],
-                    "metas_quantitativas": "",
+                    "atividades": report_texts["atividades"],
                     "resultados": "",
                     "execucao_financeira": "",
                     "cumprimento_objeto_final": "",
@@ -1532,13 +1578,16 @@ class VisitReportView(VisitAccessMixin, DetailView):
                         if has_pt_quant_data:
                             report_data["item5_quantitativos"] = pt_quant
 
-            # Ensure item5_qualitativos is a list and has exactly 4 elements
+            # Ensure item5_qualitativos e uma lista com pelo menos 1 linha para
+            # editar -- a tabela aceita adicionar/excluir linhas em tempo real
+            # (ver addQualRow/removeQualRow em report_form.html), entao nao ha
+            # mais um numero fixo de linhas.
             if "item5_qualitativos" not in report_data or not isinstance(report_data["item5_qualitativos"], list):
                 report_data["item5_qualitativos"] = []
-            
-            while len(report_data["item5_qualitativos"]) < 4:
+
+            while len(report_data["item5_qualitativos"]) < 1:
                 report_data["item5_qualitativos"].append({ "data": "", "situacao": "", "recomendacoes": "", "observacao": "" })
-                
+
             for idx in range(len(report_data["item5_qualitativos"])):
                 if not isinstance(report_data["item5_qualitativos"][idx], dict):
                     report_data["item5_qualitativos"][idx] = {}
@@ -1563,8 +1612,15 @@ class VisitReportView(VisitAccessMixin, DetailView):
         
         try:
             data = json.loads(request.POST.get("data", "{}"))
+            if isinstance(data, dict):
+                # Nome do tecnico responsavel sempre em maiusculas nas assinaturas
+                # (reforcado no servidor -- o JS ja faz .toUpperCase() antes de
+                # enviar, mas isso normaliza tambem dados antigos re-salvos).
+                for key in list(data.keys()):
+                    if key.endswith("_nome") and isinstance(data[key], str):
+                        data[key] = data[key].upper()
             setattr(visit, report_type, data)
-            
+
             # Bidirectional sync back to visit.atendimento
             if isinstance(data, dict) and report_type == "parecer_tecnico":
                 atendimento = visit.atendimento or {}
@@ -1633,9 +1689,6 @@ class VisitUploadDocumentView(VisitAccessMixin, View):
         return JsonResponse({"success": True, "document": doc_data})
 
 
-from django.core.files.storage import FileSystemStorage
-from django.conf import settings
-
 class VisitUploadNotificationView(VisitAccessMixin, View):
     def post(self, request, pk):
         visit = self.get_scoped_object()
@@ -1647,10 +1700,10 @@ class VisitUploadNotificationView(VisitAccessMixin, View):
             return JsonResponse({"success": False, "error": "Apenas arquivos PDF são permitidos"}, status=400)
         
         try:
-            fs = FileSystemStorage(location=settings.MEDIA_ROOT / "notifications")
-            filename = fs.save(file.name, file)
-            uploaded_file_url = f"/media/notifications/{filename}"
-            
+            from django.core.files.storage import default_storage
+            saved_path = default_storage.save(f"notifications/{file.name}", file)
+            uploaded_file_url = reverse("core:protected-media", kwargs={"file_path": saved_path})
+
             notif_data = {
                 "name": file.name,
                 "url": uploaded_file_url,
@@ -1795,7 +1848,11 @@ class VisitCreateView(DirectorateScopedMixin, TemplateView):
         context["is_subvencao_visit"] = is_subvencao_directorate(directorate)
         context["is_emendas_visit"] = is_emendas_directorate(directorate)
         context["is_outros_visit"] = is_outros_directorate(directorate)
-        context["osc_plans"] = build_osc_plans_map(directorate.pk) if context["is_emendas_visit"] else {}
+        context["osc_plans"] = build_osc_plans_map(directorate.pk) if context["is_subvencao_visit"] else {}
+        context["osc_pse_map"] = (
+            {str(osc.pk): osc.pse_quantitativos for osc in context["oscs"] if osc.pse_quantitativos}
+            if context["is_subvencao_visit"] else {}
+        )
         context["return_url"] = get_safe_next_url(self.request) or get_visit_list_redirect(directorate)
         context["theme_class"] = get_monitoramento_theme(directorate)[0]
         return context
@@ -1813,7 +1870,7 @@ class VisitCreateView(DirectorateScopedMixin, TemplateView):
             return redirect(f"{create_url}?next={next_url}" if next_url else create_url)
 
         work_plan = None
-        if is_emendas_directorate(directorate):
+        if is_subvencao_directorate(directorate):
             work_plan = resolve_visit_work_plan(directorate.pk, osc_id, data.get("work_plan"))
 
         visit = Visit(
@@ -1842,6 +1899,8 @@ class VisitCreateView(DirectorateScopedMixin, TemplateView):
                 set_nested_value(atendimento, read_bracket_parts(key, "atendimento"), value)
         if atendimento:
             visit.atendimento = normalize_visit_attendance(visit, atendimento)
+            if is_subvencao_directorate(directorate):
+                write_back_osc_pse_quantitativos(visit.osc, visit.atendimento)
 
         forma_acesso = {
             field: data.get(f"forma_acesso[{field}]") == "on"
@@ -1854,7 +1913,10 @@ class VisitCreateView(DirectorateScopedMixin, TemplateView):
         assinaturas = {}
         for key, value in data.items():
             if key.startswith("assinaturas[") and key.endswith("]"):
-                assinaturas[key[12:-1]] = value
+                inner_key = key[12:-1]
+                if inner_key.endswith("_nome") and isinstance(value, str):
+                    value = value.upper()
+                assinaturas[inner_key] = value
         if assinaturas:
             visit.assinaturas = assinaturas
 
@@ -1901,6 +1963,8 @@ class VisitInstrumentalView(VisitAccessMixin, UpdateView):
         obj = self.get_scoped_object()
         if obj and obj.atendimento:
             obj.atendimento = sync_atendimento_pse_fields(obj.atendimento)
+            if is_subvencao_directorate(obj.directorate):
+                obj.atendimento = merge_osc_pse_quantitativos(obj.osc, obj.atendimento)
         return obj
 
     def get_template_names(self):
@@ -1925,7 +1989,7 @@ class VisitInstrumentalView(VisitAccessMixin, UpdateView):
         context["is_subvencao_visit"] = is_subvencao_directorate(self.object.directorate)
         context["is_emendas_visit"] = is_emendas_directorate(self.object.directorate)
         context["is_outros_visit"] = is_outros_directorate(self.object.directorate)
-        if context["is_emendas_visit"]:
+        if context["is_subvencao_visit"]:
             context["visit_osc_plans"] = WorkPlan.objects.filter(
                 osc_id=self.object.osc_id, directorate_id=self.object.directorate.pk
             ).order_by("-updated_at", "title")
@@ -1971,6 +2035,8 @@ class VisitInstrumentalView(VisitAccessMixin, UpdateView):
         # Synchronize and normalize PSE data with explicit priority on atendimento fields
         atendimento = sync_atendimento_pse_fields(atendimento, priority="atendimento")
         self.object.atendimento = normalize_visit_attendance(self.object, atendimento)
+        if is_subvencao_directorate(self.object.directorate):
+            write_back_osc_pse_quantitativos(self.object.osc, self.object.atendimento)
 
         # Also sync to report fields!
         pse_data = atendimento.get("pse_data") or {}
@@ -2000,6 +2066,8 @@ class VisitInstrumentalView(VisitAccessMixin, UpdateView):
         for key, value in data.items():
             if key.startswith("assinaturas[") and key.endswith("]"):
                 inner_key = key[12:-1]
+                if inner_key.endswith("_nome") and isinstance(value, str):
+                    value = value.upper()
                 assinaturas[inner_key] = value
         self.object.assinaturas = assinaturas
 
@@ -2014,7 +2082,7 @@ class VisitInstrumentalView(VisitAccessMixin, UpdateView):
         self.object.observacoes = data.get("observacoes", "")
         self.object.recomendacoes = data.get("recomendacoes", "")
         self.object.status = data.get("status") or "draft"
-        if is_emendas_directorate(self.object.directorate) and "work_plan" in data:
+        if is_subvencao_directorate(self.object.directorate) and "work_plan" in data:
             self.object.work_plan = resolve_visit_work_plan(
                 self.object.directorate.pk, self.object.osc_id, data.get("work_plan")
             )

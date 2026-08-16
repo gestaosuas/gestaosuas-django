@@ -42,8 +42,10 @@ BORDER_GRAY = colors.HexColor("#CBD5E1")
 
 PAGE_SIZE = A4
 SIDE_MARGIN = 18 * mm
-TOP_MARGIN = 28 * mm
+TOP_MARGIN = 31 * mm
 BOTTOM_MARGIN = 16 * mm
+
+INSTITUTION_LINE = "PREFEITURA DE UBERLANDIA - SECRETARIA MUNICIPAL DE DESENVOLVIMENTO SOCIAL"
 
 
 def build_styles():
@@ -88,10 +90,42 @@ def build_styles():
 # Documento base: cabecalho/rodape repetidos em toda pagina
 # ---------------------------------------------------------------------------
 
+def _resolve_logo_reader():
+    """Mesma logica de apps/core/context_processors.py: le o logo_url
+    configuravel em SystemSetting (padrao /static/img/logo-navbar.png), nao o
+    static/img/logo.png fixo que este modulo usava antes — assim a logo do
+    PDF sempre bate com a da navbar. Aceita tanto um path estatico quanto uma
+    URL externa. Resolvido uma vez por documento (nao por pagina)."""
+    try:
+        from apps.core.models import SystemSetting
+        settings_map = {item.key: item.value for item in SystemSetting.objects.all()}
+        logo_url = settings_map.get("logo_url", "/static/img/logo-navbar.png")
+    except Exception:
+        logo_url = "/static/img/logo-navbar.png"
+
+    if not logo_url:
+        return None
+    try:
+        if logo_url.startswith("http://") or logo_url.startswith("https://"):
+            with urlopen(logo_url, timeout=8) as resp:
+                data = resp.read()
+            return ImageReader(io.BytesIO(data))
+        static_path = logo_url
+        if static_path.startswith("/static/"):
+            static_path = static_path[len("/static/"):]
+        elif static_path.startswith("static/"):
+            static_path = static_path[len("static/"):]
+        found = finders.find(static_path)
+        return ImageReader(found) if found else None
+    except Exception:
+        return None
+
+
 class SystemDocTemplate(BaseDocTemplate):
     def __init__(self, buffer, doc_title, doc_subtitle, **kwargs):
         self.doc_title = doc_title
         self.doc_subtitle = doc_subtitle
+        self._logo_reader = _resolve_logo_reader()
         kwargs.setdefault("pagesize", PAGE_SIZE)
         kwargs.setdefault("topMargin", TOP_MARGIN)
         kwargs.setdefault("bottomMargin", BOTTOM_MARGIN)
@@ -104,25 +138,27 @@ class SystemDocTemplate(BaseDocTemplate):
     def _draw_chrome(self, canvas, doc):
         canvas.saveState()
         page_w, page_h = PAGE_SIZE
-        logo_path = finders.find("img/logo.png")
         text_x = self.leftMargin
-        if logo_path:
+        if self._logo_reader:
             try:
-                canvas.drawImage(logo_path, self.leftMargin, page_h - 22 * mm,
-                                  width=12 * mm, height=12 * mm,
-                                  preserveAspectRatio=True, mask="auto")
-                text_x = self.leftMargin + 15 * mm
+                canvas.drawImage(self._logo_reader, self.leftMargin, page_h - 25 * mm,
+                                  width=13 * mm, height=13 * mm,
+                                  preserveAspectRatio=True, mask="auto", anchor="nw")
+                text_x = self.leftMargin + 16 * mm
             except Exception:
                 pass
+        canvas.setFont("Helvetica-Bold", 7)
+        canvas.setFillColor(TEXT_MUTED)
+        canvas.drawString(text_x, page_h - 10.5 * mm, INSTITUTION_LINE)
         canvas.setFont("Helvetica-Bold", 12)
         canvas.setFillColor(BRAND_BLUE)
-        canvas.drawString(text_x, page_h - 14.5 * mm, self.doc_title)
+        canvas.drawString(text_x, page_h - 16 * mm, self.doc_title)
         canvas.setFont("Helvetica", 8.5)
         canvas.setFillColor(TEXT_MUTED)
-        canvas.drawString(text_x, page_h - 19 * mm, self.doc_subtitle)
+        canvas.drawString(text_x, page_h - 20.5 * mm, self.doc_subtitle)
         canvas.setStrokeColor(BORDER_GRAY)
         canvas.setLineWidth(0.6)
-        canvas.line(self.leftMargin, page_h - 24 * mm, page_w - self.rightMargin, page_h - 24 * mm)
+        canvas.line(self.leftMargin, page_h - 26.5 * mm, page_w - self.rightMargin, page_h - 26.5 * mm)
 
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(TEXT_MUTED)
@@ -492,6 +528,15 @@ def _decode_data_url_image(data_url, max_w=45 * mm, max_h=22 * mm):
         header, b64data = data_url.split(",", 1)
         import base64
         raw = base64.b64decode(b64data)
+        # Decodifica os pixels de verdade aqui, nao so o header -- uma
+        # imagem truncada/corrompida (ex.: assinatura salva pela metade)
+        # passa despercebida por ImageReader.getSize() sozinho, e so estoura
+        # MAIS TARDE dentro de doc.build() (fora de qualquer try/except),
+        # derrubando o PDF inteiro com 500 em vez de so pular essa imagem.
+        # Achado investigando "impressao do Relatorio Final bugada" (2026-08-16).
+        from PIL import Image as PILImage
+        pil_img = PILImage.open(io.BytesIO(raw))
+        pil_img.load()
         reader = ImageReader(io.BytesIO(raw))
         iw, ih = reader.getSize()
         scale = min(max_w / iw, max_h / ih)
@@ -516,7 +561,9 @@ def signature_block(signatures, styles, pinned=True):
         else:
             cell.append(Spacer(1, 16 * mm))
         cell.append(Paragraph("_" * 34, styles["sig_role"]))
-        cell.append(Paragraph(sig.get("name") or "Nao assinado", styles["sig_name"]))
+        # Nome sempre em maiusculas -- reforcado aqui pra cobrir tambem
+        # assinaturas salvas antes desse ajuste (2026-08-16).
+        cell.append(Paragraph((sig.get("name") or "Nao assinado").upper(), styles["sig_name"]))
         cell.append(Paragraph(sig.get("label", ""), styles["sig_role"]))
         cols.append(cell)
 
