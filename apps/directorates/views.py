@@ -1603,7 +1603,16 @@ class VisitReportView(VisitAccessMixin, DetailView):
         context["is_subvencao"] = is_subvencao
         context["report_data"] = report_data
         context["directorate"] = directorate
-        context["return_url"] = get_safe_next_url(self.request) or get_visit_list_redirect(directorate)
+        # Relatorio Final e Parecer Conclusivo voltam pra aba "Relatorios e
+        # Pareceres" (de onde normalmente se abre esses dois), nao pra aba
+        # "Instrumental de Visita" que e o fallback genérico de
+        # get_visit_list_redirect() -- só pra Subvenção/Emendas e Fundos, que
+        # são as únicas diretorias com essa aba (Outros não tem).
+        if report_type in ("relatorio_final", "parecer_conclusivo") and is_subvencao_directorate(directorate):
+            fallback_return_url = f"{reverse('monitoramento:home', kwargs={'pk': directorate.pk})}?tab=reports"
+        else:
+            fallback_return_url = get_visit_list_redirect(directorate)
+        context["return_url"] = get_safe_next_url(self.request) or fallback_return_url
         return context
 
     def post(self, request, *args, **kwargs):
