@@ -157,9 +157,9 @@ class SystemDocTemplate(BaseDocTemplate):
         if self._logo_reader:
             try:
                 canvas.drawImage(self._logo_reader, self.leftMargin, page_h - 25 * mm,
-                                  width=13 * mm, height=13 * mm,
+                                  width=18 * mm, height=18 * mm,
                                   preserveAspectRatio=True, mask="auto", anchor="nw")
-                text_x = self.leftMargin + 16 * mm
+                text_x = self.leftMargin + 21 * mm
             except Exception:
                 pass
         canvas.setFont("Helvetica-Bold", 7)
