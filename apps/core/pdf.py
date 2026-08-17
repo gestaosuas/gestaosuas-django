@@ -27,6 +27,7 @@ from reportlab.platypus import (
     KeepTogether,
     ListFlowable,
     ListItem,
+    NextPageTemplate,
     PageTemplate,
     Paragraph,
     Spacer,
@@ -44,6 +45,9 @@ PAGE_SIZE = A4
 SIDE_MARGIN = 18 * mm
 TOP_MARGIN = 31 * mm
 BOTTOM_MARGIN = 16 * mm
+# Paginas 2+ nao desenham o cabecalho (logo/titulo) - so o rodape - entao
+# ganham uma margem superior bem menor em vez de repetir os 31mm em branco.
+LATER_PAGE_TOP_MARGIN = 16 * mm
 
 INSTITUTION_LINE = "PREFEITURA DE UBERLANDIA - SECRETARIA MUNICIPAL DE DESENVOLVIMENTO SOCIAL"
 
@@ -122,6 +126,13 @@ def _resolve_logo_reader():
 
 
 class SystemDocTemplate(BaseDocTemplate):
+    """Cabecalho (logo/instituicao/titulo) so na 1a pagina - paginas seguintes
+    repetiam o mesmo bloco antes (2026-08-17, pedido do usuario: em documentos
+    de mais de 1 pagina, o cabecalho nao deve se repetir). Usa 2 PageTemplates
+    ("first" com o cabecalho, "later" so com o rodape) + NextPageTemplate pra
+    trocar a partir da 2a pagina - o padrao de "papel timbrado" do ReportLab.
+    O rodape (numero de pagina/gerado em) continua em toda pagina, igual antes."""
+
     def __init__(self, buffer, doc_title, doc_subtitle, **kwargs):
         self.doc_title = doc_title
         self.doc_subtitle = doc_subtitle
@@ -132,11 +143,15 @@ class SystemDocTemplate(BaseDocTemplate):
         kwargs.setdefault("leftMargin", SIDE_MARGIN)
         kwargs.setdefault("rightMargin", SIDE_MARGIN)
         super().__init__(buffer, **kwargs)
-        frame = Frame(self.leftMargin, self.bottomMargin, self.width, self.height, id="main")
-        self.addPageTemplates([PageTemplate(id="main", frames=[frame], onPage=self._draw_chrome)])
+        frame_first = Frame(self.leftMargin, self.bottomMargin, self.width, self.height, id="first")
+        later_height = PAGE_SIZE[1] - LATER_PAGE_TOP_MARGIN - self.bottomMargin
+        frame_later = Frame(self.leftMargin, self.bottomMargin, self.width, later_height, id="later")
+        self.addPageTemplates([
+            PageTemplate(id="first", frames=[frame_first], onPage=self._draw_chrome_first),
+            PageTemplate(id="later", frames=[frame_later], onPage=self._draw_chrome_later),
+        ])
 
-    def _draw_chrome(self, canvas, doc):
-        canvas.saveState()
+    def _draw_header(self, canvas, doc):
         page_w, page_h = PAGE_SIZE
         text_x = self.leftMargin
         if self._logo_reader:
@@ -160,19 +175,34 @@ class SystemDocTemplate(BaseDocTemplate):
         canvas.setLineWidth(0.6)
         canvas.line(self.leftMargin, page_h - 26.5 * mm, page_w - self.rightMargin, page_h - 26.5 * mm)
 
+    def _draw_footer(self, canvas, doc):
+        page_w, page_h = PAGE_SIZE
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(TEXT_MUTED)
         canvas.drawString(self.leftMargin, 10 * mm,
                            "Gerado pelo Sistema de Vigilancia Socioassistencial em "
                            + datetime.now().strftime("%d/%m/%Y %H:%M"))
         canvas.drawRightString(page_w - self.rightMargin, 10 * mm, f"Pagina {doc.page}")
+
+    def _draw_chrome_first(self, canvas, doc):
+        canvas.saveState()
+        self._draw_header(canvas, doc)
+        self._draw_footer(canvas, doc)
+        canvas.restoreState()
+
+    def _draw_chrome_later(self, canvas, doc):
+        canvas.saveState()
+        self._draw_footer(canvas, doc)
         canvas.restoreState()
 
 
 def pdf_response(doc_title, doc_subtitle, story, filename):
     buffer = io.BytesIO()
     doc = SystemDocTemplate(buffer, doc_title, doc_subtitle)
-    doc.build(story)
+    # NextPageTemplate so faz efeito a partir da PROXIMA quebra de pagina -
+    # a 1a pagina continua usando o template "first" (registrado primeiro),
+    # com cabecalho; da 2a em diante usa "later" (so rodape).
+    doc.build([NextPageTemplate("later")] + list(story))
     buffer.seek(0)
     response = HttpResponse(buffer.read(), content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="{filename}"'
