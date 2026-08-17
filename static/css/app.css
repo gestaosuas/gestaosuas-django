@@ -2846,3 +2846,71 @@ body.dashboard-fit-vh .metrics-stack {
 }
 .modal-premium-header h3 { font-weight: 800; font-size: 18px; color: #1e3a8a; }
 .close-modal { font-size: 24px; color: #94a3b8; background: none; border: none; cursor: pointer; }
+
+/* Corpo/lista de tecnicos do modal "Delegar Visita" - o markup original usava
+   classes no estilo Tailwind (p-6, space-y-4, max-h-40, overflow-y-auto...)
+   que nunca existiram neste projeto (sem Tailwind, nem CDN nem build), entao
+   a lista inteira de tecnicos sempre renderizou sem estilo nenhum - so ficou
+   visualmente obvio quando a lista de perfis cresceu (2026-08-17). Reescrito
+   com classes reais + caixa de busca por nome. */
+.delegate-modal-body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.delegate-osc-name { font-size: 14px; font-weight: 700; color: #1e3a8a; margin: 0; }
+.delegate-search-wrap { position: relative; }
+.delegate-search-wrap i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 15px;
+    height: 15px;
+    color: #94a3b8;
+    pointer-events: none;
+}
+.delegate-search-input {
+    width: 100%;
+    padding: 10px 12px 10px 36px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+}
+.delegate-search-input:focus { outline: none; border-color: #3b82f6; }
+.delegate-tech-list {
+    max-height: 260px;
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 6px;
+    background: #f8fafc;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.delegate-tech-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+}
+.delegate-tech-item:hover { background: white; }
+.delegate-tech-item input[type="checkbox"] { width: 16px; height: 16px; accent-color: #1e3a8a; flex-shrink: 0; }
+.delegate-tech-empty { text-align: center; color: #94a3b8; font-size: 13px; font-weight: 600; padding: 20px 0; margin: 0; }
+.delegate-modal-footer {
+    padding: 20px 24px;
+    background: #f8fafc;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}

@@ -862,22 +862,25 @@
         </div>
         <form id="delegateForm" method="post">
             {% csrf_token %}
-            <div class="p-6 space-y-4">
-                <p id="delegateOscName" class="text-sm font-bold text-blue-900"></p>
+            <div class="delegate-modal-body">
+                <p id="delegateOscName" class="delegate-osc-name"></p>
 
-                <div class="form-group">
-                    <label class="premium-label">Técnicos Selecionados</label>
-                    <div class="max-h-40 overflow-y-auto border rounded-xl p-3 bg-zinc-50">
-                        {% for profile in profiles %}
-                        <label class="flex items-center gap-2 py-1 cursor-pointer hover:bg-white px-2 rounded">
-                            <input type="checkbox" name="user_ids" value="{{ profile.pk }}">
-                            <span class="text-xs font-medium">{{ profile.full_name }}</span>
-                        </label>
-                        {% endfor %}
-                    </div>
+                <div class="delegate-search-wrap">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="delegateSearchInput" class="delegate-search-input" placeholder="Buscar técnico por nome..." oninput="filterDelegateTechs(this)" autocomplete="off">
                 </div>
+
+                <div class="delegate-tech-list">
+                    {% for profile in profiles %}
+                    <label class="delegate-tech-item">
+                        <input type="checkbox" name="user_ids" value="{{ profile.pk }}">
+                        <span>{{ profile.full_name }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <p class="delegate-tech-empty" id="delegateTechEmpty" style="display:none;">Nenhum técnico encontrado.</p>
             </div>
-            <div class="p-6 bg-zinc-50 border-t flex justify-end gap-3">
+            <div class="delegate-modal-footer">
                 <button type="button" onclick="closeDelegateModal()" class="btn-outline-monitoring">Cancelar</button>
                 <button type="submit" class="btn-primary-premium">Salvar Delegações</button>
             </div>
@@ -889,11 +892,28 @@
     function openDelegateModal(visitId, oscName) {
         document.getElementById('delegateOscName').innerText = 'Delegando visita à: ' + oscName;
         document.getElementById('delegateForm').action = `/directorias/visitas/${visitId}/delegar/`;
+        document.getElementById('delegateForm').reset();
+        var searchInput = document.getElementById('delegateSearchInput');
+        if (searchInput) filterDelegateTechs(searchInput);
         document.getElementById('delegateModal').style.display = 'flex';
     }
 
     function closeDelegateModal() {
         document.getElementById('delegateModal').style.display = 'none';
+    }
+
+    function filterDelegateTechs(input) {
+        var query = input.value.toLowerCase().trim();
+        var items = document.querySelectorAll('#delegateForm .delegate-tech-item');
+        var visibleCount = 0;
+        items.forEach(function (item) {
+            var name = item.querySelector('span').textContent.toLowerCase();
+            var match = name.indexOf(query) !== -1;
+            item.style.display = match ? '' : 'none';
+            if (match) visibleCount++;
+        });
+        var empty = document.getElementById('delegateTechEmpty');
+        if (empty) empty.style.display = visibleCount === 0 ? '' : 'none';
     }
 </script>
 {% endif %}
