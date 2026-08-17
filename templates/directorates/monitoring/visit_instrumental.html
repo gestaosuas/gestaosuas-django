@@ -515,7 +515,7 @@
                             {% if object.atendimento.pse_qualitativos %}
                                 {% for row in object.atendimento.pse_qualitativos %}
                                 <tr class="pse-qual-row">
-                                    <td><input type="text" name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][data]" value="{{ row.data|default:'' }}" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></td>
+                                    <td><input type="date" name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][data]" value="{{ row.data|default:'' }}" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></td>
                                     <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][situacao]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ row.situacao|default:'' }}</textarea></td>
                                     <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][recomendacoes]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ row.recomendacoes|default:'' }}</textarea></td>
                                     <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][observacao]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ row.observacao|default:'' }}</textarea></td>
@@ -527,7 +527,7 @@
                             {% else %}
                                 {% for row in "1234" %}
                                 <tr class="pse-qual-row">
-                                    <td><input type="text" name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][data]" value="" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></td>
+                                    <td><input type="date" name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][data]" value="" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></td>
                                     <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][situacao]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></textarea></td>
                                     <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][recomendacoes]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></textarea></td>
                                     <td><textarea name="atendimento[pse_qualitativos][{{ forloop.counter0 }}][observacao]" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}></textarea></td>
@@ -1290,7 +1290,7 @@
         var tr = document.createElement("tr");
         tr.className = "pse-qual-row";
         tr.innerHTML =
-            '<td><input type="text" name="atendimento[pse_qualitativos][' + index + '][data]"></td>' +
+            '<td><input type="date" name="atendimento[pse_qualitativos][' + index + '][data]"></td>' +
             '<td><textarea name="atendimento[pse_qualitativos][' + index + '][situacao]"></textarea></td>' +
             '<td><textarea name="atendimento[pse_qualitativos][' + index + '][recomendacoes]"></textarea></td>' +
             '<td><textarea name="atendimento[pse_qualitativos][' + index + '][observacao]"></textarea></td>' +
