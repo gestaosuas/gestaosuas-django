@@ -17,7 +17,7 @@ from apps.core.export import ExcelExportMixin, build_workbook
 from apps.core.notifications import log_activity
 from apps.directorates.models import Directorate, FormDelegation, MonthlyReport, Osc, Visit, WorkPlan
 from apps.directorates.forms import OscForm
-from apps.directorates.views import build_registered_by_map, get_monitoramento_theme
+from apps.directorates.views import build_registered_by_map, get_admin_user_ids, get_monitoramento_theme
 from apps.core.utils import (
     MONTH_LABELS, MONTH_OPTIONS, build_sparkline,
     build_period_label, build_year_range_from_years, build_variation
@@ -141,6 +141,8 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
                 is_linked = ProfileDirectorate.objects.filter(profile=profile, directorate=directorate).exists()
                 if not (is_primary or is_linked):
                     dashboard_visits_qs = dashboard_visits_qs.none()
+                else:
+                    dashboard_visits_qs = dashboard_visits_qs.exclude(user_id__in=get_admin_user_ids())
             else:
                 delegated_visit_ids = FormDelegation.objects.filter(user_id=self.request.user.id).values_list("visit_id", flat=True)
                 dashboard_visits_qs = dashboard_visits_qs.filter(Q(user_id=self.request.user.id) | Q(id__in=delegated_visit_ids))

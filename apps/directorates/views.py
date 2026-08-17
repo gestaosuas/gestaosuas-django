@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db import OperationalError, ProgrammingError
@@ -478,6 +479,20 @@ def is_outros_directorate(directorate):
     return "outros" in ascii_name
 
 
+def get_admin_user_ids():
+    """IDs de todo usuario admin/superuser - usado pra excluir visitas
+    criadas por admin do que o diretor enxerga (docs/dominio 04 A.6,
+    refinado 2026-08-17: diretor ve todas as visitas da propria diretoria,
+    EXCETO as feitas por admin - so "seus agentes" contam, mesmo se o
+    admin em questao nao tiver diretoria nenhuma atribuida)."""
+    User = get_user_model()
+    return set(
+        User.objects.filter(
+            Q(is_superuser=True) | Q(profile__role="admin")
+        ).values_list("id", flat=True)
+    )
+
+
 def get_monitoramento_theme(directorate):
     """Cor de tema (navbar/cabeçalho) para Subvenção/Emendas e Fundos/Outros —
     mesma lógica usada em MonitoramentoHomeView, reaproveitada aqui pras telas
@@ -630,8 +645,10 @@ class VisitScopedMixin(_ObjectDirectorateScopedMixin):
 class VisitAccessMixin(VisitScopedMixin):
     """Alem do acesso a diretoria (VisitScopedMixin), restringe o acesso a
     visita conforme dono/delegacao/papel (docs/dominio/04-... A.6, refinado
-    em 2026-07-25): admin sempre; diretor tem acesso total se ele mesmo criou
-    a visita, senao so leitura (GET); agente/user so na propria visita ou com
+    em 2026-07-25 e 2026-08-17): admin sempre; diretor tem acesso total se
+    ele mesmo criou a visita, senao so leitura (GET) - EXCETO se a visita foi
+    criada por um admin, caso em que o diretor nao tem acesso nenhum (nao e
+    "dos seus agentes"); agente/user so na propria visita ou com
     FormDelegation, senao 403 ja no GET."""
 
     def dispatch(self, request, *args, **kwargs):
@@ -650,6 +667,9 @@ class VisitAccessMixin(VisitScopedMixin):
         is_owner = str(visit.user_id) == str(request.user.id)
         if not is_admin:
             if profile and profile.role == "diretor":
+                visit_made_by_admin = str(visit.user_id) in {str(uid) for uid in get_admin_user_ids()}
+                if visit_made_by_admin and not is_owner:
+                    return HttpResponseForbidden("Você não tem acesso a esta visita.")
                 if not is_owner and request.method != "GET":
                     return HttpResponseForbidden("Você não pode editar uma visita que não criou.")
             else:
@@ -917,11 +937,14 @@ class VisitListView(DirectorateScopedMixin, ListView):
         # --- PERMISSION FILTERING ---
         if not (self.request.user.is_superuser or (profile and profile.role == 'admin')):
             if profile and profile.role == 'diretor':
-                # Diretor sees all in their primary or linked directorates
+                # Diretor sees all in their primary or linked directorates,
+                # exceto visitas feitas por admin (nao sao "dos seus agentes")
                 is_primary = str(profile.primary_directorate_id) == str(self.kwargs["pk"])
                 is_linked = ProfileDirectorate.objects.filter(profile=profile, directorate_id=self.kwargs["pk"]).exists()
                 if not (is_primary or is_linked):
                     qs = qs.none()
+                else:
+                    qs = qs.exclude(user_id__in=get_admin_user_ids())
             else:
                 # Agente sees only owned or delegated
                 delegated_visit_ids = FormDelegation.objects.filter(user_id=self.request.user.id).values_list('visit_id', flat=True)
@@ -1234,10 +1257,12 @@ class MonitoringReportListView(DirectorateScopedMixin, ListView):
                 is_linked = ProfileDirectorate.objects.filter(profile=profile, directorate_id=self.kwargs["pk"]).exists()
                 if not (is_primary or is_linked):
                     qs = qs.none()
+                else:
+                    qs = qs.exclude(user_id__in=get_admin_user_ids())
             else:
                 delegated_visit_ids = FormDelegation.objects.filter(user_id=self.request.user.id).values_list('visit_id', flat=True)
                 qs = qs.filter(Q(user_id=self.request.user.id) | Q(id__in=delegated_visit_ids))
-        
+
         # Bimester filter persistence
         bimester = get_persistent_bimester(self.request)
         year = self.request.GET.get("year", datetime.now().year)
