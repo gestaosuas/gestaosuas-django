@@ -212,10 +212,17 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
 
         theme_class, header_class, icon_color = get_monitoramento_theme(directorate)
 
+        is_emendas_flag = "emendas" in ascii_name
+        # Coluna "Acoes" (delegar/reverter/excluir) da tabela inline de
+        # Instrumental de Visita so aparece pra admin - ver CLAUDE.md
+        # 2026-08-16. Colspan da linha vazia precisa contar com isso (+ a
+        # coluna extra "Identificador" so em Emendas e Fundos).
+        context["visit_table_colspan"] = 4 + (1 if is_emendas_flag else 0) + (1 if is_admin else 0)
+
         context.update({
             "subvencao_stats": subvencao_stats,
             "is_subvencao_only": is_subvencao_only,
-            "is_emendas": "emendas" in ascii_name,
+            "is_emendas": is_emendas_flag,
             "is_fundos": "fundos" in ascii_name,
             "is_subvencao_mode": is_subvencao and not is_outros,
             "is_outros_mode": is_outros,

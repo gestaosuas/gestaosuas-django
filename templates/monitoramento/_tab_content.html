@@ -246,7 +246,9 @@
                                 <th>Plano de Trabalho</th>
                                 <th>Técnicos</th>
                                 <th>Documentos</th>
+                                {% if is_admin_user %}
                                 <th>Ações</th>
+                                {% endif %}
                             </tr>
                         </thead>
                         <tbody>
@@ -309,6 +311,7 @@
                                         {% endif %}
                                     </div>
                                 </td>
+                                {% if is_admin_user %}
                                 <td class="inline-actions inline-visit-actions" data-label="Ações">
                                     {% if visit.status == 'completed' or visit.status == 'finalized' %}
                                     <form action="{% url 'directorates:visit-revert' visit.pk %}" method="post" onsubmit="return confirm('Deseja reverter para rascunho?')">
@@ -320,6 +323,10 @@
                                     </form>
                                     {% endif %}
 
+                                    <button type="button" class="inline-revert-action" onclick="openDelegateModal('{{ visit.pk }}', '{{ visit.osc.name }}')" title="Delegar">
+                                        <i data-lucide="users-round"></i>
+                                    </button>
+
                                     {% if can_delete %}
                                     <form action="{% url 'directorates:visit-delete' visit.pk %}" method="post" onsubmit="return confirm('Tem certeza que deseja excluir esta visita?')">
                                         {% csrf_token %}
@@ -330,10 +337,11 @@
                                     </form>
                                     {% endif %}
                                 </td>
+                                {% endif %}
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="{% if is_emendas %}6{% else %}5{% endif %}" class="inline-empty-cell">
+                                <td colspan="{{ visit_table_colspan }}" class="inline-empty-cell">
                                     <i data-lucide="clipboard-x"></i>
                                     <p>Nenhuma visita registrada neste período.</p>
                                     <a href="{% url 'directorates:visit-create' directorate.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-primary-btn inline-link-btn">
@@ -590,6 +598,11 @@
                             <a href="{% url 'directorates:visit-instrumental' visit.pk %}" class="report-action-btn btn-slate-light">
                                 <i data-lucide="clipboard-list"></i> Instrumental
                             </a>
+                            {% if is_admin_user %}
+                            <button type="button" class="report-action-btn btn-slate-light" onclick="openDelegateModal('{{ visit.pk }}', '{{ visit.osc.name }}')">
+                                <i data-lucide="users-round"></i> Delegar
+                            </button>
+                            {% endif %}
                             {# Notificações (PDF) ── #}
                             <div class="notif-section">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
@@ -838,3 +851,49 @@
                 </article>
             </div>
             {% endif %}
+
+{% if is_admin_user %}
+<!-- DELEGATE MODAL (Instrumental de Visita / Relatorios e Pareceres - so admin) -->
+<div id="delegateModal" class="modal-premium no-print" style="display:none;">
+    <div class="modal-premium-content">
+        <div class="modal-premium-header">
+            <h3>Delegar Visita</h3>
+            <button onclick="closeDelegateModal()" class="close-modal">&times;</button>
+        </div>
+        <form id="delegateForm" method="post">
+            {% csrf_token %}
+            <div class="p-6 space-y-4">
+                <p id="delegateOscName" class="text-sm font-bold text-blue-900"></p>
+
+                <div class="form-group">
+                    <label class="premium-label">Técnicos Selecionados</label>
+                    <div class="max-h-40 overflow-y-auto border rounded-xl p-3 bg-zinc-50">
+                        {% for profile in profiles %}
+                        <label class="flex items-center gap-2 py-1 cursor-pointer hover:bg-white px-2 rounded">
+                            <input type="checkbox" name="user_ids" value="{{ profile.pk }}">
+                            <span class="text-xs font-medium">{{ profile.full_name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="p-6 bg-zinc-50 border-t flex justify-end gap-3">
+                <button type="button" onclick="closeDelegateModal()" class="btn-outline-monitoring">Cancelar</button>
+                <button type="submit" class="btn-primary-premium">Salvar Delegações</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openDelegateModal(visitId, oscName) {
+        document.getElementById('delegateOscName').innerText = 'Delegando visita à: ' + oscName;
+        document.getElementById('delegateForm').action = `/directorias/visitas/${visitId}/delegar/`;
+        document.getElementById('delegateModal').style.display = 'flex';
+    }
+
+    function closeDelegateModal() {
+        document.getElementById('delegateModal').style.display = 'none';
+    }
+</script>
+{% endif %}

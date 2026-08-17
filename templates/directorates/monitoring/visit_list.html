@@ -81,7 +81,9 @@
                 <th class="no-tablet" style="width: 12%;">TÉCNICOS</th>
                 <th class="no-tablet" style="width: 13%;">STATUS</th>
                 <th class="no-tablet" style="width: 17%; text-align: right;">DOCUMENTOS</th>
+                {% if is_admin_user %}
                 <th style="width: 20%; text-align: right;">AÇÕES</th>
+                {% endif %}
             </tr>
         </thead>
         <tbody>
@@ -209,70 +211,29 @@
                         {% endif %}
                     </div>
                 </td>
+                {% if is_admin_user %}
                 <td class="action-btns-cell">
                     <div class="visit-actions-icons">
-                    {% if visit.is_subvencao %}
-                        {% if visit.status != 'completed' and visit.status != 'finalized' %}
-                            <a href="{% url 'directorates:visit-instrumental' visit.pk %}" class="action-icon-btn action-icon-edit-main" title="Editar Instrumental">
-                                <i data-lucide="square-pen"></i>
-                            </a>
-                        {% else %}
-                            {% if visit.relatorio_status == 'finalized' %}
-                                <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}" class="action-icon-btn action-icon-subvencao-finalized" title="Visualizar Relatório de Visita">
-                                    <i data-lucide="eye"></i>
-                                </a>
-                            {% elif visit.relatorio_status == 'draft' %}
-                                <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}" class="action-icon-btn action-icon-subvencao-draft" title="Editar Rascunho do Relatório">
-                                    <i data-lucide="file-edit"></i>
-                                </a>
-                            {% else %}
-                                <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}" class="action-icon-btn action-icon-subvencao-zerado" title="Preencher Relatório de Visita">
-                                    <i data-lucide="file-plus"></i>
-                                </a>
-                            {% endif %}
-                            
-                            <a href="{% url 'directorates:visit-instrumental' visit.pk %}" class="action-icon-btn action-icon-view" title="Visualizar Instrumental">
-                                <i data-lucide="book-open"></i>
-                            </a>
-                            
-                            <form action="{% url 'directorates:visit-revert' visit.pk %}" method="post" style="display:inline;" onsubmit="return confirm('Deseja reverter para rascunho?')">
-                                {% csrf_token %}
-                                <button type="submit" class="action-icon-btn action-icon-revert" title="Reverter para Rascunho"><i data-lucide="undo-2"></i></button>
-                            </form>
-                        {% endif %}
-                    {% else %}
-                        {% if visit.status == 'completed' or visit.status == 'finalized' %}
-                            <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}" class="action-icon-btn action-icon-report" title="Relatório de Visita">
-                                <i data-lucide="file-text"></i>
-                            </a>
-                            <a href="{% url 'directorates:visit-instrumental' visit.pk %}" class="action-icon-btn action-icon-view" title="Visualizar Instrumental">
-                                <i data-lucide="eye"></i>
-                            </a>
-                            <form action="{% url 'directorates:visit-revert' visit.pk %}" method="post" style="display:inline;" onsubmit="return confirm('Deseja reverter para rascunho?')">
-                                {% csrf_token %}
-                                <button type="submit" class="action-icon-btn action-icon-revert" title="Reverter para Rascunho"><i data-lucide="undo-2"></i></button>
-                            </form>
-                        {% else %}
-                            <a href="{% url 'directorates:visit-instrumental' visit.pk %}" class="action-icon-btn action-icon-edit-main" title="Editar Instrumental">
-                                <i data-lucide="square-pen"></i>
-                            </a>
-                        {% endif %}
+                    {% if visit.status == 'completed' or visit.status == 'finalized' %}
+                    <form action="{% url 'directorates:visit-revert' visit.pk %}" method="post" style="display:inline;" onsubmit="return confirm('Deseja reverter para rascunho?')">
+                        {% csrf_token %}
+                        <button type="submit" class="action-icon-btn action-icon-revert" title="Reverter para Rascunho"><i data-lucide="undo-2"></i></button>
+                    </form>
                     {% endif %}
 
                     <button type="button" class="action-icon-btn action-icon-delegate" onclick="openDelegateModal('{{ visit.pk }}', '{{ visit.osc.name }}')" title="Delegar"><i data-lucide="users-round"></i></button>
 
-                    {% if can_delete %}
                     <form action="{% url 'directorates:visit-delete' visit.pk %}" method="post" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja excluir esta visita?')">
                         {% csrf_token %}
-                        <button type="submit" class="action-icon-btn action-icon-delete"><i data-lucide="trash-2"></i></button>
+                        <button type="submit" class="action-icon-btn action-icon-delete" title="Excluir Visita"><i data-lucide="trash-2"></i></button>
                     </form>
-                    {% endif %}
                     </div>
                 </td>
+                {% endif %}
             </tr>
             {% empty %}
             <tr>
-                <td colspan="{% if is_emendas %}7{% else %}6{% endif %}" style="text-align: center; padding: 100px 0; color: #94a3b8; font-weight: 800; text-transform: uppercase;">
+                <td colspan="{{ visit_table_colspan }}" style="text-align: center; padding: 100px 0; color: #94a3b8; font-weight: 800; text-transform: uppercase;">
                     Nenhuma visita registrada neste período.
                 </td>
             </tr>
@@ -298,7 +259,7 @@
                     <div class="max-h-40 overflow-y-auto border rounded-xl p-3 bg-zinc-50">
                         {% for profile in profiles %}
                         <label class="flex items-center gap-2 py-1 cursor-pointer hover:bg-white px-2 rounded">
-                            <input type="checkbox" name="user_ids" value="{{ profile.id }}">
+                            <input type="checkbox" name="user_ids" value="{{ profile.pk }}">
                             <span class="text-xs font-medium">{{ profile.full_name }}</span>
                         </label>
                         {% endfor %}
@@ -593,34 +554,6 @@
         display: inline-flex !important;
         margin: 0;
     }
-
-    .modal-premium {
-        position: fixed;
-        inset: 0;
-        background: rgba(15, 23, 42, 0.6);
-        backdrop-filter: blur(4px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-    }
-    .modal-premium-content {
-        background: white;
-        width: 100%;
-        max-width: 500px;
-        border-radius: 24px;
-        overflow: hidden;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    }
-    .modal-premium-header {
-        padding: 24px;
-        border-bottom: 1px solid #f1f5f9;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .modal-premium-header h3 { font-weight: 800; font-size: 18px; color: #1e3a8a; }
-    .close-modal { font-size: 24px; color: #94a3b8; background: none; border: none; cursor: pointer; }
 
     .visit-filter-form {
         display: flex; align-items: center; gap: 12px; flex-wrap: wrap; width: 100%;

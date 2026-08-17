@@ -975,17 +975,27 @@ class VisitListView(DirectorateScopedMixin, ListView):
         context["selected_bimester"] = get_persistent_bimester(self.request)
         context["bimester_options"] = BIMESTER_OPTIONS
         profile = getattr(self.request.user, 'profile', None)
-        context["can_delete"] = self.request.user.is_superuser or (profile and profile.role == 'admin')
+        is_admin_user = self.request.user.is_superuser or (profile and profile.role == 'admin')
+        context["can_delete"] = is_admin_user
+        context["is_admin_user"] = is_admin_user
+        # Coluna "Acoes" (delegar/reverter/excluir) so aparece pra admin -
+        # ver CLAUDE.md 2026-08-16. Colspan da linha vazia precisa contar com
+        # isso (+ a coluna extra "Identificador" so em Emendas e Fundos).
+        context["visit_table_colspan"] = 5 + (1 if context["is_emendas"] else 0) + (1 if is_admin_user else 0)
         return context
 
 class VisitDelegateView(VisitScopedMixin, View):
+    """So admin pode delegar visitas (restrito 2026-08-16 - antes diretor
+    tambem podia, mas o usuario pediu que delegar/reverter fiquem exclusivos
+    de admin)."""
+
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return self.handle_no_permission()
         profile = getattr(request.user, "profile", None)
-        is_allowed = request.user.is_superuser or (profile and profile.role in ("admin", "diretor"))
+        is_allowed = request.user.is_superuser or (profile and profile.role == "admin")
         if not is_allowed:
-            return HttpResponseForbidden("Apenas administradores e diretores podem delegar visitas.")
+            return HttpResponseForbidden("Apenas administradores podem delegar visitas.")
         return super().dispatch(request, *args, **kwargs)
 
     def post(self, request, pk):
@@ -1246,6 +1256,9 @@ class MonitoringReportListView(DirectorateScopedMixin, ListView):
         context["directorate"] = directorate
         context["selected_bimester"] = get_persistent_bimester(self.request)
         context["theme_class"] = get_monitoramento_theme(directorate)[0]
+        profile = getattr(self.request.user, 'profile', None)
+        context["is_admin_user"] = self.request.user.is_superuser or (profile and profile.role == 'admin')
+        context["profiles"] = Profile.objects.all().order_by("full_name")
         return context
 
 class VisitReportView(VisitAccessMixin, DetailView):
@@ -2172,7 +2185,20 @@ class VisitDeleteDocumentView(VisitAccessMixin, View):
             
         return JsonResponse({"success": False, "error": "Index invalido"}, status=400)
 
-class VisitRevertView(VisitAccessMixin, View):
+class VisitRevertView(VisitScopedMixin, View):
+    """Reverte o status (instrumental inteiro) para 'draft'. So admin
+    (restrito 2026-08-16 - antes o dono, mesmo diretor/agente, tambem podia;
+    usuario pediu exclusividade admin, mesma regra do RevertReportView)."""
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        profile = getattr(request.user, "profile", None)
+        is_allowed = request.user.is_superuser or (profile and profile.role == "admin")
+        if not is_allowed:
+            return HttpResponseForbidden("Apenas administradores podem reverter visitas.")
+        return super().dispatch(request, *args, **kwargs)
+
     def post(self, request, pk):
         visit = self.get_scoped_object()
         visit.status = "draft"
@@ -2182,9 +2208,20 @@ class VisitRevertView(VisitAccessMixin, View):
             return redirect(next_url)
         return redirect(get_visit_list_redirect(visit.directorate))
 
-class RevertReportView(VisitAccessMixin, View):
-    """Reverte o status de relatorio_final ou parecer_conclusivo para 'draft'."""
+class RevertReportView(VisitScopedMixin, View):
+    """Reverte o status de relatorio_final ou parecer_conclusivo para 'draft'.
+    So admin (restrito 2026-08-16 - antes o dono, mesmo sendo diretor/agente,
+    tambem podia reverter a propria visita; usuario pediu exclusividade admin)."""
     ALLOWED = ("relatorio_final", "parecer_conclusivo")
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        profile = getattr(request.user, "profile", None)
+        is_allowed = request.user.is_superuser or (profile and profile.role == "admin")
+        if not is_allowed:
+            return HttpResponseForbidden("Apenas administradores podem reverter relatórios.")
+        return super().dispatch(request, *args, **kwargs)
 
     def post(self, request, pk, report_type):
         if report_type not in self.ALLOWED:
