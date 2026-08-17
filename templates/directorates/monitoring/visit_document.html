@@ -17,6 +17,12 @@
         </a>
     </div>
 
+    <div class="visit-document-status-row no-print">
+        <div class="visit-document-status-tag">
+            <i data-lucide="check-circle"></i> Documento Finalizado e Autenticado
+        </div>
+    </div>
+
     <article class="visit-document-page">
         <header class="visit-document-header">
             <div class="visit-document-header-top">
@@ -26,9 +32,6 @@
                     <p>Secretaria Municipal de Desenvolvimento Social</p>
                     <p>Diretoria de {{ directorate.name }}</p>
                 </div>
-            </div>
-            <div class="visit-document-status-tag">
-                <i data-lucide="check-circle"></i> Documento Finalizado e Autenticado
             </div>
         </header>
 
@@ -341,12 +344,16 @@
 
     .visit-document-header { margin-bottom: 50px; border-bottom: 2px solid #1e40af; padding-bottom: 25px; }
     .visit-document-header-top { display: flex; align-items: center; gap: 40px; }
-    .visit-document-logo { max-width: 250px; height: auto; }
+    .visit-document-logo { max-width: 170px; height: auto; }
     .visit-document-header-meta h1 { font-size: 20px; font-weight: 900; color: #1e40af; margin: 0 0 5px; text-transform: uppercase; }
     .visit-document-header-meta p { margin: 0; font-size: 13px; color: #64748b; font-weight: 700; text-transform: uppercase; }
 
+    .visit-document-status-row {
+        max-width: 1000px; margin: 0 auto 16px; padding: 0 20px;
+        display: flex; justify-content: flex-end;
+    }
     .visit-document-status-tag {
-        position: absolute; top: 40px; right: 40px; background: #f0fdf4; border: 1px solid #bbf7d0;
+        background: #f0fdf4; border: 1px solid #bbf7d0;
         color: #166534; padding: 8px 16px; border-radius: 50px; font-size: 11px; font-weight: 800;
         text-transform: uppercase; display: flex; align-items: center; gap: 8px;
     }
