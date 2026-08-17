@@ -1922,7 +1922,12 @@ class VisitCreateView(DirectorateScopedMixin, TemplateView):
             osc_id=osc_id,
             work_plan=work_plan,
             visit_date=data.get("identificacao[visit_date_1]", "") or datetime.now(),
-            visit_time="09:00",
+            # visit_time nao tem campo proprio no formulario (so "Turno"
+            # manha/tarde) - usa o horario real de criacao em vez de um
+            # valor fixo, ja que o campo e NOT NULL no banco e nao pode
+            # ficar vazio (achado 2026-08-17: toda visita criada mostrava
+            # 09:00, sempre igual, porque era hardcoded aqui).
+            visit_time=datetime.now().time(),
             status=data.get("status", "draft"),
             user_id=request.user.pk,
         )

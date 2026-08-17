@@ -119,18 +119,16 @@
                         <input type="text" value="{{ object.osc.activity_type|default:'Nao informado' }}" disabled class="form-input-premium is-readonly">
                     </div>
                 </div>
+                <div class="visit-field">
+                    <label class="premium-label">Endereco</label>
+                    <input type="text" value="{{ object.osc.address }}{% if object.osc.number %}, {{ object.osc.number }}{% endif %} - {{ object.osc.neighborhood|default:'' }}" disabled class="form-input-premium is-readonly">
+                </div>
                 <div class="visit-grid visit-grid-two">
-                    <div class="visit-field">
-                        <label class="premium-label">Endereco</label>
-                        <input type="text" value="{{ object.osc.address }}{% if object.osc.number %}, {{ object.osc.number }}{% endif %} - {{ object.osc.neighborhood|default:'' }}" disabled class="form-input-premium is-readonly">
-                    </div>
                     <div class="visit-field">
                         <label class="premium-label">Telefone</label>
                         <input type="text" value="{{ object.osc.phone|default:'Nao informado' }}" disabled class="form-input-premium is-readonly">
                     </div>
-                </div>
-                {% if is_subvencao_visit %}
-                <div class="visit-grid visit-grid-two">
+                    {% if is_subvencao_visit %}
                     <div class="visit-field">
                         <label class="premium-label">Plano de Trabalho vinculado</label>
                         <select name="work_plan" id="workPlanSelect" class="form-input-premium" {% if visit_osc_plans|length > 1 %}data-needs-choice="1"{% endif %} {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
@@ -140,8 +138,8 @@
                             {% endfor %}
                         </select>
                     </div>
+                    {% endif %}
                 </div>
-                {% endif %}
                 <div class="section-divider"><span>Dados da visita</span></div>
                 {% endif %}
 
@@ -240,7 +238,7 @@
                                 </label>
                             </div>
                         </div>
-                        <div id="attendanceWaitingQuantityField" style="{% if object.atendimento.lista_espera != 'sim' %}visibility: hidden;{% else %}visibility: visible;{% endif %}">
+                        <div id="attendanceWaitingQuantityField" style="{% if object.atendimento.lista_espera != 'sim' %}display: none; visibility: hidden;{% else %}visibility: visible;{% endif %}">
                             <label class="micro-label">Quant. Espera</label>
                             <input type="number" name="atendimento[lista_espera_quantidade]" value="{{ object.atendimento.lista_espera_quantidade|default:'' }}" class="form-input-premium attendance-present-input" placeholder="Qtd" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
                         </div>
@@ -1113,7 +1111,9 @@
             return;
         }
 
-        quantityField.style.visibility = selected && selected.value === "sim" ? "visible" : "hidden";
+        var show = selected && selected.value === "sim";
+        quantityField.style.visibility = show ? "visible" : "hidden";
+        quantityField.style.display = show ? "" : "none";
     }
 
     function setPseSectionState(enabled) {
@@ -2351,19 +2351,18 @@
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    /* Otimizacao para Tablets e Mobile */
+    /* Otimizacao para Tablets e Mobile. As regras de grid/colunas do tablet
+       ficam todas juntas no bloco @media (max-width: 1024px) mais abaixo
+       (perto de .signature-grid) - esse bloco aqui so cuida do espacamento
+       da pagina em si, pra nao ter duas fontes de verdade conflitantes pro
+       mesmo breakpoint (2026-08-17: era exatamente esse o bug - duas regras
+       @media 1024px em pontos diferentes do arquivo brigando pela mesma
+       classe, e a que vinha depois sempre vencia, achatando tudo pra 1
+       coluna mesmo quando a de cima pedia 2 ou 3). */
     @media (max-width: 1024px) {
         .visit-page-shell {
             margin-top: -30px;
             padding: 0 16px;
-        }
-
-        .visit-grid-three {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .attendance-top-grid {
-            grid-template-columns: repeat(3, 1fr);
         }
     }
 
@@ -3597,22 +3596,110 @@
     }
 
     @media (max-width: 1024px) {
-        .visit-top-actions,
-        .signature-grid,
-        .visit-grid-two,
-        .visit-grid-three,
-        .attendance-top-grid,
-        .visit-check-grid,
-        .attendance-present-grid,
-        .visit-evidence-grid,
         .plan-preview-info-grid {
             grid-template-columns: 1fr;
         }
 
-        .visit-table-toolbar,
-        .visit-footer-actions-inner {
+        /* Botoes do topo em 2x2 (Plano de Trabalho, Imprimir Relatorio,
+           Salvar Rascunho, Finalizar Visita) - "Voltar" ocupa a linha
+           inteira sozinho acima do grupo. */
+        .visit-top-actions {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .visit-top-action-back {
+            grid-column: 1 / -1;
+        }
+
+        /* .visit-grid-two ja e 2 colunas por padrao (fora de media query) -
+           so precisava parar de ser achatado pra 1 coluna aqui. Cobre
+           Identificacao (Telefone + Plano de Trabalho), Observacoes e
+           Recomendacoes, etc. */
+
+        /* Dados da visita: Data da Visita + Turno em 2 colunas (o 3o item,
+           botao "Adicionar Visita", quando existe, cai numa linha propria). */
+        .visit-grid-three {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        /* Atendimento: Horario Inicio/Fim pareados, Total-Mes/Subvencionados
+           pareados - Tipo de Horario (1o campo) ocupa a linha toda sozinho. */
+        .attendance-top-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .attendance-top-grid > .visit-field:first-child {
+            grid-column: 1 / -1;
+        }
+
+        /* Usuarios presentes: Manha/Tarde/Lista de Espera/Total em 4
+           colunas (Quant. Espera, quando fica visivel, cai numa linha
+           propria abaixo). */
+        .attendance-present-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        /* Forma de acesso: os 4 checkboxes em 2x2 ("Quem encaminha" ja fica
+           fora desse grid, aparece abaixo por conta propria). */
+        .visit-check-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        /* Fotos/Evidencias: Abrir Camera + Selecionar da Galeria lado a lado. */
+        .visit-evidence-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        /* Assinaturas: os 2 tecnicos lado a lado; representante da OSC
+           (3o bloco) ocupa a linha inteira abaixo, como ja era. */
+        .signature-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .signature-grid > .signature-block:nth-child(3) {
+            grid-column: 1 / -1;
+        }
+
+        /* Tabela de Colaboradores: fonte um pouco menor pra caber melhor. */
+        .visit-rh-table th {
+            font-size: 8px;
+        }
+        .visit-table-input {
+            font-size: 12px;
+        }
+
+        /* PSE - tabela de Qualitativos: colunas um pouco mais estreitas. */
+        .pse-qualitative-table {
+            min-width: 760px;
+        }
+        .pse-qualitative-table textarea,
+        .pse-qualitative-table input {
+            font-size: 11px;
+            padding: 8px;
+        }
+
+        .visit-table-toolbar {
             flex-direction: column;
             align-items: stretch;
+        }
+
+        /* Botoes de baixo (Salvar rascunho / Finalizar e bloquear): 2
+           colunas, mesma cor dos botoes de cima da pagina (antes o de
+           finalizar usava um verde diferente do azul de cima). */
+        .visit-footer-actions-inner {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .visit-save-draft-btn {
+            min-height: 44px;
+            padding: 8px 16px;
+            border-radius: 14px;
+            border: 1px solid #dbe4ee;
+            background: #f8fafc;
+            color: #0f172a;
+            box-shadow: 0 4px 12px rgba(148, 163, 184, 0.08);
+        }
+        .visit-finish-btn {
+            background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+            box-shadow: 0 14px 30px rgba(37, 99, 235, 0.25);
         }
 
         .visit-field-action {

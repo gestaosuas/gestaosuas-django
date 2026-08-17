@@ -1,16 +1,18 @@
 from django.urls import path
 
-from .views import (LandingView, MapManagementView, MapView,
+from .views import (LandingView, ManifestView, MapManagementView, MapView,
                      NarrativeReportDeleteView, NotificationsListView,
                      NotificationsMarkReadView, NotificationsUnreadView,
-                     ProtectedMediaView, SystemSettingsView, TvApiUrlsView,
-                     TvDashboardView)
+                     ProtectedMediaView, ServiceWorkerView, SystemSettingsView,
+                     TvApiUrlsView, TvDashboardView)
 
 
 app_name = "core"
 
 urlpatterns = [
     path("", LandingView.as_view(), name="landing"),
+    path("manifest.json", ManifestView.as_view(), name="manifest"),
+    path("sw.js", ServiceWorkerView.as_view(), name="service-worker"),
     path("settings/", SystemSettingsView.as_view(), name="settings"),
     path("settings/mapas/", MapManagementView.as_view(), name="map_management"),
     path("mapas/", MapView.as_view(), name="map"),

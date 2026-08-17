@@ -67,6 +67,13 @@
       </button>
     </form>
 
+    <button type="button" class="login-btn login-btn-outline" id="pwaInstallBtn" style="display:none;">
+      <span class="login-btn-label">
+        Instalar Aplicativo
+        <i data-lucide="download"></i>
+      </span>
+    </button>
+
     <footer class="login-panel-footer">
       &copy; {{ system_reference_year }} &bull; {{ system_name }}
     </footer>
@@ -372,6 +379,21 @@
   height: 16px;
 }
 
+.login-btn-outline {
+  margin-top: 12px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.75);
+  box-shadow: none;
+}
+
+.login-btn-outline:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+}
+
 .login-btn-spinner {
   display: none;
   width: 16px;
@@ -474,6 +496,37 @@
             }
         });
     }
+
+    // Instalar como app (PWA) - o botao so aparece se o navegador realmente
+    // permitir instalar (Chrome/Edge/Android). O iOS Safari nao dispara
+    // beforeinstallprompt (sem API de instalacao programatica la), entao
+    // o botao nunca aparece nele - limitacao da plataforma, nao um bug;
+    // no iPhone a instalacao e manual via Compartilhar > Adicionar a Tela
+    // de Inicio.
+    var installBtn = document.getElementById('pwaInstallBtn');
+    var deferredInstallPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', function(event) {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+        if (installBtn) installBtn.style.display = '';
+    });
+
+    if (installBtn) {
+        installBtn.addEventListener('click', function() {
+            if (!deferredInstallPrompt) return;
+            deferredInstallPrompt.prompt();
+            deferredInstallPrompt.userChoice.finally(function() {
+                deferredInstallPrompt = null;
+                installBtn.style.display = 'none';
+            });
+        });
+    }
+
+    window.addEventListener('appinstalled', function() {
+        if (installBtn) installBtn.style.display = 'none';
+        deferredInstallPrompt = null;
+    });
 })();
 </script>
 {% endblock %}

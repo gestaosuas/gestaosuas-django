@@ -4,8 +4,9 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import OperationalError, ProgrammingError
-from django.http import FileResponse, Http404, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect
+from django.templatetags.static import static
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import TemplateView, RedirectView, View
@@ -17,6 +18,63 @@ from apps.directorates.models import Directorate
 
 class LandingView(RedirectView):
     url = "/mapas/"
+
+
+class ManifestView(View):
+    """Web App Manifest pra instalabilidade PWA. View (nao arquivo estatico)
+    de proposito - assim o nome acompanha o SystemSetting.system_name (mesmo
+    texto do navbar/login) sem precisar rebuild pra mudar. Publica (sem
+    LoginRequiredMixin) porque o navegador busca isso antes do login, na
+    propria tela de login."""
+
+    def get(self, request):
+        try:
+            from apps.core.models import SystemSetting
+            settings_map = {item.key: item.value for item in SystemSetting.objects.all()}
+        except (OperationalError, ProgrammingError):
+            settings_map = {}
+        name = settings_map.get("system_name", "Plataforma de Vigilancia Socioassistencial")
+        manifest = {
+            "name": name,
+            "short_name": "Vigilância",
+            "description": "Sistema de Vigilância Socioassistencial - Secretaria Municipal de Desenvolvimento Social de Uberlândia-MG",
+            "start_url": "/",
+            "scope": "/",
+            "display": "standalone",
+            "background_color": "#0a1128",
+            "theme_color": "#0a1128",
+            "orientation": "portrait-primary",
+            "lang": "pt-BR",
+            "icons": [
+                {"src": static("img/icon-192.png"), "sizes": "192x192", "type": "image/png", "purpose": "any"},
+                {"src": static("img/favicon-512x512.png"), "sizes": "512x512", "type": "image/png", "purpose": "any"},
+            ],
+        }
+        return JsonResponse(manifest, content_type="application/manifest+json")
+
+
+class ServiceWorkerView(View):
+    """Service worker minimo, so pra satisfazer o criterio de instalabilidade
+    do Chrome/Edge (o evento beforeinstallprompt so dispara com um SW
+    registrado que tenha um listener de 'fetch'). Sem cache/offline de
+    proposito - os dados do sistema (visitas, relatorios) precisam sempre
+    vir atualizados do servidor, cachear paginas aqui seria perigoso.
+    Servido via view (nao staticfiles) pra ficar em /sw.js na raiz, exigido
+    pro escopo do service worker cobrir o site inteiro."""
+
+    def get(self, request):
+        js = (
+            "self.addEventListener('install', function (event) {\n"
+            "    self.skipWaiting();\n"
+            "});\n"
+            "self.addEventListener('activate', function (event) {\n"
+            "    event.waitUntil(self.clients.claim());\n"
+            "});\n"
+            "self.addEventListener('fetch', function (event) {\n"
+            "    return;\n"
+            "});\n"
+        )
+        return HttpResponse(js, content_type="application/javascript")
 
 
 class SystemSettingsView(LoginRequiredMixin, TemplateView):
