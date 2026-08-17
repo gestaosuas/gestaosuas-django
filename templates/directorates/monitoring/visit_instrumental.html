@@ -78,7 +78,34 @@
             </div>
             <div class="visit-section-body">
                 {% if is_new %}
-                {% if is_subvencao_visit %}
+                {% if is_emendas_visit %}
+                <div class="visit-grid visit-grid-three">
+                    <div class="visit-field">
+                        <label class="premium-label">Selecione a Organizacao Social Civil (OSC)</label>
+                        <select name="osc" required class="form-input-premium">
+                            <option value="">Selecione a OSC...</option>
+                            {% for osc in oscs %}
+                            <option value="{{ osc.pk }}" data-subsidized="{{ osc.subsidized_count|default:0 }}">{{ osc.name }} - {{ osc.activity_type|default:'' }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="visit-field">
+                        <label class="premium-label">Identificador</label>
+                        <input type="text" name="identificacao[identifier]" value="" class="form-input-premium" placeholder="Ex: 2024.001">
+                    </div>
+                    <div class="visit-field" id="workPlanLinkField">
+                        <button type="button" id="workPlanLinkButton" class="btn-outline-monitoring visit-add-row-btn" style="display:none;" onclick="revealWorkPlanSelect()">
+                            <i data-lucide="link"></i> Vincular Plano de Trabalho
+                        </button>
+                        <div id="workPlanSelectWrap" style="display:none;">
+                            <label class="premium-label">Plano de Trabalho vinculado</label>
+                            <select name="work_plan" id="workPlanSelect" class="form-input-premium" disabled>
+                                <option value="">Selecione a OSC primeiro...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                {% elif is_subvencao_visit %}
                 <div class="visit-grid visit-grid-two">
                     <div class="visit-field">
                         <label class="premium-label">Selecione a Organizacao Social Civil (OSC)</label>
@@ -128,7 +155,12 @@
                         <label class="premium-label">Telefone</label>
                         <input type="text" value="{{ object.osc.phone|default:'Nao informado' }}" disabled class="form-input-premium is-readonly">
                     </div>
-                    {% if is_subvencao_visit %}
+                    {% if is_emendas_visit %}
+                    <div class="visit-field">
+                        <label class="premium-label">Identificador</label>
+                        <input type="text" name="identificacao[identifier]" value="{{ object.identificacao.identifier|default:'' }}" class="form-input-premium" placeholder="Ex: 2024.001" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                    </div>
+                    {% elif is_subvencao_visit %}
                     <div class="visit-field">
                         <label class="premium-label">Plano de Trabalho vinculado</label>
                         <select name="work_plan" id="workPlanSelect" class="form-input-premium" {% if visit_osc_plans|length > 1 %}data-needs-choice="1"{% endif %} {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
@@ -140,6 +172,25 @@
                     </div>
                     {% endif %}
                 </div>
+                {% if is_emendas_visit and visit_osc_plans|length > 1 %}
+                <div class="visit-field" id="workPlanLinkField">
+                    <button type="button" id="workPlanLinkButton" class="btn-outline-monitoring visit-add-row-btn" style="{% if object.work_plan_id %}display:none;{% endif %}" onclick="revealWorkPlanSelect()" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                        <i data-lucide="link"></i> Vincular Plano de Trabalho
+                    </button>
+                    <div id="workPlanSelectWrap" style="{% if not object.work_plan_id %}display:none;{% endif %}">
+                        <label class="premium-label">Plano de Trabalho vinculado</label>
+                        <select name="work_plan" id="workPlanSelect" class="form-input-premium" data-needs-choice="1" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                            <option value="">Selecione o plano de trabalho...</option>
+                            {% for plan in visit_osc_plans %}
+                            <option value="{{ plan.pk }}" {% if object.work_plan_id == plan.pk %}selected{% endif %}>{{ plan.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                {% endif %}
+                {% if is_emendas_visit and visit_osc_plans|length == 1 and not object.work_plan_id %}
+                <input type="hidden" name="work_plan" value="">
+                {% endif %}
                 <div class="section-divider"><span>Dados da visita</span></div>
                 {% endif %}
 
@@ -160,7 +211,7 @@
                         {% if object.status != 'finalized' and object.status != 'completed' %}
                     <div class="visit-field visit-field-action">
                         <button type="button" class="btn-toggle-segunda" id="btnAdicionarVisita" onclick="addExtraVisit()">
-                            <i data-lucide="plus"></i> Adicionar Visita
+                            <i data-lucide="plus"></i> {% if is_emendas_visit %}Adicionar 2ª Visita{% else %}Adicionar Visita{% endif %}
                         </button>
                     </div>
                     {% endif %}
@@ -264,7 +315,7 @@
                     <label class="premium-label">Observações</label>
                     <textarea name="atendimento[observacoes_atendimento]" rows="4" class="form-textarea-premium" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>{{ object.atendimento.observacoes_atendimento|default:'' }}</textarea>
                 </div>
-                {% elif is_subvencao_visit %}
+                {% elif is_subvencao_visit and not is_emendas_visit %}
                 <div class="visit-grid visit-grid-two">
                     <div class="visit-field">
                         <label class="premium-label">Tipos de atividades desenvolvidas</label>
@@ -294,7 +345,8 @@
                 </div>
                 {% endif %}
 
-                {% if not is_subvencao_visit and not is_outros_visit %}
+                {% if not is_outros_visit %}
+                {% if is_emendas_visit or not is_subvencao_visit %}
                 <div class="visit-grid visit-grid-two">
                     <div class="visit-field">
                         <label class="premium-label">Observacoes</label>
@@ -306,10 +358,12 @@
                     </div>
                 </div>
                 {% endif %}
+                {% endif %}
             </div>
         </section>
 
-        {% if not is_subvencao_visit and not is_outros_visit %}
+        {% if not is_outros_visit %}
+        {% if is_emendas_visit or not is_subvencao_visit %}
         <section class="visit-section-content">
             <div class="visit-section-header visit-section-header-compact">
                 <div>
@@ -327,6 +381,7 @@
                 </label>
             </div>
         </section>
+        {% endif %}
         {% endif %}
 
         {% if not is_subvencao_visit %}
@@ -381,7 +436,7 @@
         </section>
         {% endif %}
 
-        {% if not is_outros_visit %}
+        {% if not is_outros_visit and not is_emendas_visit %}
         <section class="visit-section-content">
             <div class="visit-section-header">
                 <div class="section-icon visit-section-icon-amber"><i class="ph-duotone ph-user-list"></i></div>
@@ -477,7 +532,7 @@
         </section>
         {% endif %}
 
-        {% if is_subvencao_visit %}
+        {% if is_subvencao_visit and not is_emendas_visit %}
         <div class="pse-toggle-wrap">
             <button type="button" class="pse-toggle-btn" id="pseToggleButton" onclick="togglePseSection()" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
                 <span class="pse-toggle-remove"><i data-lucide="x"></i></span>
@@ -596,7 +651,9 @@
                 </div>
             </div>
         </section>
+        {% endif %}
 
+        {% if is_subvencao_visit %}
         <section class="visit-section-content">
             <div class="visit-section-header visit-section-header-compact">
                 <div>
@@ -793,6 +850,27 @@
                 </div>
             </div>
 
+            {% if is_emendas_visit %}
+            <div style="margin-top: 15px;">
+                <span class="report-label">Aplicação do Recurso, Conforme Objeto Estabelecido e Prestação de Contas:</span>
+                <div class="report-text-block" id="print-aplicacao-recurso">Nao detalhado</div>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <span class="report-label">Resultados da Aplicação dos Recursos no Atendimento:</span>
+                <div class="report-text-block" id="print-resultados-recursos">Nao detalhado</div>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <span class="report-label">Itens Identificados no Momento da Visita Técnica:</span>
+                <div class="report-text-block" id="print-itens-identificados">Nao detalhado</div>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <span class="report-label">Itens Não Identificados na OSC (se houver):</span>
+                <div class="report-text-block" id="print-itens-nao-identificados">Nao detalhado</div>
+            </div>
+            {% else %}
             <div style="margin-top: 15px;">
                 <span class="report-label">Tipos de atividades desenvolvidas (descritivo):</span>
                 <div class="report-text-block" id="print-atividades-desenvolvidas">Nao detalhado</div>
@@ -802,8 +880,10 @@
                 <span class="report-label">Atividades em execução no momento da visita:</span>
                 <div class="report-text-block" id="print-atividades-execucao">Nao detalhado</div>
             </div>
+            {% endif %}
         </div>
 
+        {% if not is_emendas_visit %}
         <div class="report-section">
             <h2 class="report-section-title">Forma de Acesso do Usuário</h2>
             <div class="report-check-group" style="flex-direction: column; gap: 8px;">
@@ -821,6 +901,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
         <div class="report-section">
             <h2 class="report-section-title">Observações e Recomendações</h2>
@@ -1197,6 +1278,11 @@
     }
 
     function updateWorkPlanOptions() {
+        updateWorkPlanOptionsInner();
+        updateWorkPlanLinkUI();
+    }
+
+    function updateWorkPlanOptionsInner() {
         var select = document.getElementById("workPlanSelect");
         if (!select || !oscPlansData) {
             return;
@@ -1233,6 +1319,40 @@
         });
         select.disabled = false;
         select.setAttribute("data-needs-choice", "1");
+    }
+
+    // --- Emendas e Fundos: dropdown de plano fica escondido atras de um
+    // botao "Vincular Plano de Trabalho", só aparecendo quando a OSC tiver
+    // mais de um plano cadastrado (com 0 ou 1 plano o vinculo e automatico
+    // no backend, sem precisar de escolha manual). Pra Subvencao o campo
+    // #workPlanLinkField nao existe no HTML, entao essas funcoes viram no-op.
+    function updateWorkPlanLinkUI() {
+        if (!oscPlansData) {
+            // Modo edicao: a visibilidade inicial (botao vs. select) ja vem
+            // pronta do servidor, calculada a partir de object.work_plan_id;
+            // sem isso aqui, essa chamada (disparada no load da pagina)
+            // reabriria o botao por cima de um plano ja vinculado.
+            return;
+        }
+        var linkField = document.getElementById("workPlanLinkField");
+        if (!linkField) {
+            return;
+        }
+        var button = document.getElementById("workPlanLinkButton");
+        var wrap = document.getElementById("workPlanSelectWrap");
+        var select = document.getElementById("workPlanSelect");
+        var needsChoice = !!(select && select.getAttribute("data-needs-choice") === "1");
+        if (button) { button.style.display = needsChoice ? "" : "none"; }
+        if (wrap) { wrap.style.display = "none"; }
+    }
+
+    function revealWorkPlanSelect() {
+        var button = document.getElementById("workPlanLinkButton");
+        var wrap = document.getElementById("workPlanSelectWrap");
+        if (button) { button.style.display = "none"; }
+        if (wrap) { wrap.style.display = ""; }
+        var select = document.getElementById("workPlanSelect");
+        if (select) { select.focus(); }
     }
 
     function workPlanChoiceMissing() {
@@ -1517,8 +1637,12 @@
     function openFinalizeModal() {
         if (workPlanChoiceMissing()) {
             alert("Esta OSC possui mais de um plano de trabalho. Selecione o plano vinculado a esta visita antes de finalizar.");
-            var wpSelect = document.getElementById("workPlanSelect");
-            if (wpSelect) { wpSelect.focus(); }
+            if (document.getElementById("workPlanLinkField")) {
+                revealWorkPlanSelect();
+            } else {
+                var wpSelect = document.getElementById("workPlanSelect");
+                if (wpSelect) { wpSelect.focus(); }
+            }
             return;
         }
         var modal = document.getElementById("finalizeVisitModal");
@@ -3953,11 +4077,24 @@
         const mapping = {
             'identificacao[visit_date_1]': 'print-date-1',
             'atendimento[total_mes]': 'print-total-mes',
-            'atendimento[atividades_momento]': 'print-atividades-desenvolvidas',
-            'atendimento[atividades_execucao]': 'print-atividades-execucao',
             'observacoes': 'print-observacoes',
             'recomendacoes': 'print-recomendacoes'
         };
+        if (form.querySelector('[name="atendimento[atividades_momento]"]')) {
+            mapping['atendimento[atividades_momento]'] = 'print-atividades-desenvolvidas';
+            mapping['atendimento[atividades_execucao]'] = 'print-atividades-execucao';
+        } else {
+            // Emendas e Fundos: Atendimento usa os 4 campos originais, e
+            // Observacoes/Recomendacoes ficam dentro do Atendimento (a secao
+            // V, de onde vem 'observacoes'/'recomendacoes' acima, nao existe
+            // pra esse tipo de visita).
+            mapping['atendimento[aplicacao_recurso]'] = 'print-aplicacao-recurso';
+            mapping['atendimento[resultados_recursos]'] = 'print-resultados-recursos';
+            mapping['atendimento[itens_identificados]'] = 'print-itens-identificados';
+            mapping['atendimento[itens_nao_identificados]'] = 'print-itens-nao-identificados';
+            mapping['atendimento[observacoes_atendimento]'] = 'print-observacoes';
+            mapping['atendimento[recomendacoes_atendimento]'] = 'print-recomendacoes';
+        }
 
         for (let [name, id] of Object.entries(mapping)) {
             const input = form.querySelector(`[name="${name}"]`);
@@ -3982,11 +4119,14 @@
         document.getElementById('print-check-espera-nao').classList.toggle('checked', !listaSim);
         document.getElementById('print-espera-info').innerText = listaSim ? `(${qndEspera} pessoas)` : '';
 
-        // Formas de Acesso
+        // Formas de Acesso (secao nao existe pra Emendas e Fundos nem Outros)
         const acessos = ['demanda_espontanea', 'busca_ativa', 'encaminhamento', 'outros'];
         acessos.forEach(tipo => {
-            const checked = form.querySelector(`[name="forma_acesso[${tipo}]"]`).checked;
-            document.getElementById(`print-check-acesso-${tipo}`).classList.toggle('checked', checked);
+            const checkbox = form.querySelector(`[name="forma_acesso[${tipo}]"]`);
+            const target = document.getElementById(`print-check-acesso-${tipo}`);
+            if (checkbox && target) {
+                target.classList.toggle('checked', checkbox.checked);
+            }
         });
 
         // Assinaturas
