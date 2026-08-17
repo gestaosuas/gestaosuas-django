@@ -235,84 +235,58 @@
                     </div>
                 </div>
 
-                <div class="inline-table-card inline-visits-scroll">
-                    <table class="inline-visit-table" id="inline-visit-table">
-                        <thead>
-                            <tr>
-                                <th>Data e OSC</th>
+                <div class="inline-table-card">
+                    <div class="visit-cards-grid" id="inline-visit-grid">
+                        {% for visit in dashboard_visits %}
+                        <div class="visit-card" data-osc="{{ visit.osc.name|lower }}">
+                            <div class="visit-card-header">
+                                <span class="visit-status-dot {% if visit.status == 'completed' or visit.status == 'finalized' %}is-finalized{% else %}is-draft{% endif %}"></span>
+                                <h3 class="visit-card-osc-name" title="{{ visit.osc.name }}">{{ visit.osc.name }}</h3>
+                            </div>
+                            <span class="inline-registered inline-registered-under">
+                                <span>{{ visit.registered_by_name|first|default:"?" }}</span>
+                                {{ visit.registered_by_name|title }}
+                            </span>
+                            <div class="visit-card-meta">
+                                <span class="visit-meta-row"><i data-lucide="calendar"></i> {{ visit.visit_date|date:"d/m/Y" }} · {{ visit.visit_time|time:"H:i" }}</span>
                                 {% if is_emendas %}
-                                <th>Identificador</th>
+                                <span class="visit-meta-row">
+                                    <i data-lucide="hash"></i>
+                                    {% if visit.identificacao.identifier %}{{ visit.identificacao.identifier }}{% else %}<span class="inline-muted">Sem identificador</span>{% endif %}
+                                </span>
                                 {% endif %}
-                                <th>Plano de Trabalho</th>
-                                <th>Técnicos</th>
-                                <th>Documentos</th>
-                                {% if is_admin_user %}
-                                <th>Ações</th>
-                                {% endif %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for visit in dashboard_visits %}
-                            <tr class="inline-visit-row">
-                                <td data-label="Data e OSC">
-                                    <strong class="inline-visit-osc">{{ visit.osc.name }}</strong>
-                                    <small>{{ visit.visit_date|date:"d/m/Y" }} · salvo às {{ visit.visit_time|time:"H:i" }}</small>
-                                    <span class="inline-registered inline-registered-under">
-                                        <span>{{ visit.registered_by_name|first|default:"?" }}</span>
-                                        {{ visit.registered_by_name|title }}
-                                    </span>
-                                </td>
-                                {% if is_emendas %}
-                                <td data-label="Identificador">
-                                    {% if visit.identificacao.identifier %}
-                                        <span style="font-size: 11px; font-weight: 700; background: #f1f5f9; color: #334155; padding: 2px 8px; border-radius: 6px;">{{ visit.identificacao.identifier }}</span>
+                                <span class="visit-meta-row">
+                                    <i data-lucide="folder-open"></i>
+                                    {% if visit.work_plan %}<span title="{{ visit.work_plan.title }}">{{ visit.work_plan.title }}</span>{% else %}<span class="inline-muted">Sem plano de trabalho</span>{% endif %}
+                                </span>
+                                <span class="visit-meta-row">
+                                    <i data-lucide="users"></i>
+                                    {% if visit.assinaturas.tecnico1_nome or visit.assinaturas.tecnico2_nome %}
+                                        {{ visit.tecnico1_display }}{% if visit.assinaturas.tecnico1_nome and visit.assinaturas.tecnico2_nome %}, {% endif %}{{ visit.tecnico2_display }}
+                                    {% else %}<span class="inline-muted">Técnicos não informados</span>{% endif %}
+                                </span>
+                            </div>
+                            <div class="visit-card-footer">
+                                <div class="inline-doc-icons">
+                                    <a href="{% url 'directorates:visit-instrumental' visit.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}"
+                                       class="inline-doc-icon-btn {% if visit.status == 'completed' or visit.status == 'finalized' %}is-finalized{% else %}is-draft{% endif %}"
+                                       title="{% if visit.status == 'completed' or visit.status == 'finalized' %}Ver Instrumental de Visita{% else %}Editar Instrumental de Visita{% endif %}">
+                                        <i data-lucide="clipboard-list"></i>
+                                    </a>
+                                    {% if visit.status == 'completed' or visit.status == 'finalized' %}
+                                    <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}"
+                                       class="inline-doc-icon-btn {% if visit.relatorio_status == 'finalized' %}is-finalized{% else %}is-draft{% endif %}"
+                                       title="{% if visit.relatorio_status == 'finalized' %}Ver Relatório de Visita{% elif visit.relatorio_status == 'draft' %}Continuar Relatório de Visita{% else %}Preencher Relatório de Visita{% endif %}">
+                                        <i data-lucide="file-text"></i>
+                                    </a>
                                     {% else %}
-                                        <span class="inline-muted">—</span>
-                                    {% endif %}
-                                </td>
-                                {% endif %}
-                                <td data-label="Plano de Trabalho">
-                                    {% if visit.work_plan %}
-                                        <span style="font-size: 11px; font-weight: 700; background: #eff6ff; color: #1e3a8a; padding: 2px 8px; border-radius: 6px; display: inline-block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom;" title="{{ visit.work_plan.title }}">{{ visit.work_plan.title }}</span>
-                                    {% else %}
-                                        <span class="inline-muted">—</span>
-                                    {% endif %}
-                                </td>
-                                <td data-label="Técnicos">
-                                    <span class="inline-techs">
-                                        {% if visit.assinaturas.tecnico1_nome %}
-                                            {{ visit.tecnico1_display }}
-                                        {% endif %}
-                                        {% if visit.assinaturas.tecnico2_nome %}
-                                            {% if visit.assinaturas.tecnico1_nome %}<br>{% endif %}{{ visit.tecnico2_display }}
-                                        {% endif %}
-                                        {% if not visit.assinaturas.tecnico1_nome and not visit.assinaturas.tecnico2_nome %}
-                                            Não informado
-                                        {% endif %}
+                                    <span class="inline-doc-icon-btn is-disabled" title="Libera ao finalizar o Instrumental de Visita">
+                                        <i data-lucide="file-text"></i>
                                     </span>
-                                </td>
-                                <td data-label="Documentos">
-                                    <div class="inline-doc-icons">
-                                        <a href="{% url 'directorates:visit-instrumental' visit.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}"
-                                           class="inline-doc-icon-btn {% if visit.status == 'completed' or visit.status == 'finalized' %}is-finalized{% else %}is-draft{% endif %}"
-                                           title="{% if visit.status == 'completed' or visit.status == 'finalized' %}Ver Instrumental de Visita{% else %}Editar Instrumental de Visita{% endif %}">
-                                            <i data-lucide="clipboard-list"></i>
-                                        </a>
-                                        {% if visit.status == 'completed' or visit.status == 'finalized' %}
-                                        <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}"
-                                           class="inline-doc-icon-btn {% if visit.relatorio_status == 'finalized' %}is-finalized{% else %}is-draft{% endif %}"
-                                           title="{% if visit.relatorio_status == 'finalized' %}Ver Relatório de Visita{% elif visit.relatorio_status == 'draft' %}Continuar Relatório de Visita{% else %}Preencher Relatório de Visita{% endif %}">
-                                            <i data-lucide="file-text"></i>
-                                        </a>
-                                        {% else %}
-                                        <span class="inline-doc-icon-btn is-disabled" title="Libera ao finalizar o Instrumental de Visita">
-                                            <i data-lucide="file-text"></i>
-                                        </span>
-                                        {% endif %}
-                                    </div>
-                                </td>
+                                    {% endif %}
+                                </div>
                                 {% if is_admin_user %}
-                                <td class="inline-actions inline-visit-actions" data-label="Ações">
+                                <div class="inline-actions">
                                     {% if visit.status == 'completed' or visit.status == 'finalized' %}
                                     <form action="{% url 'directorates:visit-revert' visit.pk %}" method="post" onsubmit="return confirm('Deseja reverter para rascunho?')">
                                         {% csrf_token %}
@@ -336,23 +310,25 @@
                                         </button>
                                     </form>
                                     {% endif %}
-                                </td>
+                                </div>
                                 {% endif %}
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="{{ visit_table_colspan }}" class="inline-empty-cell">
-                                    <i data-lucide="clipboard-x"></i>
-                                    <p>Nenhuma visita registrada neste período.</p>
-                                    <a href="{% url 'directorates:visit-create' directorate.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-primary-btn inline-link-btn">
-                                        <i data-lucide="plus"></i>
-                                        Criar primeira visita
-                                    </a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="inline-empty-cell" id="inline-visit-empty-initial">
+                            <i data-lucide="clipboard-x"></i>
+                            <p>Nenhuma visita registrada neste período.</p>
+                            <a href="{% url 'directorates:visit-create' directorate.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-primary-btn inline-link-btn">
+                                <i data-lucide="plus"></i>
+                                Criar primeira visita
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="inline-visit-empty-search" style="display:none;" class="inline-empty-cell">
+                        <i data-lucide="clipboard-x"></i>
+                        <p>Nenhuma visita encontrada para essa busca.</p>
+                    </div>
                 </div>
             </section>
             {% elif dashboard_tab == 'plans' %}

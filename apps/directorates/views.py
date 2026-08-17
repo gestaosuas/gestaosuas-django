@@ -1001,10 +1001,6 @@ class VisitListView(DirectorateScopedMixin, ListView):
         is_admin_user = self.request.user.is_superuser or (profile and profile.role == 'admin')
         context["can_delete"] = is_admin_user
         context["is_admin_user"] = is_admin_user
-        # Coluna "Acoes" (delegar/reverter/excluir) so aparece pra admin -
-        # ver CLAUDE.md 2026-08-16. Colspan da linha vazia precisa contar com
-        # isso (+ a coluna extra "Identificador" so em Emendas e Fundos).
-        context["visit_table_colspan"] = 5 + (1 if context["is_emendas"] else 0) + (1 if is_admin_user else 0)
         return context
 
 class VisitDelegateView(VisitScopedMixin, View):

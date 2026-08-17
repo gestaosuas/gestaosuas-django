@@ -70,72 +70,59 @@
         </div>
     </div>
 
-    <table class="table-monitoring">
-        <thead>
-            <tr>
-                <th style="width: 33%;">DATA E OSC</th>
-                {% if is_emendas %}
-                <th class="no-tablet" style="width: 7%;">IDENTIFICADOR</th>
-                {% endif %}
-                <th class="no-tablet" style="width: 10%;">PLANO DE TRABALHO</th>
-                <th class="no-tablet" style="width: 12%;">TÉCNICOS</th>
-                <th class="no-tablet" style="width: 13%;">STATUS</th>
-                <th class="no-tablet" style="width: 17%; text-align: right;">DOCUMENTOS</th>
-                {% if is_admin_user %}
-                <th style="width: 20%; text-align: right;">AÇÕES</th>
-                {% endif %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for visit in visits %}
-            <tr>
-                <td>
-                    <div style="display: flex; align-items: flex-start; gap: 10px; overflow:hidden;">
-                        {% if visit.is_subvencao %}
-                            {% if visit.status != 'completed' and visit.status != 'finalized' %}
-                                <span class="status-dot-tablet dot-draft" title="Instrumental Rascunho"></span>
-                            {% else %}
-                                {% if visit.relatorio_status == 'finalized' %}
-                                    <span class="status-dot-tablet dot-finalized" title="Finalizado"></span>
-                                {% elif visit.relatorio_status == 'draft' %}
-                                    <span class="status-dot-tablet dot-draft" title="Rascunho"></span>
-                                {% else %}
-                                    <span class="status-dot-tablet dot-zerado" title="Zerado"></span>
-                                {% endif %}
-                            {% endif %}
+    <div class="visit-cards-grid" id="visit-cards-grid">
+        {% for visit in visits %}
+        <div class="visit-card" data-osc="{{ visit.osc.name|lower }}">
+            <div class="visit-card-top">
+                {% if visit.is_subvencao %}
+                    {% if visit.status != 'completed' and visit.status != 'finalized' %}
+                        <span class="status-dot-tablet dot-draft" title="Instrumental Rascunho"></span>
+                    {% else %}
+                        {% if visit.relatorio_status == 'finalized' %}
+                            <span class="status-dot-tablet dot-finalized" title="Finalizado"></span>
+                        {% elif visit.relatorio_status == 'draft' %}
+                            <span class="status-dot-tablet dot-draft" title="Rascunho"></span>
                         {% else %}
-                            <span class="status-dot-tablet {% if visit.status == 'completed' or visit.status == 'finalized' %}dot-finalized{% else %}dot-draft{% endif %}" title="{% if visit.status == 'completed' or visit.status == 'finalized' %}Finalizado{% else %}{{ visit.get_status_display|title }}{% endif %}"></span>
+                            <span class="status-dot-tablet dot-zerado" title="Zerado"></span>
                         {% endif %}
-                        <div style="overflow:hidden; width: 100%;">
-                            <span class="osc-name">{{ visit.osc.name }}</span>
-                            <div style="display: flex; align-items: center; gap: 8px; margin-top: 3px;">
-                                <i data-lucide="calendar" style="width: 12px; color: #94a3b8; flex-shrink:0;"></i>
-                                <span class="visit-date-text">{{ visit.visit_date|date:"d/m/Y" }}</span>
-                            </div>
-                            <div class="registered-by-pill">
-                                <div class="registered-by-avatar">{{ visit.registered_by_name|first|default:"?" }}</div>
-                                <span title="{{ visit.registered_by_name|title }}">{{ visit.registered_by_name|title }}</span>
-                            </div>
-                        </div>
-                    </div>
-                </td>
-                {% if is_emendas %}
-                <td class="no-tablet" style="text-align: center;">
-                    {% if visit.identificacao.identifier %}
-                        <span style="font-size: 11px; font-weight: 700; background: #f1f5f9; color: #334155; padding: 2px 8px; border-radius: 6px;">{{ visit.identificacao.identifier }}</span>
-                    {% else %}
-                        <span style="color: #cbd5e1; font-weight: 900;">—</span>
                     {% endif %}
-                </td>
+                {% else %}
+                    <span class="status-dot-tablet {% if visit.status == 'completed' or visit.status == 'finalized' %}dot-finalized{% else %}dot-draft{% endif %}" title="{% if visit.status == 'completed' or visit.status == 'finalized' %}Finalizado{% else %}{{ visit.get_status_display|title }}{% endif %}"></span>
                 {% endif %}
-                <td class="no-tablet">
-                    {% if visit.work_plan %}
-                        <span style="font-size: 11px; font-weight: 700; background: #eff6ff; color: #1e3a8a; padding: 2px 8px; border-radius: 6px; display: inline-block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom;" title="{{ visit.work_plan.title }}">{{ visit.work_plan.title }}</span>
+                <div class="visit-card-title-wrap">
+                    <span class="osc-name">{{ visit.osc.name }}</span>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 3px;">
+                        <i data-lucide="calendar" style="width: 12px; color: #94a3b8; flex-shrink:0;"></i>
+                        <span class="visit-date-text">{{ visit.visit_date|date:"d/m/Y" }}</span>
+                    </div>
+                    <div class="registered-by-pill">
+                        <div class="registered-by-avatar">{{ visit.registered_by_name|first|default:"?" }}</div>
+                        <span title="{{ visit.registered_by_name|title }}">{{ visit.registered_by_name|title }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="visit-card-meta">
+                {% if is_emendas %}
+                <div class="visit-card-meta-row">
+                    <span class="visit-card-meta-label">Identificador</span>
+                    {% if visit.identificacao.identifier %}
+                        <span class="visit-card-badge">{{ visit.identificacao.identifier }}</span>
                     {% else %}
-                        <span style="color: #cbd5e1; font-weight: 900;">—</span>
+                        <span class="visit-card-dash">—</span>
                     {% endif %}
-                </td>
-                <td class="no-tablet">
+                </div>
+                {% endif %}
+                <div class="visit-card-meta-row">
+                    <span class="visit-card-meta-label">Plano de Trabalho</span>
+                    {% if visit.work_plan %}
+                        <span class="visit-card-badge" title="{{ visit.work_plan.title }}">{{ visit.work_plan.title }}</span>
+                    {% else %}
+                        <span class="visit-card-dash">—</span>
+                    {% endif %}
+                </div>
+                <div class="visit-card-meta-row">
+                    <span class="visit-card-meta-label">Técnicos</span>
                     <div class="technician-names">
                         {% if visit.assinaturas.tecnico1_nome %}
                             {{ visit.tecnico1_display }}<br>
@@ -147,8 +134,9 @@
                             NÃO INFORMADO
                         {% endif %}
                     </div>
-                </td>
-                <td class="no-tablet">
+                </div>
+                <div class="visit-card-meta-row">
+                    <span class="visit-card-meta-label">Status</span>
                     {% if visit.is_subvencao %}
                         {% if visit.status != 'completed' and visit.status != 'finalized' %}
                             <span class="visit-status-badge status-draft">
@@ -175,71 +163,71 @@
                             {% if visit.status == 'completed' or visit.status == 'finalized' %}Finalizado{% else %}{{ visit.get_status_display|title }}{% endif %}
                         </span>
                     {% endif %}
-                </td>
-                <td class="no-tablet visit-docs-cell">
-                    <div class="visit-doc-actions">
-                        {% if visit.is_subvencao %}
-                            {% if visit.status != 'completed' and visit.status != 'finalized' %}
-                                <a href="{% url 'directorates:visit-instrumental' visit.pk %}" class="action-text-btn doc-link btn-edit-direct" title="Editar Instrumental">
-                                    <i data-lucide="square-pen"></i> <span>Editar Inst.</span>
-                                </a>
-                            {% else %}
-                                {% if visit.relatorio_status == 'finalized' %}
-                                    <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}" class="action-text-btn doc-link btn-doc-subvencao-finalizado" title="Relatório de Visita Finalizado">
-                                        <i data-lucide="file-text"></i> <span>Relatório</span>
-                                    </a>
-                                {% elif visit.relatorio_status == 'draft' %}
-                                    <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}" class="action-text-btn doc-link btn-doc-subvencao-rascunho" title="Editar Rascunho do Relatório">
-                                        <i data-lucide="file-edit"></i> <span>Rascunho</span>
-                                    </a>
-                                {% else %}
-                                    <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}" class="action-text-btn doc-link btn-doc-subvencao-zerado" title="Preencher Relatório de Visita">
-                                        <i data-lucide="plus-circle"></i> <span>Preencher</span>
-                                    </a>
-                                {% endif %}
-                            {% endif %}
+                </div>
+            </div>
+
+            <div class="visit-card-footer">
+                <div class="visit-doc-actions">
+                    {% if visit.is_subvencao %}
+                        {% if visit.status != 'completed' and visit.status != 'finalized' %}
+                            <a href="{% url 'directorates:visit-instrumental' visit.pk %}" class="action-text-btn doc-link btn-edit-direct" title="Editar Instrumental">
+                                <i data-lucide="square-pen"></i> <span>Editar Inst.</span>
+                            </a>
                         {% else %}
-                            {% if visit.status == 'completed' or visit.status == 'finalized' %}
-                                <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}" class="action-text-btn doc-link btn-report-direct" title="Relatorio de Visita">
+                            {% if visit.relatorio_status == 'finalized' %}
+                                <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}" class="action-text-btn doc-link btn-doc-subvencao-finalizado" title="Relatório de Visita Finalizado">
                                     <i data-lucide="file-text"></i> <span>Relatório</span>
                                 </a>
+                            {% elif visit.relatorio_status == 'draft' %}
+                                <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}" class="action-text-btn doc-link btn-doc-subvencao-rascunho" title="Editar Rascunho do Relatório">
+                                    <i data-lucide="file-edit"></i> <span>Rascunho</span>
+                                </a>
                             {% else %}
-                                <a href="{% url 'directorates:visit-instrumental' visit.pk %}" class="action-text-btn doc-link btn-edit-direct" title="Editar Instrumental">
-                                    <i data-lucide="square-pen"></i> <span>Editar</span>
+                                <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}" class="action-text-btn doc-link btn-doc-subvencao-zerado" title="Preencher Relatório de Visita">
+                                    <i data-lucide="plus-circle"></i> <span>Preencher</span>
                                 </a>
                             {% endif %}
                         {% endif %}
-                    </div>
-                </td>
-                {% if is_admin_user %}
-                <td class="action-btns-cell">
-                    <div class="visit-actions-icons">
-                    {% if visit.status == 'completed' or visit.status == 'finalized' %}
-                    <form action="{% url 'directorates:visit-revert' visit.pk %}" method="post" style="display:inline;" onsubmit="return confirm('Deseja reverter para rascunho?')">
-                        {% csrf_token %}
-                        <button type="submit" class="action-icon-btn action-icon-revert" title="Reverter para Rascunho"><i data-lucide="undo-2"></i></button>
-                    </form>
+                    {% else %}
+                        {% if visit.status == 'completed' or visit.status == 'finalized' %}
+                            <a href="{% url 'directorates:visit-report' visit.pk 'parecer_tecnico' %}" class="action-text-btn doc-link btn-report-direct" title="Relatorio de Visita">
+                                <i data-lucide="file-text"></i> <span>Relatório</span>
+                            </a>
+                        {% else %}
+                            <a href="{% url 'directorates:visit-instrumental' visit.pk %}" class="action-text-btn doc-link btn-edit-direct" title="Editar Instrumental">
+                                <i data-lucide="square-pen"></i> <span>Editar</span>
+                            </a>
+                        {% endif %}
                     {% endif %}
-
-                    <button type="button" class="action-icon-btn action-icon-delegate" onclick="openDelegateModal('{{ visit.pk }}', '{{ visit.osc.name }}')" title="Delegar"><i data-lucide="users-round"></i></button>
-
-                    <form action="{% url 'directorates:visit-delete' visit.pk %}" method="post" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja excluir esta visita?')">
-                        {% csrf_token %}
-                        <button type="submit" class="action-icon-btn action-icon-delete" title="Excluir Visita"><i data-lucide="trash-2"></i></button>
-                    </form>
-                    </div>
-                </td>
+                </div>
+                {% if is_admin_user %}
+                <div class="visit-actions-icons">
+                {% if visit.status == 'completed' or visit.status == 'finalized' %}
+                <form action="{% url 'directorates:visit-revert' visit.pk %}" method="post" style="display:inline;" onsubmit="return confirm('Deseja reverter para rascunho?')">
+                    {% csrf_token %}
+                    <button type="submit" class="action-icon-btn action-icon-revert" title="Reverter para Rascunho"><i data-lucide="undo-2"></i></button>
+                </form>
                 {% endif %}
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="{{ visit_table_colspan }}" style="text-align: center; padding: 100px 0; color: #94a3b8; font-weight: 800; text-transform: uppercase;">
-                    Nenhuma visita registrada neste período.
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+
+                <button type="button" class="action-icon-btn action-icon-delegate" onclick="openDelegateModal('{{ visit.pk }}', '{{ visit.osc.name }}')" title="Delegar"><i data-lucide="users-round"></i></button>
+
+                <form action="{% url 'directorates:visit-delete' visit.pk %}" method="post" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja excluir esta visita?')">
+                    {% csrf_token %}
+                    <button type="submit" class="action-icon-btn action-icon-delete" title="Excluir Visita"><i data-lucide="trash-2"></i></button>
+                </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="visit-cards-empty" id="visit-cards-empty-initial">
+            Nenhuma visita registrada neste período.
+        </div>
+        {% endfor %}
+    </div>
+    <div class="visit-cards-empty" id="visit-cards-empty-search" style="display:none;">
+        Nenhuma visita encontrada para essa busca.
+    </div>
 </div>
 
 <!-- DELEGATE MODAL -->
@@ -304,6 +292,19 @@
         var empty = document.getElementById('delegateTechEmpty');
         if (empty) empty.style.display = visibleCount === 0 ? '' : 'none';
     }
+
+    document.getElementById('osc-filter')?.addEventListener('input', function () {
+        var q = this.value.toLowerCase().trim();
+        var visible = 0;
+        document.querySelectorAll('#visit-cards-grid .visit-card').forEach(function (card) {
+            var show = !q || (card.dataset.osc || '').includes(q);
+            card.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+        var initialEmpty = document.getElementById('visit-cards-empty-initial');
+        var searchEmpty = document.getElementById('visit-cards-empty-search');
+        if (searchEmpty) searchEmpty.style.display = (q && visible === 0 && !initialEmpty) ? 'block' : 'none';
+    });
 </script>
 
 <style>
@@ -402,13 +403,6 @@
         background: #008f6f !important;
     }
 
-    .table-monitoring tbody tr {
-        transition: background-color 0.15s ease;
-    }
-    .table-monitoring tbody tr:hover {
-        background-color: #f8fafc;
-    }
-
     .monitoring-main-card {
         width: 96%;
         margin: -60px auto 40px;
@@ -416,43 +410,38 @@
         padding: 28px 24px 40px;
     }
 
-    .table-monitoring {
-        width: 100%;
-        border-spacing: 0 6px;
-        table-layout: fixed;
+    /* Cards de Instrumental de Visita (2026-08-17) - substituem a tabela
+       antiga (.table-monitoring), que escondia colunas inteiras em telas
+       de tablet via .no-tablet em vez de reorganizar o conteudo. Grid
+       flexivel, texto quebra linha em vez de truncar/vazar horizontalmente. */
+    .visit-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+    .visit-card {
+        background: white; border-radius: 18px; padding: 18px;
+        box-shadow: 0 4px 18px rgba(15,23,42,.06); border: 1px solid #e8edf5;
+        display: flex; flex-direction: column; gap: 14px;
+        min-width: 0;
+        transition: transform .2s, box-shadow .2s;
     }
-
-    .table-monitoring th {
-        padding: 0 10px;
-        font-size: 9px;
-    }
-
-    .table-monitoring td {
-        padding: 10px 10px;
-        font-size: 11px;
-        vertical-align: middle;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
+    .visit-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(15,23,42,.1); }
+    .visit-card-top { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+    .visit-card-title-wrap { min-width: 0; flex: 1; overflow-wrap: break-word; }
 
     .osc-name {
         font-size: 13px !important;
-        line-height: 1.25;
-        white-space: nowrap;
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
         overflow: hidden;
-        text-overflow: ellipsis;
-        display: block;
+        overflow-wrap: break-word;
     }
     .visit-date-text { font-size: 11px; font-weight: 700; color: #64748b; white-space: nowrap; }
-    .visit-time-text { font-size: 10px; color: #94a3b8; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .technician-names {
-        font-size: 10px;
-        line-height: 1.3;
+        font-size: 11px;
+        line-height: 1.4;
         text-transform: none;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        overflow-wrap: break-word;
     }
 
     .visit-status-badge {
@@ -463,12 +452,8 @@
         text-align: left;
     }
 
-    .doc-list {
-        display: flex; flex-direction: column; gap: 2px;
-        max-width: 100%;
-    }
     .doc-link {
-        display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        display: inline-block; overflow-wrap: break-word;
         font-size: 9px; font-weight: 600;
     }
 
@@ -501,64 +486,34 @@
         font-weight: 700;
         line-height: 1.2;
         text-transform: capitalize;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        overflow-wrap: break-word;
     }
 
-    .visit-docs-cell {
-        text-align: right;
-        vertical-align: middle;
+    .visit-card-meta { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
+    .visit-card-meta-row { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .visit-card-meta-label { font-size: 9px; font-weight: 900; letter-spacing: .07em; text-transform: uppercase; color: #94a3b8; }
+    .visit-card-badge {
+        font-size: 11px; font-weight: 700; background: #eff6ff; color: #1e3a8a;
+        padding: 3px 9px; border-radius: 6px; display: inline-block; width: fit-content;
+        max-width: 100%; overflow-wrap: break-word;
     }
+    .visit-card-dash { color: #cbd5e1; font-weight: 900; }
 
     .visit-doc-actions {
         display: flex;
         align-items: center;
-        justify-content: flex-end;
-        gap: 6px;
-        justify-items: end;
-    }
-
-    .visit-docs-empty {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        color: #cbd5e1;
-        font-size: 14px;
-        font-weight: 900;
-        width: 92px;
-    }
-
-    .action-btns-cell {
-        display: table-cell !important;
-        text-align: right;
-        vertical-align: middle;
-        white-space: nowrap;
-    }
-
-    .action-btns-cell > a,
-    .action-btns-cell > button,
-    .action-btns-cell > form {
-        margin-left: 4px;
-        vertical-align: middle;
-    }
-
-    .action-btns-cell-inner {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
+        flex-wrap: wrap;
         gap: 6px;
     }
 
-    .action-btns-cell form {
-        display: inline-flex !important;
-        margin: 0;
+    .visit-card-footer {
+        display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+        padding-top: 12px; border-top: 1px solid #f1f5f9;
     }
 
     .visit-actions-icons {
         display: inline-flex;
         align-items: center;
-        justify-content: flex-end;
         gap: 6px;
         padding: 4px;
         border-radius: 999px;
@@ -566,13 +521,18 @@
         border: 1px solid #eef2f7;
     }
 
-    .action-view-btn {
-        width: 92px;
-    }
-
     .visit-actions-icons form {
         display: inline-flex !important;
         margin: 0;
+    }
+
+    .visit-cards-empty {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 80px 20px;
+        color: #94a3b8;
+        font-weight: 800;
+        text-transform: uppercase;
     }
 
     .visit-filter-form {
@@ -782,8 +742,6 @@
     }
 
     @media (max-width: 1366px) {
-        .no-tablet { display: none !important; }
-
         .monitoring-header-container {
             padding-top: 80px !important;
             padding-bottom: 40px;
@@ -795,9 +753,6 @@
         }
 
         .status-dot-tablet { display: block; }
-
-        .table-monitoring th:nth-child(1), .table-monitoring td:nth-child(1) { width: 55% !important; }
-        .table-monitoring th:nth-child(7), .table-monitoring td:nth-child(7) { width: 45% !important; text-align: right; }
 
         .monitoring-main-card {
             width: 100% !important;
@@ -814,6 +769,20 @@
             gap: 10px;
             display: inline-flex;
             align-items: center;
+        }
+
+        /* .visit-header-actions tinha min-width:760px fixo (regra de
+           desktop) - sobrava largura em telas de tablet/mobile e forcava
+           rolagem horizontal na pagina inteira (achado ao converter a
+           listagem de visitas pra cards, 2026-08-17). */
+        .visit-header-actions {
+            min-width: 0;
+            width: 100%;
+            flex-wrap: wrap;
+        }
+
+        .visit-filter-form-hero {
+            max-width: 100%;
         }
 
         .action-icon-btn {

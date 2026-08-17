@@ -981,14 +981,7 @@
     border-collapse: collapse;
 }
 
-.inline-visit-table {
-    width: 100%;
-    min-width: 1040px;
-    border-collapse: collapse;
-}
-
-.inline-osc-table th,
-.inline-visit-table th {
+.inline-osc-table th {
     position: sticky;
     top: 0;
     z-index: 2;
@@ -1003,8 +996,7 @@
     border-bottom: 1px solid #e8eef6;
 }
 
-.inline-osc-table td,
-.inline-visit-table td {
+.inline-osc-table td {
     padding: 14px 16px;
     color: #475569;
     font-size: 12px;
@@ -1013,102 +1005,26 @@
     border-bottom: 1px solid #f1f5f9;
 }
 
-.inline-osc-table tr:last-child td,
-.inline-visit-table tr:last-child td {
+.inline-osc-table tr:last-child td {
     border-bottom: 0;
 }
 
-.inline-osc-table tbody tr:hover td,
-.inline-visit-table tbody tr:hover td {
+.inline-osc-table tbody tr:hover td {
     background: rgba(236, 253, 245, 0.42);
 }
 
-.inline-osc-table td strong,
-.inline-visit-table td strong {
+.inline-osc-table td strong {
     display: block;
     color: #08275a;
     font-size: 13px;
     font-weight: 900;
 }
 
-.inline-osc-table td small,
-.inline-visit-table td small {
+.inline-osc-table td small {
     display: block;
     margin-top: 3px;
     color: #94a3b8;
     font-size: 11px;
-}
-
-.inline-visits-scroll {
-    max-height: clamp(380px, 50vh, 650px);
-    overflow-x: auto;
-}
-
-.inline-visit-table th:nth-child(1) { width: 28%; }
-.inline-visit-table th:nth-child(2) { width: 14%; }
-.inline-visit-table th:nth-child(3) { width: 11%; }
-.inline-visit-table th:nth-child(4) { width: 15%; }
-.inline-visit-table th:nth-child(5) { width: 16%; }
-.inline-visit-table th:nth-child(6) { width: 16%; text-align: right; }
-
-/* Tabela de Instrumental de Visita no mobile: em vez de rolagem horizontal
-   escondida dentro de uma tabela de 1040px, cada linha vira um cartao
-   empilhado — thead some, e cada td ganha um rotulo (data-label) acima
-   do valor. Mantido separado da tabela de OSCs (.inline-osc-table), que
-   nao foi pedida nesta rodada. */
-@media (max-width: 640px) {
-    .inline-visit-table {
-        min-width: 0;
-    }
-
-    .inline-visit-table,
-    .inline-visit-table thead,
-    .inline-visit-table tbody,
-    .inline-visit-table tr.inline-visit-row,
-    .inline-visit-table td {
-        display: block;
-        width: auto !important;
-    }
-
-    .inline-visit-table thead {
-        display: none;
-    }
-
-    .inline-visit-table tr.inline-visit-row {
-        padding: 14px 16px;
-        border-bottom: 1px solid #f1f5f9;
-    }
-
-    .inline-visit-table tr.inline-visit-row td {
-        padding: 6px 0;
-        border-bottom: 0;
-    }
-
-    .inline-visit-table td[data-label]::before {
-        content: attr(data-label);
-        display: block;
-        margin-bottom: 3px;
-        color: #94a3b8;
-        font-size: 9px;
-        font-weight: 900;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-    }
-
-    .inline-visit-table td[data-label="Data e OSC"] {
-        padding-top: 0;
-    }
-
-    .inline-visit-table td[data-label="Data e OSC"]::before,
-    .inline-visit-table td.inline-actions::before {
-        display: none;
-    }
-
-    .inline-visit-table td.inline-actions {
-        display: flex;
-        gap: 10px;
-        padding-top: 10px;
-    }
 }
 
 .inline-plan-search {
@@ -1550,16 +1466,6 @@
     color: #94a3b8;
 }
 
-.inline-visit-actions {
-    justify-content: flex-end;
-}
-
-.inline-visit-actions a,
-.inline-visit-actions button {
-    width: 34px;
-    height: 34px;
-}
-
 .inline-view-action:hover {
     color: #2563eb !important;
     border-color: #bfdbfe !important;
@@ -1971,6 +1877,40 @@
 .notif-name { font-size: 10px; font-weight: 700; color: #475569; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .notif-name:hover { color: #3b82f6; text-decoration: none; }
 
+/* Cards de Instrumental de Visita (2026-08-17) - substituem a tabela antiga
+   (.inline-visit-table, removida) que tinha min-width:1040px e vazava com
+   rolagem horizontal em telas de tablet. Grid flexivel + texto que quebra
+   linha em vez de vazar - mesma familia visual de .report-card, que ja
+   resolvia isso pra "Relatorios e Pareceres". */
+.visit-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-top: 4px; }
+.visit-card {
+    background: white; border-radius: 16px; padding: 16px;
+    box-shadow: 0 4px 18px rgba(47,104,230,.06); border: 1px solid #e8edf5;
+    display: flex; flex-direction: column; gap: 4px;
+    transition: transform .2s, box-shadow .2s;
+    min-width: 0;
+}
+.visit-card:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(47,104,230,.12); border-color: #10b981; }
+.visit-card-header { display: flex; align-items: flex-start; gap: 8px; }
+.visit-status-dot { width: 9px; height: 9px; border-radius: 999px; flex-shrink: 0; margin-top: 5px; }
+.visit-status-dot.is-draft { background: #f59e0b; }
+.visit-status-dot.is-finalized { background: #10b981; }
+.visit-card-osc-name {
+    flex: 1; min-width: 0; margin: 0; font-size: 13px; font-weight: 800; color: #08275a; line-height: 1.35;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.visit-card-meta { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.visit-meta-row {
+    display: flex; align-items: flex-start; gap: 7px;
+    font-size: 11px; font-weight: 600; color: #475569;
+    overflow-wrap: break-word; word-break: break-word;
+}
+.visit-meta-row i { width: 13px; height: 13px; color: #94a3b8; flex-shrink: 0; margin-top: 1px; }
+.visit-card-footer {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+    margin-top: 12px; padding-top: 12px; border-top: 1px solid #f1f5f9;
+}
+
 </style>
 
 <script>
@@ -2128,10 +2068,15 @@
         var visitSearchInput = document.getElementById("inline-visit-search");
         function filterInlineVisitTable() {
             var q = ((visitSearchInput && visitSearchInput.value) || "").toLowerCase();
-            document.querySelectorAll("#inline-visit-table .inline-visit-row").forEach(function (row) {
-                var name = (row.querySelector(".inline-visit-osc")?.textContent || "").toLowerCase();
-                row.style.display = !q || name.includes(q) ? "" : "none";
+            var visible = 0;
+            document.querySelectorAll("#inline-visit-grid .visit-card").forEach(function (card) {
+                var show = !q || (card.dataset.osc || "").includes(q);
+                card.style.display = show ? "" : "none";
+                if (show) visible++;
             });
+            var initialEmpty = document.getElementById("inline-visit-empty-initial");
+            var searchEmpty = document.getElementById("inline-visit-empty-search");
+            if (searchEmpty) searchEmpty.style.display = (q && visible === 0 && !initialEmpty) ? "flex" : "none";
         }
         if (visitSearchInput) visitSearchInput.addEventListener("input", filterInlineVisitTable);
 
