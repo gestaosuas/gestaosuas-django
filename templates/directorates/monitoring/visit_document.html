@@ -112,7 +112,7 @@
                 </div>
             </div>
 
-            {% if is_subvencao_visit %}
+            {% if is_subvencao_visit and not is_emendas_visit %}
                 <div class="visit-doc-text-block">
                     <h3>Atividades Desenvolvidas</h3>
                     <p>{{ object.atendimento.atividades_momento|default:"Nenhuma atividade descrita."|linebreaks }}</p>
@@ -120,6 +120,31 @@
                 <div class="visit-doc-text-block">
                     <h3>Atividades em Execução no Momento</h3>
                     <p>{{ object.atendimento.atividades_execucao|default:"Nenhuma atividade descrita."|linebreaks }}</p>
+                </div>
+            {% elif is_emendas_visit %}
+                <div class="visit-doc-text-block">
+                    <h3>Aplicação do Recurso, Conforme Objeto Estabelecido e Prestação de Contas</h3>
+                    <p>{{ object.atendimento.aplicacao_recurso|default:"Não informado."|linebreaks }}</p>
+                </div>
+                <div class="visit-doc-text-block">
+                    <h3>Resultados da Aplicação dos Recursos no Atendimento</h3>
+                    <p>{{ object.atendimento.resultados_recursos|default:"Não informado."|linebreaks }}</p>
+                </div>
+                <div class="visit-doc-text-block">
+                    <h3>Itens Identificados no Momento da Visita Técnica</h3>
+                    <p>{{ object.atendimento.itens_identificados|default:"Não informado."|linebreaks }}</p>
+                </div>
+                <div class="visit-doc-text-block">
+                    <h3>Itens Não Identificados na OSC</h3>
+                    <p>{{ object.atendimento.itens_nao_identificados|default:"Não informado."|linebreaks }}</p>
+                </div>
+                <div class="visit-doc-text-block">
+                    <h3>Observações</h3>
+                    <p>{{ object.atendimento.observacoes_atendimento|default:"Sem observações registradas."|linebreaks }}</p>
+                </div>
+                <div class="visit-doc-text-block">
+                    <h3>Recomendações</h3>
+                    <p>{{ object.atendimento.recomendacoes_atendimento|default:"Sem recomendações registradas."|linebreaks }}</p>
                 </div>
             {% else %}
                 <div class="visit-doc-text-block">
@@ -133,6 +158,7 @@
             {% endif %}
         </section>
 
+        {% if not is_emendas_visit %}
         <section class="visit-document-section">
             <div class="section-doc-header">
                 <i data-lucide="users-2"></i>
@@ -169,7 +195,9 @@
                 </tbody>
             </table>
         </section>
+        {% endif %}
 
+        {% if not is_emendas_visit %}
         <section class="visit-document-section page-break-before">
             <div class="section-doc-header">
                 <i data-lucide="clipboard-list"></i>
@@ -188,6 +216,7 @@
                 </div>
             </div>
         </section>
+        {% endif %}
 
         {% if is_subvencao_visit and object.atendimento.pse_habilitado == 'sim' %}
         <section class="visit-document-section">

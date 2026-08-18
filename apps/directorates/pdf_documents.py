@@ -117,6 +117,7 @@ def render_visit_document_pdf(context):
     directorate = context["directorate"]
     extra_visits = context.get("extra_visits", [])
     is_subvencao_visit = context.get("is_subvencao_visit")
+    is_emendas_visit = context.get("is_emendas_visit")
     identificacao = visit.identificacao or {}
     atendimento = visit.atendimento or {}
     assinaturas = visit.assinaturas or {}
@@ -160,11 +161,24 @@ def render_visit_document_pdf(context):
         styles, col_widths=[55 * pdfmod.mm, None],
     )
     body_blocks = [grid_table]
-    if is_subvencao_visit:
+    if is_subvencao_visit and not is_emendas_visit:
         body_blocks.append(Paragraph("Atividades Desenvolvidas", styles["h3"]))
         body_blocks.append(Paragraph(atendimento.get("atividades_momento") or "Nenhuma atividade descrita.", styles["body"]))
         body_blocks.append(Paragraph("Atividades em Execução no Momento", styles["h3"]))
         body_blocks.append(Paragraph(atendimento.get("atividades_execucao") or "Nenhuma atividade descrita.", styles["body"]))
+    elif is_emendas_visit:
+        body_blocks.append(Paragraph("Aplicação do Recurso, Conforme Objeto Estabelecido e Prestação de Contas", styles["h3"]))
+        body_blocks.append(Paragraph(atendimento.get("aplicacao_recurso") or "Não informado.", styles["body"]))
+        body_blocks.append(Paragraph("Resultados da Aplicação dos Recursos no Atendimento", styles["h3"]))
+        body_blocks.append(Paragraph(atendimento.get("resultados_recursos") or "Não informado.", styles["body"]))
+        body_blocks.append(Paragraph("Itens Identificados no Momento da Visita Técnica", styles["h3"]))
+        body_blocks.append(Paragraph(atendimento.get("itens_identificados") or "Não informado.", styles["body"]))
+        body_blocks.append(Paragraph("Itens Não Identificados na OSC", styles["h3"]))
+        body_blocks.append(Paragraph(atendimento.get("itens_nao_identificados") or "Não informado.", styles["body"]))
+        body_blocks.append(Paragraph("Observações", styles["h3"]))
+        body_blocks.append(Paragraph(atendimento.get("observacoes_atendimento") or "Sem observações registradas.", styles["body"]))
+        body_blocks.append(Paragraph("Recomendações", styles["h3"]))
+        body_blocks.append(Paragraph(atendimento.get("recomendacoes_atendimento") or "Sem recomendações registradas.", styles["body"]))
     else:
         body_blocks.append(Paragraph("Aplicação do Recurso e Prestação de Contas", styles["h3"]))
         body_blocks.append(Paragraph(atendimento.get("aplicacao_recurso") or "Não informado.", styles["body"]))
@@ -174,37 +188,38 @@ def render_visit_document_pdf(context):
     story.extend(pdfmod.heading_with_body(Paragraph("II. Dados de Atendimento", styles["h2"]), body_blocks[0]))
     story.extend(body_blocks[1:])
 
-    # III. Colaboradores / Recursos Humanos
-    rh_rows = [
-        [
-            row.get("cargo", ""),
-            "Sim" if row.get("terceirizado") else "Não",
-            "Sim" if row.get("outros") else "Não",
-            "Sim" if row.get("subvencao") else "Não",
-            row.get("quantidade", 0),
-            row.get("observacoes", "") or "-",
+    if not is_emendas_visit:
+        # III. Colaboradores / Recursos Humanos
+        rh_rows = [
+            [
+                row.get("cargo", ""),
+                "Sim" if row.get("terceirizado") else "Não",
+                "Sim" if row.get("outros") else "Não",
+                "Sim" if row.get("subvencao") else "Não",
+                row.get("quantidade", 0),
+                row.get("observacoes", "") or "-",
+            ]
+            for row in (visit.rh_data or [])
+            if any([row.get("cargo"), row.get("observacoes"), row.get("quantidade"),
+                    row.get("terceirizado"), row.get("outros"), row.get("subvencao")])
         ]
-        for row in (visit.rh_data or [])
-        if any([row.get("cargo"), row.get("observacoes"), row.get("quantidade"),
-                row.get("terceirizado"), row.get("outros"), row.get("subvencao")])
-    ]
-    if not rh_rows:
-        rh_rows = [["Nenhum colaborador registrado.", "", "", "", "", ""]]
-    rh_table = pdfmod.styled_table(
-        ["Cargo / Função", "Terceirizado", "Outros", "Subvenção", "Qtd.", "Nomes / Observações"], rh_rows, styles,
-    )
-    rh_title = "III. Colaboradores" if is_subvencao_visit else "III. Recursos Humanos"
-    story.extend(pdfmod.heading_with_body(Paragraph(rh_title, styles["h2"]), rh_table))
+        if not rh_rows:
+            rh_rows = [["Nenhum colaborador registrado.", "", "", "", "", ""]]
+        rh_table = pdfmod.styled_table(
+            ["Cargo / Função", "Terceirizado", "Outros", "Subvenção", "Qtd.", "Nomes / Observações"], rh_rows, styles,
+        )
+        rh_title = "III. Colaboradores" if is_subvencao_visit else "III. Recursos Humanos"
+        story.extend(pdfmod.heading_with_body(Paragraph(rh_title, styles["h2"]), rh_table))
 
-    # IV. Observações e Recomendações Técnicas
-    obs_blocks = pdfmod.glue_headings([
-        Paragraph("Parecer da Equipe Técnica", styles["h3"]),
-        Paragraph(visit.observacoes or "Sem observações registradas.", styles["body"]),
-        Paragraph("Recomendações e Encaminhamentos", styles["h3"]),
-        Paragraph(visit.recomendacoes or "Sem recomendações registradas.", styles["body"]),
-    ], styles)
-    story.extend(pdfmod.heading_with_body(Paragraph("IV. Observações e Recomendações Técnicas", styles["h2"]), obs_blocks[0]))
-    story.extend(obs_blocks[1:])
+        # IV. Observações e Recomendações Técnicas
+        obs_blocks = pdfmod.glue_headings([
+            Paragraph("Parecer da Equipe Técnica", styles["h3"]),
+            Paragraph(visit.observacoes or "Sem observações registradas.", styles["body"]),
+            Paragraph("Recomendações e Encaminhamentos", styles["h3"]),
+            Paragraph(visit.recomendacoes or "Sem recomendações registradas.", styles["body"]),
+        ], styles)
+        story.extend(pdfmod.heading_with_body(Paragraph("IV. Observações e Recomendações Técnicas", styles["h2"]), obs_blocks[0]))
+        story.extend(obs_blocks[1:])
 
     # V. Dados PSE (Proteção Social Especial) -- so quando habilitado, so Subvencao
     if is_subvencao_visit and atendimento.get("pse_habilitado") == "sim":
