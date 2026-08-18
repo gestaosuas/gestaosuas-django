@@ -271,6 +271,25 @@
         {% if object.documents %}
         <section class="visit-document-section">
             <div class="section-doc-header">
+                <i data-lucide="file-text"></i>
+                <h2>Balanço Financeiro</h2>
+            </div>
+            <div class="doc-file-list">
+                {% for doc in object.documents %}
+                {% if doc.type == "Balanço Financeiro" %}
+                <a class="doc-file-item" href="{{ doc.url }}" target="_blank" rel="noopener">
+                    <i data-lucide="file-text"></i>
+                    <span>{{ doc.name }}</span>
+                </a>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        {% if object.documents %}
+        <section class="visit-document-section">
+            <div class="section-doc-header">
                 <i data-lucide="image"></i>
                 <h2>Fotos / Evidências</h2>
             </div>
@@ -413,6 +432,10 @@
 </div>
 
 <style>
+    .doc-file-list { display:flex; flex-direction:column; gap:10px; }
+    .doc-file-item { display:flex; align-items:center; gap:10px; padding:12px 16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; text-decoration:none; color:#1e293b; font-size:14px; font-weight:600; transition:background 0.15s; }
+    .doc-file-item:hover { background:#f1f5f9; }
+    .doc-file-item i { width:20px; height:20px; color:#dc2626; flex-shrink:0; }
     .doc-photo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
     .doc-photo-item { position:relative; border-radius:8px; overflow:hidden; border:1px solid #e2e8f0; cursor:pointer; aspect-ratio:4/3; }
     .doc-photo-item img { width:100%; height:100%; object-fit:cover; display:block; transition:transform 0.2s; }

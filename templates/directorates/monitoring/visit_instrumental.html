@@ -372,13 +372,41 @@
             </div>
             <div class="visit-section-body">
                 <label class="visit-upload-dropzone">
-                    <input type="file" name="balanco_financeiro" accept="application/pdf,.pdf" {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
+                    <input type="file" name="balanco_financeiro" accept="application/pdf,.pdf" multiple {% if object.status == 'finalized' or object.status == 'completed' %}disabled{% endif %}>
                     <span class="visit-upload-icon"><i data-lucide="plus"></i></span>
                     <span>
                         <strong>Fazer Upload de Balanço Financeiro</strong>
-                        <small>Apenas arquivos .PDF</small>
+                        <small>Apenas arquivos .PDF — pode selecionar vários de uma vez</small>
                     </span>
                 </label>
+
+                {% if object.documents %}
+                <div class="balanco-file-list">
+                    {% for doc in object.documents %}
+                        {% if doc.type == "Balanço Financeiro" %}
+                        <div class="evidence-item balanco-file-item" id="doc-{{ forloop.counter0 }}">
+                            <div class="balanco-file-info">
+                                <i class="ph ph-file-pdf"></i>
+                                <span class="balanco-file-name">{{ doc.name }}</span>
+                            </div>
+                            <div class="balanco-file-actions">
+                                <a href="{{ doc.url }}" target="_blank" rel="noopener" class="evidence-action-btn" title="Visualizar">
+                                    <i class="ph ph-eye"></i>
+                                </a>
+                                <a href="{{ doc.url }}" download="{{ doc.name }}" class="evidence-action-btn" title="Baixar">
+                                    <i class="ph ph-download-simple"></i>
+                                </a>
+                                {% if object.status != 'finalized' and object.status != 'completed' %}
+                                <button type="button" class="evidence-action-btn delete" onclick="deleteSavedDocument('{{ forloop.counter0 }}', this)" title="Excluir">
+                                    <i class="ph ph-trash"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
         </section>
         {% endif %}
@@ -2986,6 +3014,64 @@
         color: #64748b;
         text-transform: uppercase;
         pointer-events: none;
+    }
+
+    /* Balanco Financeiro - lista de PDFs salvos */
+    .balanco-file-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 16px;
+    }
+
+    .balanco-file-item.evidence-item {
+        position: static;
+        aspect-ratio: auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 14px;
+        flex-wrap: wrap;
+        transform: none;
+    }
+
+    .balanco-file-item.evidence-item:hover {
+        transform: none;
+    }
+
+    .balanco-file-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        color: #0f172a;
+    }
+
+    .balanco-file-info i {
+        font-size: 22px;
+        color: #dc2626;
+        flex-shrink: 0;
+    }
+
+    .balanco-file-name {
+        font-weight: 600;
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .balanco-file-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .balanco-file-actions .evidence-action-btn {
+        position: static;
+        border: 1px solid #e2e8f0;
     }
 
     /* Lightbox */

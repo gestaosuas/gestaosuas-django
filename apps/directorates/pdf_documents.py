@@ -4,6 +4,8 @@ Relatorio/Parecer de Visita. Ver apps/core/pdf.py para as primitivas
 compartilhadas; o Relatorio Mensal Narrativo fica em
 apps/core/pdf.py:render_narrative_report_pdf por ser usado por 9 apps.
 """
+import html
+
 from reportlab.platypus import Paragraph, Spacer
 
 from apps.core import pdf as pdfmod
@@ -222,6 +224,15 @@ def render_visit_document_pdf(context):
             pse_blocks.append(_atendimento_quant_table(atendimento.get("pse_quantitativos"), styles))
         story.extend(pdfmod.heading_with_body(Paragraph("V. Dados PSE (Proteção Social Especial)", styles["h2"]), pse_blocks[0]))
         story.extend(pse_blocks[1:])
+
+    # Balanço Financeiro
+    balances = [doc for doc in (visit.documents or []) if doc.get("type") == "Balanço Financeiro"]
+    if balances:
+        story.append(Paragraph("Balanço Financeiro", styles["h2"]))
+        for doc in balances:
+            name = html.escape(doc.get("name") or "Arquivo PDF")
+            url = html.escape(doc.get("url") or "", quote=True)
+            story.append(Paragraph(f'<link href="{url}" color="#1e40af">{name}</link>', styles["body"]))
 
     # Fotos / Evidências
     photos = [doc for doc in (visit.documents or []) if doc.get("type") == "Foto / Evidência"]
