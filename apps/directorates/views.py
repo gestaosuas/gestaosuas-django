@@ -1094,6 +1094,14 @@ class WorkPlanObjectivesView(WorkPlanScopedMixin, View):
             return redirect(next_url)
         return redirect(reverse("directorates:plan-list", kwargs={"pk": plan.directorate.pk}))
 
+def _form_errors_summary(form):
+    parts = []
+    for field, errs in form.errors.items():
+        label = form.fields[field].label if field in form.fields else None
+        parts.append(f"{label or field}: {', '.join(errs)}")
+    return "; ".join(parts)
+
+
 class WorkPlanUpdateView(WorkPlanScopedMixin, UpdateView):
     model = WorkPlan
     template_name = "directorates/monitoring/plan_form.html"
@@ -1120,10 +1128,15 @@ class WorkPlanUpdateView(WorkPlanScopedMixin, UpdateView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
+        messages.success(self.request, f"Plano de Trabalho \"{self.object.title}\" salvo com sucesso.")
         log_activity(self.request, self.object.directorate, "updated", "work_plan",
                      f"Plano de Trabalho — {self.object.title}",
                      url=reverse("directorates:plan-update", kwargs={"pk": self.object.pk}))
         return response
+
+    def form_invalid(self, form):
+        messages.error(self.request, f"Não foi possível salvar o Plano de Trabalho. {_form_errors_summary(form)}")
+        return super().form_invalid(form)
 
     def get_success_url(self):
         next_url = get_safe_next_url(self.request)
@@ -1157,10 +1170,15 @@ class WorkPlanCreateView(DirectorateScopedMixin, CreateView):
         form.instance.directorate_id = self.kwargs["pk"]
         form.instance.user_id = self.request.user.pk
         response = super().form_valid(form)
+        messages.success(self.request, f"Plano de Trabalho \"{self.object.title}\" criado com sucesso.")
         log_activity(self.request, self.object.directorate, "created", "work_plan",
                      f"Plano de Trabalho — {self.object.title}",
                      url=reverse("directorates:plan-update", kwargs={"pk": self.object.pk}))
         return response
+
+    def form_invalid(self, form):
+        messages.error(self.request, f"Não foi possível salvar o Plano de Trabalho. {_form_errors_summary(form)}")
+        return super().form_invalid(form)
 
     def get_success_url(self):
         next_url = get_safe_next_url(self.request)

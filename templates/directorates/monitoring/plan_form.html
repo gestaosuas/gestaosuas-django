@@ -35,7 +35,7 @@
 
                     <div class="plan-form-group">
                         <label>Titulo do plano</label>
-                        <input type="text" name="title" id="id_title" value="{{ object.title|default:'' }}" class="plan-editor-input" placeholder="Ex: PT - Nome da OSC - 2026">
+                        <input type="text" name="title" id="id_title" value="{{ object.title|default:'' }}" class="plan-editor-input" placeholder="Ex: PT - Nome da OSC - 2026" required>
                     </div>
 
                     <div class="plan-form-group">
@@ -347,7 +347,11 @@
 
     document.getElementById("saveBtn").addEventListener("click", function() {
         document.getElementById("id_content").value = JSON.stringify(blocks);
-        document.getElementById("planForm").submit();
+        var form = document.getElementById("planForm");
+        if (!form.reportValidity()) {
+            return;
+        }
+        form.submit();
     });
 
     renderBlocks();

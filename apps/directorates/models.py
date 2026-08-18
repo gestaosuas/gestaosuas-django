@@ -134,7 +134,7 @@ class WorkPlan(TimeStampedUUIDModel):
     osc = models.ForeignKey(Osc, on_delete=models.CASCADE, related_name="work_plans")
     user_id = models.UUIDField(null=True, blank=True)
     directorate = models.ForeignKey(Directorate, on_delete=models.CASCADE, related_name="work_plans")
-    title = models.CharField(max_length=255)
+    title = models.CharField(max_length=255, verbose_name="Título")
     content = models.JSONField(default=list, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
     # Textos herdados pelo relatório de visita (Emendas e Fundos): uma OSC
