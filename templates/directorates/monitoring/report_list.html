@@ -153,7 +153,7 @@
                                         </div>
                                         <div style="display: flex; gap: 4px; flex-shrink: 0;">
                                             <a href="{{ notif.url }}" target="_blank" class="btn-notif-action" title="Visualizar"><i data-lucide="external-link"></i></a>
-                                            <button type="button" class="btn-notif-action btn-notif-delete" onclick="removeNotification('{{ visit.pk }}', {{ forloop.index0 }})" title="Excluir"><i data-lucide="trash-2"></i></button>
+                                            <button type="button" class="btn-notif-action btn-notif-delete" onclick="removeNotification('{{ visit.pk }}', {{ forloop.counter0 }})" title="Excluir"><i data-lucide="trash-2"></i></button>
                                         </div>
                                     </div>
                                     {% endfor %}
