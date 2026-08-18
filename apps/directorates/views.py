@@ -1262,9 +1262,9 @@ class MonitoringReportListView(DirectorateScopedMixin, ListView):
     context_object_name = "visits"
 
     def get_queryset(self):
-        qs = Visit.objects.filter(directorate_id=self.kwargs["pk"]).order_by("-visit_date")
+        qs = Visit.objects.filter(directorate_id=self.kwargs["pk"]).select_related("osc", "work_plan").order_by("-visit_date")
         profile = getattr(self.request.user, 'profile', None)
-        
+
         if not (self.request.user.is_superuser or (profile and profile.role == 'admin')):
             if profile and profile.role == 'diretor':
                 is_primary = str(profile.primary_directorate_id) == str(self.kwargs["pk"])

@@ -62,6 +62,12 @@
                             <i data-lucide="calendar"></i>
                             <span>{{ visit.visit_date|date:"d/m/Y" }}</span>
                         </div>
+                        {% if visit.work_plan %}
+                        <div class="report-plan-row" title="{{ visit.work_plan.title }}">
+                            <i data-lucide="clipboard-list"></i>
+                            <span>{{ visit.work_plan.title }}</span>
+                        </div>
+                        {% endif %}
                         {% if visit.assinaturas.tecnico1_nome %}
                         <div class="report-tech-row">
                             <i data-lucide="user"></i>
@@ -483,8 +489,9 @@ function filterCards() {
 
 .report-osc-name { font-size: 13px; font-weight: 800; color: #1e3a8a; margin: 0 0 6px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
-.report-date-row, .report-tech-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #64748b; font-weight: 500; margin-bottom: 3px; }
-.report-date-row i, .report-tech-row i { width: 13px; height: 13px; color: #94a3b8; }
+.report-date-row, .report-tech-row, .report-plan-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #64748b; font-weight: 500; margin-bottom: 3px; }
+.report-date-row i, .report-tech-row i, .report-plan-row i { width: 13px; height: 13px; color: #94a3b8; }
+.report-plan-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .report-card-actions { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
 

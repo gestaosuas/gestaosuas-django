@@ -555,6 +555,12 @@
                                 <i data-lucide="calendar"></i>
                                 <span>{{ visit.visit_date|date:"d/m/Y" }}</span>
                             </div>
+                            {% if visit.work_plan %}
+                            <div class="report-plan-row" title="{{ visit.work_plan.title }}">
+                                <i data-lucide="clipboard-list"></i>
+                                <span>{{ visit.work_plan.title }}</span>
+                            </div>
+                            {% endif %}
                             {% if visit.assinaturas.tecnico1_nome %}
                             <div class="report-tech-row">
                                 <i data-lucide="user"></i>
