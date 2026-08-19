@@ -1,10 +1,11 @@
 import uuid
+from datetime import date, time
 
 from django.test import TestCase
 from django.urls import reverse
 
 from apps.accounts.models import Profile, ProfileDirectorate, User
-from apps.directorates.models import Directorate
+from apps.directorates.models import Directorate, Osc, Visit
 
 
 def make_directorate(name=None):
@@ -20,6 +21,21 @@ def make_user(email=None, password="senha12345", role=Profile.ROLE_USER, full_na
     user = User.objects.create_user(username=email, email=email, password=password)
     profile = Profile.objects.create(user=user, full_name=full_name, role=role, **profile_kwargs)
     return user, profile
+
+
+def make_osc(directorate, name=None):
+    return Osc.objects.create(id=uuid.uuid4(), name=name or f"OSC Teste {uuid.uuid4().hex[:8]}", directorate=directorate)
+
+
+def make_visit(directorate, osc=None, user=None):
+    return Visit.objects.create(
+        id=uuid.uuid4(),
+        osc=osc or make_osc(directorate),
+        directorate=directorate,
+        visit_date=date.today(),
+        visit_time=time(9, 0),
+        user_id=user.pk if user else None,
+    )
 
 
 class MonitoramentoBaseMixinAccessTests(TestCase):
@@ -174,3 +190,89 @@ class MonitoramentoHomeTabRestrictionTests(TestCase):
         self.client.login(username=user.username, password=self.password)
         response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}))
         self.assertEqual(response.status_code, 200)
+
+
+class MonitoramentoAgentePeerVisibilityTests(TestCase):
+    """2026-08-19, pedido explicito do usuario: "somente em monitoramento, no
+    caso em emendas e fundos e subvencao, as visitas criadas por um agente da
+    mesma diretoria, pode ser visto e editado por outros agentes da mesma
+    diretoria (semelhante ao que o Diretor ve)". Cobre a mudanca em
+    MonitoramentoHomeView.get_context_data() (dashboard_visits) e no acesso
+    direto por URL (VisitAccessMixin, via directorates:visit-instrumental).
+    "Outros" fica de fora (so Subvencao/Emendas e Fundos) - is_subvencao_directorate
+    ja exclui "Outros" pelo nome."""
+
+    def setUp(self):
+        self.password = "senha12345"
+
+    def test_agente_sees_coworkers_visit_in_subvencao_dashboard(self):
+        directorate = make_directorate(name=f"Subvenção Teste {uuid.uuid4().hex[:8]}")
+        owner, _ = make_user(password=self.password, role="agente", primary_directorate=directorate)
+        visit = make_visit(directorate, user=owner)
+        viewer, _ = make_user(password=self.password, role="agente", primary_directorate=directorate)
+        self.client.login(username=viewer.username, password=self.password)
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=visits")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(visit, response.context["dashboard_visits"])
+
+    def test_agente_sees_coworkers_visit_in_emendas_dashboard(self):
+        directorate = make_directorate(name=f"Emendas e Fundos Teste {uuid.uuid4().hex[:8]}")
+        owner, _ = make_user(password=self.password, role="agente", primary_directorate=directorate)
+        visit = make_visit(directorate, user=owner)
+        viewer, _ = make_user(password=self.password, role="agente", primary_directorate=directorate)
+        self.client.login(username=viewer.username, password=self.password)
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=visits")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(visit, response.context["dashboard_visits"])
+
+    def test_agente_still_cannot_see_coworkers_visit_in_outros(self):
+        """"Outros" nao entra na nova regra - continua so dono/delegado."""
+        directorate = make_directorate(name=f"Outros Teste {uuid.uuid4().hex[:8]}")
+        owner, _ = make_user(password=self.password, role="agente", primary_directorate=directorate)
+        visit = make_visit(directorate, user=owner)
+        viewer, _ = make_user(password=self.password, role="agente", primary_directorate=directorate)
+        self.client.login(username=viewer.username, password=self.password)
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=visits")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(visit, response.context["dashboard_visits"])
+
+    def test_agente_does_not_see_admin_created_visit_in_subvencao(self):
+        """Mesma exclusao ja aplicada pro diretor: visita de admin nao conta
+        como "de um agente", mesmo dentro de Subvencao/Emendas e Fundos."""
+        directorate = make_directorate(name=f"Subvenção Teste {uuid.uuid4().hex[:8]}")
+        admin, _ = make_user(password=self.password, role=Profile.ROLE_ADMIN)
+        visit = make_visit(directorate, user=admin)
+        viewer, _ = make_user(password=self.password, role="agente", primary_directorate=directorate)
+        self.client.login(username=viewer.username, password=self.password)
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=visits")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(visit, response.context["dashboard_visits"])
+
+    def test_agente_can_edit_coworkers_visit_in_subvencao(self):
+        """Diferente do diretor (so leitura em visita alheia), agente ganha
+        edicao completa na visita de um colega da mesma diretoria."""
+        directorate = make_directorate(name=f"Subvenção Teste {uuid.uuid4().hex[:8]}")
+        owner, _ = make_user(password=self.password, role="agente", primary_directorate=directorate)
+        visit = make_visit(directorate, user=owner)
+        coworker, _ = make_user(password=self.password, role="agente", primary_directorate=directorate)
+        self.client.login(username=coworker.username, password=self.password)
+        get_response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
+        )
+        self.assertEqual(get_response.status_code, 200)
+        post_response = self.client.post(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}),
+            {"status": "draft", "observacoes": "colega editando", "recomendacoes": ""},
+        )
+        self.assertEqual(post_response.status_code, 302)
+
+    def test_agente_cannot_edit_coworkers_visit_in_outros(self):
+        directorate = make_directorate(name=f"Outros Teste {uuid.uuid4().hex[:8]}")
+        owner, _ = make_user(password=self.password, role="agente", primary_directorate=directorate)
+        visit = make_visit(directorate, user=owner)
+        coworker, _ = make_user(password=self.password, role="agente", primary_directorate=directorate)
+        self.client.login(username=coworker.username, password=self.password)
+        response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
+        )
+        self.assertEqual(response.status_code, 403)

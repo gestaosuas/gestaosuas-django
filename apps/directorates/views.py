@@ -645,11 +645,15 @@ class VisitScopedMixin(_ObjectDirectorateScopedMixin):
 class VisitAccessMixin(VisitScopedMixin):
     """Alem do acesso a diretoria (VisitScopedMixin), restringe o acesso a
     visita conforme dono/delegacao/papel (docs/dominio/04-... A.6, refinado
-    em 2026-07-25 e 2026-08-17): admin sempre; diretor tem acesso total se
-    ele mesmo criou a visita, senao so leitura (GET) - EXCETO se a visita foi
-    criada por um admin, caso em que o diretor nao tem acesso nenhum (nao e
-    "dos seus agentes"); agente/user so na propria visita ou com
-    FormDelegation, senao 403 ja no GET."""
+    em 2026-07-25, 2026-08-17 e 2026-08-19): admin sempre; diretor tem acesso
+    total se ele mesmo criou a visita, senao so leitura (GET) - EXCETO se a
+    visita foi criada por um admin, caso em que o diretor nao tem acesso
+    nenhum (nao e "dos seus agentes"); agente/user tem acesso total (leitura
+    E edicao) a propria visita, a visitas delegadas, e - so em Subvencao/
+    Emendas e Fundos (2026-08-19, pedido explicito do usuario, "essa regra so
+    se aplica em monitoramentos") - a qualquer visita de outro agente da
+    mesma diretoria, exceto as criadas por admin (mesma exclusao usada pro
+    diretor); senao 403 ja no GET."""
 
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -674,7 +678,11 @@ class VisitAccessMixin(VisitScopedMixin):
                     return HttpResponseForbidden("Você não pode editar uma visita que não criou.")
             else:
                 is_delegated = FormDelegation.objects.filter(visit=visit, user_id=request.user.id).exists()
-                if not (is_owner or is_delegated):
+                is_directorate_peer = (
+                    is_subvencao_directorate(visit.directorate)
+                    and str(visit.user_id) not in {str(uid) for uid in get_admin_user_ids()}
+                )
+                if not (is_owner or is_delegated or is_directorate_peer):
                     return HttpResponseForbidden("Você não tem acesso a esta visita.")
         self.can_edit = is_admin or is_owner or not (profile and profile.role == "diretor")
         return super().dispatch(request, *args, **kwargs)
@@ -946,9 +954,15 @@ class VisitListView(DirectorateScopedMixin, ListView):
                 else:
                     qs = qs.exclude(user_id__in=get_admin_user_ids())
             else:
-                # Agente sees only owned or delegated
-                delegated_visit_ids = FormDelegation.objects.filter(user_id=self.request.user.id).values_list('visit_id', flat=True)
-                qs = qs.filter(Q(user_id=self.request.user.id) | Q(id__in=delegated_visit_ids))
+                # Agente sees own + delegated visits; em Subvencao/Emendas e
+                # Fundos, tambem ve as de outros agentes da mesma diretoria
+                # (pedido explicito 2026-08-19, exceto as feitas por admin -
+                # mesma exclusao usada pro diretor).
+                if is_subvencao_directorate(self.get_directorate()):
+                    qs = qs.exclude(user_id__in=get_admin_user_ids())
+                else:
+                    delegated_visit_ids = FormDelegation.objects.filter(user_id=self.request.user.id).values_list('visit_id', flat=True)
+                    qs = qs.filter(Q(user_id=self.request.user.id) | Q(id__in=delegated_visit_ids))
         # ----------------------------
 
         bimester = get_persistent_bimester(self.request)
@@ -1274,8 +1288,14 @@ class MonitoringReportListView(DirectorateScopedMixin, ListView):
                 else:
                     qs = qs.exclude(user_id__in=get_admin_user_ids())
             else:
-                delegated_visit_ids = FormDelegation.objects.filter(user_id=self.request.user.id).values_list('visit_id', flat=True)
-                qs = qs.filter(Q(user_id=self.request.user.id) | Q(id__in=delegated_visit_ids))
+                # Mesma regra de VisitListView: em Subvencao/Emendas e Fundos,
+                # agente ve os relatorios/pareceres de outros agentes da
+                # mesma diretoria tambem (2026-08-19).
+                if is_subvencao_directorate(self.get_directorate()):
+                    qs = qs.exclude(user_id__in=get_admin_user_ids())
+                else:
+                    delegated_visit_ids = FormDelegation.objects.filter(user_id=self.request.user.id).values_list('visit_id', flat=True)
+                    qs = qs.filter(Q(user_id=self.request.user.id) | Q(id__in=delegated_visit_ids))
 
         # Bimester filter persistence
         bimester = get_persistent_bimester(self.request)

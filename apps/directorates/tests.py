@@ -32,6 +32,7 @@ from django.urls import reverse
 
 from apps.accounts.models import Profile, ProfileDirectorate, User
 from apps.directorates.models import Directorate, FormDelegation, Osc, Visit, WorkPlan
+from apps.directorates.views import is_subvencao_directorate
 
 # WhiteNoise's CompressedManifestStaticFilesStorage (config/settings.py STORAGES)
 # exige que `collectstatic` já tenha rodado (manifesto staticfiles.json). Como os
@@ -80,6 +81,15 @@ class DirectoratesTestBase(TestCase):
             .annotate(n_oscs=Count("oscs"))
             .order_by("-n_oscs", "name")
             .first()
+        )
+        # `cls.directorate`/`cls.other_directorate` (as 2 com mais OSCs neste
+        # banco de dev real) sao ambas Subvencao/Emendas e Fundos - qualquer
+        # teste que precise de uma diretoria FORA do grupo com a regra de
+        # colegas-se-veem (2026-08-19) deve usar esta em vez de assumir que
+        # `cls.directorate` serve.
+        cls.non_subvencao_directorate = next(
+            (d for d in Directorate.objects.order_by("name") if not is_subvencao_directorate(d)),
+            None,
         )
 
     def make_osc(self, name="OSC de Teste", directorate=None):
@@ -312,10 +322,19 @@ class ObjectScopedAccessMixinTests(DirectoratesTestBase):
 
     def test_visit_access_denied_for_agente_not_owner_not_delegated(self):
         """VisitAccessMixin (2026-07-25): agente com acesso a diretoria mas
-        sem ser dono nem delegado nao pode nem visualizar a visita alheia."""
-        owner = make_user(role="agente", primary_directorate=self.directorate)
-        visit = self.make_visit(user=owner)
-        other_agente = make_user(role="agente", primary_directorate=self.directorate)
+        sem ser dono nem delegado nao pode nem visualizar a visita alheia -
+        EXCETO em Subvencao/Emendas e Fundos, onde agentes da mesma
+        diretoria passaram a se enxergar/editar entre si (2026-08-19, ver
+        VisitAccessMixinSubvencaoPeerTests abaixo). Usa uma diretoria fora
+        desse grupo pra isolar o caso "sem nenhuma relacao especial" -
+        `self.directorate`/`self.other_directorate` (as com mais OSCs no
+        banco de dev real) sao ambas do grupo Subvencao/Emendas."""
+        if not self.non_subvencao_directorate:
+            self.skipTest("Nenhuma diretoria fora de Subvencao/Emendas e Fundos encontrada no banco de teste.")
+        owner = make_user(role="agente", primary_directorate=self.non_subvencao_directorate)
+        osc = self.make_osc(directorate=self.non_subvencao_directorate)
+        visit = self.make_visit(osc=osc, directorate=self.non_subvencao_directorate, user=owner)
+        other_agente = make_user(role="agente", primary_directorate=self.non_subvencao_directorate)
         self.client.force_login(other_agente)
         response = self.client.get(
             reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
@@ -385,6 +404,71 @@ class ObjectScopedAccessMixinTests(DirectoratesTestBase):
             reverse("directorates:plan-update", kwargs={"pk": plan.pk}), follow=False
         )
         self.assertEqual(response.status_code, 403)
+
+
+class VisitAccessMixinSubvencaoPeerTests(DirectoratesTestBase):
+    """2026-08-19, pedido explicito do usuario: "somente em monitoramento, no
+    caso em emendas e fundos e subvencao, as visitas criadas por um agente da
+    mesma diretoria, pode ser visto e editado por outros agentes da mesma
+    diretoria (semelhante ao que o Diretor ve)". `self.directorate` (a com
+    mais OSCs no banco de dev real) e "Subvencao" - usado diretamente aqui
+    pra validar contra dado real, com skip se isso mudar no futuro."""
+
+    def setUp(self):
+        if not is_subvencao_directorate(self.directorate):
+            self.skipTest("A diretoria com mais OSCs no banco de teste não é mais Subvenção/Emendas e Fundos.")
+
+    def test_agente_can_view_and_edit_coworkers_visit(self):
+        """Diferente do diretor (so leitura em visita alheia - ver
+        test_visit_access_diretor_view_only_on_others_visit acima), o agente
+        ganha edicao completa na visita de um colega da mesma diretoria."""
+        owner = make_user(role="agente", primary_directorate=self.directorate)
+        visit = self.make_visit(user=owner)
+        coworker = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(coworker)
+        get_response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
+        )
+        self.assertEqual(get_response.status_code, 200)
+        post_response = self.client.post(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}),
+            {"status": "draft", "observacoes": "colega editando", "recomendacoes": ""},
+        )
+        self.assertEqual(post_response.status_code, 302)
+
+    def test_agente_still_denied_for_admin_created_visit(self):
+        """Mesma exclusao ja aplicada pro diretor: visita de admin nao conta
+        como "de um agente", mesmo dentro de Subvencao/Emendas e Fundos."""
+        admin = make_user(role="admin")
+        visit = self.make_visit(user=admin)
+        agente = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(agente)
+        response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_agente_sees_coworkers_visit_in_visit_list(self):
+        owner = make_user(role="agente", primary_directorate=self.directorate)
+        visit = self.make_visit(user=owner)
+        coworker = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(coworker)
+        response = self.client.get(
+            reverse("directorates:visit-list", kwargs={"pk": self.directorate.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(visit, response.context["visits"])
+
+    def test_agente_sees_coworkers_report_in_report_list(self):
+        owner = make_user(role="agente", primary_directorate=self.directorate)
+        visit = self.make_visit(user=owner)
+        coworker = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(coworker)
+        response = self.client.get(
+            reverse("directorates:report-list", kwargs={"pk": self.directorate.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(visit, response.context["visits"])
 
 
 class OscCrudTests(DirectoratesTestBase):

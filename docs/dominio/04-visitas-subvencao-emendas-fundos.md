@@ -129,19 +129,21 @@ Implementado em `apps/directorates/views.py` (`VisitReportView.get_context_data(
 - `relatorio_final` → **Relatório Final** (Etapa 3a)
 - `parecer_conclusivo` → **Parecer Conclusivo** (Etapa 3b)
 
-### A.6 Permissões de Visita por Perfil (CONFIRMADO pelo usuário em 2026-07-21; refinado em 2026-07-25)
+### A.6 Permissões de Visita por Perfil (CONFIRMADO pelo usuário em 2026-07-21; refinado em 2026-07-25 e 2026-08-19)
 
-| Ação | Admin | Diretor | Agente |
-|------|-------|---------|--------|
-| Ver visitas da diretoria | Todas | Todas (visualização) | **Apenas as próprias + delegadas** |
-| Criar Nova Visita | Sim | Sim | Sim |
-| Editar visita (rascunho) | Sim | **Sim, se ele criou** / só visualiza se for de outra pessoa | **Sim** (só as próprias/delegadas) |
-| Finalizar visita | Sim | **Sim, se ele criou** / não, se for de outra pessoa | **Sim** (só as próprias/delegadas) |
-| Preencher Relatório de Visita | Sim | **Sim, se ele criou** / não, se for de outra pessoa | **Sim** (só as próprias/delegadas) |
-| Relatório Final / Parecer | Sim | **Sim, se ele criou** / não, se for de outra pessoa | **Sim** (só as próprias/delegadas) |
-| Excluir visita | Sim | Não | Não |
+| Ação | Admin | Diretor | Agente — Subvenção/Emendas e Fundos¹ | Agente — Outros/demais |
+|------|-------|---------|---------------------------------------|--------------------------|
+| Ver visitas da diretoria | Todas | Todas (visualização) | **Todas as de outros agentes** (exceto as criadas por admin) + próprias/delegadas | **Apenas as próprias + delegadas** |
+| Criar Nova Visita | Sim | Sim | Sim | Sim |
+| Editar visita (rascunho) | Sim | **Sim, se ele criou** / só visualiza se for de outra pessoa | **Sim**, inclusive as de outro agente da mesma diretoria (exceto criadas por admin) | **Sim** (só as próprias/delegadas) |
+| Finalizar visita | Sim | **Sim, se ele criou** / não, se for de outra pessoa | **Sim**, inclusive as de outro agente | **Sim** (só as próprias/delegadas) |
+| Preencher Relatório de Visita | Sim | **Sim, se ele criou** / não, se for de outra pessoa | **Sim**, inclusive as de outro agente | **Sim** (só as próprias/delegadas) |
+| Relatório Final / Parecer | Sim | **Sim, se ele criou** / não, se for de outra pessoa | **Sim**, inclusive as de outro agente | **Sim** (só as próprias/delegadas) |
+| Excluir visita | Sim | Não | Não | Não |
 
-**Resumo (refinado 2026-07-25)**: agente edita/finaliza só as próprias visitas (ou as que foram delegadas a ele via `FormDelegation`) — visita de outro agente, mesmo com acesso à diretoria, não abre nem em modo leitura. Diretor vê tudo na sua diretoria em modo leitura, **exceto as visitas que ele mesmo criou**, que ele edita/finaliza normalmente igual um agente dono (esclarecido pelo usuário: diretor supervisiona o trabalho alheio, mas não fica travado no próprio). Admin tem acesso total sempre.
+¹ **Regra nova (2026-08-19, pedido explícito do usuário)**: "somente em monitoramento, no caso em Emendas e Fundos e Subvenção, as visitas criadas por um agente da mesma diretoria podem ser vistas e editadas por outros agentes da mesma diretoria (semelhante ao que o Diretor vê)". Diferente do Diretor (que só visualiza visita alheia, nunca edita), o agente ganha **edição completa** — não só leitura — na visita de um colega da mesma diretoria. A exclusão de visitas criadas por admin usa o mesmo `get_admin_user_ids()` já aplicado ao Diretor (admin não é "um agente"). A diretoria "Outros" fica **fora** dessa regra nova — continua só próprias + delegadas, igual às demais diretorias fora do módulo `monitoramento`. Implementado em `VisitAccessMixin.dispatch()`, `VisitListView.get_queryset()`, `MonitoringReportListView.get_queryset()` (`apps/directorates/views.py`) e `MonitoramentoHomeView.get_context_data()` (`apps/monitoramento/views.py`), guardado por `is_subvencao_directorate()`.
+
+**Resumo (refinado 2026-07-25, estendido 2026-08-19)**: fora de Subvenção/Emendas e Fundos, agente edita/finaliza só as próprias visitas (ou as que foram delegadas a ele via `FormDelegation`) — visita de outro agente, mesmo com acesso à diretoria, não abre nem em modo leitura. Dentro de Subvenção/Emendas e Fundos, agente vê e edita as visitas de qualquer colega da mesma diretoria (exceto as criadas por admin), sem precisar de delegação. Diretor vê tudo na sua diretoria em modo leitura, **exceto as visitas que ele mesmo criou**, que ele edita/finaliza normalmente igual um agente dono (esclarecido pelo usuário: diretor supervisiona o trabalho alheio, mas não fica travado no próprio). Admin tem acesso total sempre.
 
 **Reforço de servidor (2026-07-25)**: até então, `FormDelegation` só filtrava listagens (`VisitListView`, `MonitoringReportListView`, dashboard do módulo) — as telas de edição (`VisitInstrumentalView`, `VisitReportView`, `RevertReportView`, upload/remoção de documentos e notificações, reverter visita) não validavam dono/delegação nenhuma, então qualquer agente ou diretor com acesso à diretoria conseguia abrir e salvar a visita de outra pessoa via URL direta (UUID). Corrigido com `VisitAccessMixin` (`apps/directorates/views.py`), que aplica exatamente a tabela acima antes de despachar a request; a UI (`visit_instrumental.html`, `report_form.html`) também desabilita o formulário (`<fieldset disabled>`) e esconde os botões de salvar/finalizar quando `can_edit` é falso, para não mostrar uma tela editável que na prática vai rejeitar o POST. `VisitDelegateView` (delegar visita) também passou a exigir admin ou diretor — antes qualquer agente com acesso à diretoria podia redelegar (e apagar as delegações existentes de) qualquer visita.
 
@@ -434,10 +436,10 @@ Então todos os relatórios da visita estão concluídos e bloqueados
 ```
 
 ### D.6 Permissões de edição de visita
-> **Status**: Confirmado pelo usuário em 2026-07-21.
+> **Status**: Confirmado pelo usuário em 2026-07-21; regra de agente estendida em 2026-08-19 (só Subvenção/Emendas e Fundos).
 
 ```
-Dado que o agente "João" criou a visita #123
+Dado que o agente "João" criou a visita #123 na diretoria "Subvenção"
 E a visita está como rascunho
 Quando João tenta editar a visita
 Então ele consegue abrir o formulário e salvar alterações
@@ -446,9 +448,15 @@ Dado que o diretor "Maria" é da mesma diretoria de João
 Quando Maria tenta editar a visita #123
 Então ela NÃO consegue editar (somente visualização)
 
-Dado que o agente "Pedro" é da mesma diretoria mas NÃO criou a visita #123
-Quando Pedro tenta acessar a visita #123
-Então ele NÃO vê a visita no seu dashboard (só vê as próprias)
+Dado que o agente "Pedro" é da mesma diretoria "Subvenção" mas NÃO criou a visita #123
+Quando Pedro acessa a visita #123
+Então ele VÊ a visita no seu dashboard e CONSEGUE editar/salvar (regra nova 2026-08-19,
+     só em Subvenção/Emendas e Fundos — em qualquer outra diretoria, incluindo "Outros",
+     Pedro não veria nem acessaria a visita de João)
+
+Dado que a visita #124 na diretoria "Subvenção" foi criada por um usuário admin
+Quando o agente "Pedro" (mesma diretoria) tenta acessar a visita #124
+Então ele NÃO vê nem acessa (admin não conta como "um agente" pra essa regra)
 
 Dado que o admin "Carlos" acessa a diretoria
 Quando Carlos tenta editar qualquer visita
@@ -502,3 +510,4 @@ E a visita é válida e funcional
 | 2026-07-25 | Navegação de abas do dashboard corrigida para allowlist, não redirect externo | Com o recuo do redirect pra `visit-list` (ver primeira entrada desta data), a restrição de abas virou: `MonitoramentoHomeView` calcula `dashboard_tab` com allowlist `{"visits", "reports"}` (só `{"visits"}` pra Outros) pra quem não é admin — qualquer `?tab=` fora disso (incluindo o default `overview`) cai em `visits`; `home.html` esconde os links de "Cadastrar OSC"/"Plano de Trabalho" via novo `is_admin_user` no contexto |
 | 2026-08-02 | Nova seção A.5-B: estrutura de campos do Relatório Final/Parecer Conclusivo diverge entre Subvenção e Emendas e Fundos | Usuário confirmou que a produção original (app Next.js legado) teve mudanças nos itens desses 2 formulários só pra Subvenção (removeu campo "Recurso"/`emenda`, adicionou seção de Conclusão separada) — Emendas e Fundos mantém a estrutura antiga. `report_form.html`/`VisitReportView` atualizados para renderizar/validar/salvar os campos certos por tipo de diretoria (`is_subvencao`) |
 | 2026-08-02 | Sincronização de dados do Supabase de produção (visits, oscs, work_plans, form_delegations, e várias tabelas de relatório por diretoria) pro banco de dev local | Ver seção "Migração Supabase → PostgreSQL puro (status)" do CLAUDE.md pra detalhes do processo incremental usado (sem reset, comparando IDs pra preservar dado local-only) |
+| 2026-08-19 | A.6 estendido: em Subvenção/Emendas e Fundos (não em "Outros"), agente vê e edita as visitas de outros agentes da mesma diretoria (não só as próprias/delegadas), exceto as criadas por admin | Pedido explícito do usuário: "somente em monitoramento, no caso em emendas e fundos e subvenção, as visitas criadas por um agente da mesma diretoria, pode ser visto e editado por outros agentes da mesma diretoria (semelhante ao que o Diretor vê)". Diferente do Diretor (só leitura em visita alheia), o agente ganha edição completa. Implementado via `is_subvencao_directorate()` em `VisitAccessMixin`, `VisitListView`, `MonitoringReportListView` (`apps/directorates/views.py`) e `MonitoramentoHomeView` (`apps/monitoramento/views.py`); coberto por testes novos em `apps/directorates/tests.py` (`VisitAccessMixinSubvencaoPeerTests`) e `apps/monitoramento/tests.py` (`MonitoramentoAgentePeerVisibilityTests`) |
