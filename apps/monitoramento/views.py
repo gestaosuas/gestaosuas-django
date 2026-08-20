@@ -151,11 +151,15 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
             else:
                 # Mesma regra de VisitListView/MonitoringReportListView: em
                 # Subvencao/Emendas e Fundos, agente ve as visitas de outros
-                # agentes da mesma diretoria tambem (2026-08-19).
+                # agentes da mesma diretoria tambem (2026-08-19), mas visita
+                # delegada continua visivel mesmo se admin-criada (fix
+                # 2026-08-20 - ver apps/directorates/views.py VisitListView
+                # pro detalhe do bug: a exclusao de admin escondia o caso
+                # mais comum de delegacao, admin cria e delega pra agente).
+                delegated_visit_ids = FormDelegation.objects.filter(user_id=self.request.user.id).values_list("visit_id", flat=True)
                 if is_subvencao_directorate(directorate):
-                    dashboard_visits_qs = dashboard_visits_qs.exclude(user_id__in=get_admin_user_ids())
+                    dashboard_visits_qs = dashboard_visits_qs.filter(Q(id__in=delegated_visit_ids) | ~Q(user_id__in=get_admin_user_ids()))
                 else:
-                    delegated_visit_ids = FormDelegation.objects.filter(user_id=self.request.user.id).values_list("visit_id", flat=True)
                     dashboard_visits_qs = dashboard_visits_qs.filter(Q(user_id=self.request.user.id) | Q(id__in=delegated_visit_ids))
 
         all_visits = list(dashboard_visits_qs)

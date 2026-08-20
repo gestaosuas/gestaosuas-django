@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from apps.accounts.models import Profile, ProfileDirectorate, User
-from apps.directorates.models import Directorate, Osc, Visit
+from apps.directorates.models import Directorate, FormDelegation, Osc, Visit
 
 
 def make_directorate(name=None):
@@ -247,6 +247,24 @@ class MonitoramentoAgentePeerVisibilityTests(TestCase):
         response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=visits")
         self.assertEqual(response.status_code, 200)
         self.assertNotIn(visit, response.context["dashboard_visits"])
+
+    def test_agente_sees_admin_created_visit_in_subvencao_when_delegated(self):
+        """Regressao real 2026-08-20: a exclusao do teste acima tinha virado
+        absoluta - nem uma FormDelegation explicita conseguia furar ela,
+        quebrando o caso de uso mais comum de delegacao (admin cria a visita
+        e delega pra um agente preencher). Reportado pelo usuario em producao
+        ("tentamos delegar a um agente, mas parece que nao funcionou")."""
+        directorate = make_directorate(name=f"Subvenção Teste {uuid.uuid4().hex[:8]}")
+        admin, _ = make_user(password=self.password, role=Profile.ROLE_ADMIN)
+        visit = make_visit(directorate, user=admin)
+        agente, _ = make_user(password=self.password, role="agente", primary_directorate=directorate)
+        FormDelegation.objects.create(
+            id=uuid.uuid4(), visit=visit, user_id=agente.pk, delegated_by=admin.pk,
+        )
+        self.client.login(username=agente.username, password=self.password)
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=visits")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(visit, response.context["dashboard_visits"])
 
     def test_agente_can_edit_coworkers_visit_in_subvencao(self):
         """Diferente do diretor (so leitura em visita alheia), agente ganha

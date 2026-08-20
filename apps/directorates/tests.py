@@ -470,6 +470,37 @@ class VisitAccessMixinSubvencaoPeerTests(DirectoratesTestBase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(visit, response.context["visits"])
 
+    def test_agente_sees_admin_created_visit_when_delegated(self):
+        """Regressao real 2026-08-20: a exclusao de visitas admin-criadas
+        (test_agente_still_denied_for_admin_created_visit acima) tinha virado
+        absoluta - nem uma delegacao explicita (FormDelegation) conseguia
+        furar ela, quebrando o caso de uso mais comum de delegacao (admin cria
+        a visita e delega pra um agente preencher). Reportado pelo usuario em
+        producao ("tentamos delegar a um agente, mas parece que nao
+        funcionou")."""
+        admin = make_user(role="admin")
+        visit = self.make_visit(user=admin)
+        agente = make_user(role="agente", primary_directorate=self.directorate)
+        FormDelegation.objects.create(
+            id=uuid.uuid4(), visit=visit, user_id=agente.pk, delegated_by=admin.pk,
+        )
+        self.client.force_login(agente)
+
+        list_response = self.client.get(
+            reverse("directorates:visit-list", kwargs={"pk": self.directorate.pk})
+        )
+        self.assertIn(visit, list_response.context["visits"])
+
+        report_response = self.client.get(
+            reverse("directorates:report-list", kwargs={"pk": self.directorate.pk})
+        )
+        self.assertIn(visit, report_response.context["visits"])
+
+        access_response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
+        )
+        self.assertEqual(access_response.status_code, 200)
+
 
 class OscCrudTests(DirectoratesTestBase):
     def test_osc_create_view_forbidden_for_diretor_and_agente(self):
@@ -769,23 +800,30 @@ class VisitFlowTests(DirectoratesTestBase):
 
 
 class VisitDelegateViewTests(DirectoratesTestBase):
+    """Ator trocado de diretor pra admin nestes testes (2026-08-20) - estavam
+    desatualizados desde o commit 191e915 (2026-08-16), que restringiu
+    VisitDelegateView.dispatch() de "admin ou diretor" pra admin-only; os
+    testes que esperavam 302 pra um diretor delegando estavam falhando
+    silenciosamente há um mês (confirmado rodando a suite antes desta
+    correção)."""
+
     def test_delegate_to_users_creates_form_delegations(self):
         visit = self.make_visit()
-        owner = make_user(role="diretor", primary_directorate=self.directorate)
+        admin = make_user(role="admin")
         target_user = make_user(role="agente", primary_directorate=self.directorate)
-        self.client.force_login(owner)
+        self.client.force_login(admin)
         url = reverse("directorates:visit-delegate", kwargs={"pk": visit.pk})
         response = self.client.post(url, {"user_ids": [str(target_user.pk)]})
         self.assertEqual(response.status_code, 302)
         delegation = FormDelegation.objects.get(visit=visit, user_id=target_user.pk)
-        self.assertEqual(delegation.delegated_by, owner.pk)
+        self.assertEqual(delegation.delegated_by, admin.pk)
 
     def test_delegate_replaces_previous_delegations(self):
         visit = self.make_visit()
-        owner = make_user(role="diretor", primary_directorate=self.directorate)
+        admin = make_user(role="admin")
         first_target = make_user(role="agente", primary_directorate=self.directorate)
         second_target = make_user(role="agente", primary_directorate=self.directorate)
-        self.client.force_login(owner)
+        self.client.force_login(admin)
         url = reverse("directorates:visit-delegate", kwargs={"pk": visit.pk})
 
         self.client.post(url, {"user_ids": [str(first_target.pk)]})
@@ -796,20 +834,22 @@ class VisitDelegateViewTests(DirectoratesTestBase):
         self.assertEqual(delegations.count(), 1)
         self.assertEqual(delegations.first().user_id, second_target.pk)
 
-    def test_delegate_denied_for_user_without_directorate_access(self):
-        """role=diretor pra isolar a checagem de diretoria (o role check do
-        VisitDelegateView roda antes e bloquearia um agente de qualquer jeito
-        - ver test_delegate_denied_for_agente_role abaixo)."""
+    def test_delegate_denied_for_diretor_role(self):
+        """VisitDelegateView (2026-08-16): delegar virou admin-only - antes
+        diretor tambem podia, agora nao pode mais, mesmo sendo diretor da
+        mesma diretoria da visita (acesso a diretoria nao é o que bloqueia
+        aqui - é o papel)."""
         visit = self.make_visit()
-        outsider = make_user(role="diretor", primary_directorate=self.other_directorate)
-        self.client.force_login(outsider)
+        diretor = make_user(role="diretor", primary_directorate=self.directorate)
+        self.client.force_login(diretor)
         url = reverse("directorates:visit-delegate", kwargs={"pk": visit.pk})
-        response = self.client.post(url, {"user_ids": []}, follow=False)
-        self.assertRedirects(response, reverse("core:landing"), fetch_redirect_response=False)
+        response = self.client.post(url, {"user_ids": []})
+        self.assertEqual(response.status_code, 403)
 
     def test_delegate_denied_for_agente_role(self):
-        """VisitDelegateView (2026-07-25): so admin/diretor podem delegar,
-        mesmo um agente com acesso normal a diretoria nao pode."""
+        """VisitDelegateView (2026-07-25, reforçado 2026-08-16): só admin
+        pode delegar, mesmo um agente com acesso normal à diretoria não
+        pode."""
         visit = self.make_visit()
         agente = make_user(role="agente", primary_directorate=self.directorate)
         self.client.force_login(agente)

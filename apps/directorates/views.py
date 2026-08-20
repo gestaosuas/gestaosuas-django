@@ -957,11 +957,15 @@ class VisitListView(DirectorateScopedMixin, ListView):
                 # Agente sees own + delegated visits; em Subvencao/Emendas e
                 # Fundos, tambem ve as de outros agentes da mesma diretoria
                 # (pedido explicito 2026-08-19, exceto as feitas por admin -
-                # mesma exclusao usada pro diretor).
+                # mesma exclusao usada pro diretor). Visita delegada continua
+                # visivel mesmo se foi o admin quem criou (bug real
+                # 2026-08-20: a exclusao de admin escondia justamente o caso
+                # mais comum - admin cria a visita e delega pra um agente
+                # preencher - fazendo a delegacao parecer que "nao funciona").
+                delegated_visit_ids = FormDelegation.objects.filter(user_id=self.request.user.id).values_list('visit_id', flat=True)
                 if is_subvencao_directorate(self.get_directorate()):
-                    qs = qs.exclude(user_id__in=get_admin_user_ids())
+                    qs = qs.filter(Q(id__in=delegated_visit_ids) | ~Q(user_id__in=get_admin_user_ids()))
                 else:
-                    delegated_visit_ids = FormDelegation.objects.filter(user_id=self.request.user.id).values_list('visit_id', flat=True)
                     qs = qs.filter(Q(user_id=self.request.user.id) | Q(id__in=delegated_visit_ids))
         # ----------------------------
 
@@ -1290,11 +1294,13 @@ class MonitoringReportListView(DirectorateScopedMixin, ListView):
             else:
                 # Mesma regra de VisitListView: em Subvencao/Emendas e Fundos,
                 # agente ve os relatorios/pareceres de outros agentes da
-                # mesma diretoria tambem (2026-08-19).
+                # mesma diretoria tambem (2026-08-19), mas visita delegada
+                # continua visivel mesmo se admin-criada (fix 2026-08-20,
+                # ver VisitListView.get_queryset acima pro detalhe do bug).
+                delegated_visit_ids = FormDelegation.objects.filter(user_id=self.request.user.id).values_list('visit_id', flat=True)
                 if is_subvencao_directorate(self.get_directorate()):
-                    qs = qs.exclude(user_id__in=get_admin_user_ids())
+                    qs = qs.filter(Q(id__in=delegated_visit_ids) | ~Q(user_id__in=get_admin_user_ids()))
                 else:
-                    delegated_visit_ids = FormDelegation.objects.filter(user_id=self.request.user.id).values_list('visit_id', flat=True)
                     qs = qs.filter(Q(user_id=self.request.user.id) | Q(id__in=delegated_visit_ids))
 
         # Bimester filter persistence
