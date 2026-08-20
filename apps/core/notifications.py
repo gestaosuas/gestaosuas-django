@@ -4,6 +4,8 @@ ACTION_VERBS = {
     "created": "enviou",
     "updated": "editou",
     "finalized": "finalizou",
+    "deactivated": "excluiu",
+    "reactivated": "reativou",
 }
 
 

@@ -243,3 +243,38 @@ class UserPermissionsView(AdminRequiredMixin, UpdateView):
             return self.form_valid(form)
         else:
             return self.form_invalid(form)
+
+
+class UserDeactivateView(AdminRequiredMixin, View):
+    """"Excluir usuário" (pedido do usuário, 2026-08-20) é soft-delete: marca
+    User.is_active=False, o que já bloqueia login (ModelBackend do Django
+    filtra usuário inativo em authenticate()). Nunca hard-delete — a maioria
+    das tabelas de relatório/visita referencia user_id como UUID solto (sem
+    FK, managed=False), então apagar o User de vez deixaria autoria de
+    histórico real como "Desconhecido" pra sempre, sem poder reverter."""
+
+    def post(self, request, pk):
+        profile = get_object_or_404(Profile, pk=pk)
+        if str(profile.user_id) == str(request.user.id):
+            messages.error(request, "Você não pode excluir sua própria conta.")
+            return redirect("accounts:user_list")
+        profile.user.is_active = False
+        profile.user.save(update_fields=["is_active"])
+        log_activity(request, None, "deactivated", "user", f"Usuário {profile.full_name}",
+                     url=reverse("accounts:user_list"))
+        messages.success(request, f"Usuário {profile.full_name} excluído com sucesso.")
+        return redirect("accounts:user_list")
+
+
+class UserReactivateView(AdminRequiredMixin, View):
+    """Contraparte de UserDeactivateView — como a exclusão é soft-delete, um
+    admin precisa conseguir reverter um usuário excluído por engano."""
+
+    def post(self, request, pk):
+        profile = get_object_or_404(Profile, pk=pk)
+        profile.user.is_active = True
+        profile.user.save(update_fields=["is_active"])
+        log_activity(request, None, "reactivated", "user", f"Usuário {profile.full_name}",
+                     url=reverse("accounts:user_list"))
+        messages.success(request, f"Usuário {profile.full_name} reativado com sucesso.")
+        return redirect("accounts:user_list")

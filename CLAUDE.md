@@ -485,6 +485,17 @@ A partir de 2026-07-21, os formulários de violação do CREAS foram estratifica
 
 ---
 
+## Excluir usuário (admin-only, soft-delete) — 2026-08-20
+
+Pedido explícito do usuário: opção de remover um usuário, restrita a admin, com alerta de confirmação de exclusão via o modal do próprio sistema (não `confirm()` nativo do navegador). Antes de implementar, o usuário confirmou explicitamente que a exclusão deve ser **soft-delete** (desativar), não hard-delete — a maioria das tabelas de relatório/visita (`visits.user_id`, `cras_reports.user_id`, `form_delegations.delegated_by`, etc.) referencia o usuário como `UUIDField` solto, sem FK (`managed=False`), então apagar o `User` de vez faria toda autoria histórica virar "Desconhecido" pra sempre, sem poder reverter.
+
+- **`UserDeactivateView`/`UserReactivateView`** (`apps/accounts/views.py`, `AdminRequiredMixin`, só POST): setam `User.is_active = False`/`True`. O `ModelBackend` nativo do Django já bloqueia login de usuário inativo em `authenticate()` — nenhuma mudança extra precisou ser feita no fluxo de login. Auto-exclusão bloqueada no servidor (`str(profile.user_id) == str(request.user.id)` → `messages.error`, sem tocar no banco) — é a checagem autoritativa; o botão "Excluir" também some da própria linha do admin logado no template (`{% if profile.pk != request.user.profile.pk %}`), mas só como UX, não como segurança (se `request.user.profile` não existir por algum motivo, o `{% if %}` falha aberto/mostra o botão, mas o POST ainda seria bloqueado no servidor).
+- **`apps/core/notifications.py`**: `ACTION_VERBS` ganhou `"deactivated": "excluiu"` e `"reactivated": "reativou"` (antes só existiam `created`/`updated`/`finalized`) — sem isso, o sino de notificação mostraria "Fulano **editou** Usuário Ciclana" pra uma exclusão, o que lia mal.
+- **`templates/accounts/user_list.html`**: nova coluna "Status" (badge verde "Ativo" / cinza "Excluído"), botão "Excluir" (vermelho, ícone `user-x`) que abre um modal de confirmação com o nome do usuário interpolado via JS (mesmo padrão `openXModal(url, nome)` já usado no modal "Delegar Visita" de monitoramento), e botão "Reativar" (sem confirmação — ação reversível, não destrutiva) pra quem já está excluído. O par `.modal-overlay`/`.modal-content` é definido localmente no `<style>` da própria página (replicando o padrão de `beneficios/form.html`/`cras/form.html`, 2026-08-13) — **não** existe global em `app.css`, então não copiar essas classes achando que já existem em algum outro lugar sem checar (foi exatamente esse tipo de suposição que causou o bug do modal "Delegar Visita" usando classes Tailwind inexistentes em 2026-08-17).
+- Testado via Django test client (`apps/accounts/tests.py::UserDeactivateReactivateViewTests`: admin-only, bloqueia auto-exclusão, usuário desativado não loga mais, reativação restaura login, notificação gerada, badge/botão certos no HTML) **e** com navegador real (login como admin temporário, abrir modal, confirmar exclusão, checar badge "Excluído" + botão "Reativar" aparecendo, reativar, checar volta pra "Ativo", captura de tela confirmando estilo do modal idêntico ao padrão do sistema, botão "Excluir" ausente na própria linha do admin logado) — contas de teste criadas e removidas do banco de dev na mesma sessão, sem deixar resíduo.
+
+---
+
 ## Débito Técnico Conhecido
 
 | # | Problema | Impacto | Prioridade |

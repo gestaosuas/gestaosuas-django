@@ -571,3 +571,121 @@ class UserPermissionsViewTests(TestCase):
             },
         )
         self.assertFalse(ProfileDirectorate.objects.filter(profile=self.target_profile).exists())
+
+
+class UserDeactivateReactivateViewTests(TestCase):
+    """"Excluir usuário" (2026-08-20, pedido explícito do usuário): soft-delete
+    via User.is_active=False, admin-only, com reversão (UserReactivateView)."""
+
+    def setUp(self):
+        self.password = "senha12345"
+        self.admin_email = f"admin-{uuid.uuid4().hex[:8]}@example.com"
+        self.admin_user, self.admin_profile = make_user(
+            email=self.admin_email, password=self.password, role=Profile.ROLE_ADMIN
+        )
+        self.regular_email = f"regular-{uuid.uuid4().hex[:8]}@example.com"
+        self.regular_user, self.regular_profile = make_user(
+            email=self.regular_email, password=self.password, role=Profile.ROLE_USER
+        )
+        self.target_email = f"target-{uuid.uuid4().hex[:8]}@example.com"
+        self.target_user, self.target_profile = make_user(
+            email=self.target_email, password=self.password, full_name="Alvo Exclusao"
+        )
+
+    def _login_admin(self):
+        self.client.login(username=self.admin_email, password=self.password)
+
+    def _deactivate_url(self, profile=None):
+        return reverse("accounts:user_deactivate", kwargs={"pk": (profile or self.target_profile).pk})
+
+    def _reactivate_url(self, profile=None):
+        return reverse("accounts:user_reactivate", kwargs={"pk": (profile or self.target_profile).pk})
+
+    def test_anonymous_cannot_deactivate(self):
+        response = self.client.post(self._deactivate_url())
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("accounts:login"), response.url)
+        self.target_user.refresh_from_db()
+        self.assertTrue(self.target_user.is_active)
+
+    def test_non_admin_cannot_deactivate(self):
+        self.client.login(username=self.regular_email, password=self.password)
+        response = self.client.post(self._deactivate_url())
+        self.assertIn(response.status_code, (302, 403))
+        self.target_user.refresh_from_db()
+        self.assertTrue(self.target_user.is_active)
+
+    def test_admin_deactivates_user(self):
+        self._login_admin()
+        response = self.client.post(self._deactivate_url())
+        self.assertRedirects(response, reverse("accounts:user_list"))
+        self.target_user.refresh_from_db()
+        self.assertFalse(self.target_user.is_active)
+
+    def test_deactivated_user_cannot_login(self):
+        self._login_admin()
+        self.client.post(self._deactivate_url())
+        self.client.logout()
+        response = self.client.post(
+            reverse("accounts:login"),
+            {"username": self.target_email, "password": self.password},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(self.client.session.get("_auth_user_id"))
+
+    def test_admin_cannot_deactivate_own_account(self):
+        self._login_admin()
+        response = self.client.post(self._deactivate_url(self.admin_profile), follow=True)
+        self.admin_user.refresh_from_db()
+        self.assertTrue(self.admin_user.is_active)
+        messages_followed = list(response.context["messages"])
+        self.assertTrue(any("própria conta" in str(m) for m in messages_followed))
+
+    def test_admin_reactivates_deactivated_user(self):
+        self._login_admin()
+        self.client.post(self._deactivate_url())
+        self.target_user.refresh_from_db()
+        self.assertFalse(self.target_user.is_active)
+
+        response = self.client.post(self._reactivate_url())
+        self.assertRedirects(response, reverse("accounts:user_list"))
+        self.target_user.refresh_from_db()
+        self.assertTrue(self.target_user.is_active)
+
+    def test_reactivated_user_can_login_again(self):
+        self._login_admin()
+        self.client.post(self._deactivate_url())
+        self.client.post(self._reactivate_url())
+        self.client.logout()
+        response = self.client.post(
+            reverse("accounts:login"),
+            {"username": self.target_email, "password": self.password},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(str(self.client.session.get("_auth_user_id")), str(self.target_user.pk))
+
+    def test_non_admin_cannot_reactivate(self):
+        self._login_admin()
+        self.client.post(self._deactivate_url())
+        self.client.logout()
+        self.client.login(username=self.regular_email, password=self.password)
+        response = self.client.post(self._reactivate_url())
+        self.assertIn(response.status_code, (302, 403))
+        self.target_user.refresh_from_db()
+        self.assertFalse(self.target_user.is_active)
+
+    def test_deactivate_generates_notification(self):
+        self._login_admin()
+        self.client.post(self._deactivate_url())
+        response = self.client.get(reverse("core:notifications-unread"))
+        data = response.json()
+        messages_text = " ".join(item["message"] for item in data["items"])
+        self.assertIn("excluiu", messages_text)
+        self.assertIn("Alvo Exclusao", messages_text)
+
+    def test_user_list_shows_status_badge_for_inactive_user(self):
+        self._login_admin()
+        self.client.post(self._deactivate_url())
+        response = self.client.get(reverse("accounts:user_list"))
+        self.assertContains(response, "Excluído")
+        self.assertContains(response, "Reativar")
