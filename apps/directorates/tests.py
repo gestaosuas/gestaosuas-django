@@ -857,6 +857,52 @@ class VisitDelegateViewTests(DirectoratesTestBase):
         response = self.client.post(url, {"user_ids": []})
         self.assertEqual(response.status_code, 403)
 
+    def test_delegate_success_shows_confirmation_message(self):
+        """Pedido explicito do usuario 2026-08-24 (testado em Emendas e
+        Fundos, mas a view e compartilhada por Subvencao/Emendas/Outros): a
+        view nunca dava nenhum feedback - so um redirect silencioso - entao
+        o admin nao tinha como saber se a delegacao funcionou."""
+        visit = self.make_visit()
+        admin = make_user(role="admin")
+        target_user = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(admin)
+        url = reverse("directorates:visit-delegate", kwargs={"pk": visit.pk})
+        response = self.client.post(url, {"user_ids": [str(target_user.pk)]}, follow=True)
+        messages_followed = list(response.context["messages"])
+        self.assertTrue(any("delegada com sucesso" in str(m) for m in messages_followed))
+        self.assertTrue(any(m.tags == "success" for m in messages_followed))
+
+    def test_delegate_with_no_users_selected_shows_removal_message(self):
+        """Selecionar nenhum usuario e enviar e um jeito valido de LIMPAR as
+        delegacoes existentes (comportamento pre-existente da view) - nao e
+        uma falha, entao a mensagem e distinta de erro."""
+        visit = self.make_visit()
+        admin = make_user(role="admin")
+        target_user = make_user(role="agente", primary_directorate=self.directorate)
+        FormDelegation.objects.create(id=uuid.uuid4(), visit=visit, user_id=target_user.pk, delegated_by=admin.pk)
+        self.client.force_login(admin)
+        url = reverse("directorates:visit-delegate", kwargs={"pk": visit.pk})
+        response = self.client.post(url, {"user_ids": []}, follow=True)
+        messages_followed = list(response.context["messages"])
+        self.assertTrue(any("removidas" in str(m) for m in messages_followed))
+        self.assertTrue(any(m.tags == "success" for m in messages_followed))
+        self.assertFalse(FormDelegation.objects.filter(visit=visit).exists())
+
+    def test_delegate_with_nonexistent_user_id_shows_error_and_does_not_delegate(self):
+        """UUID que nao corresponde a nenhum Profile real (ex.: POST
+        adulterado) - a view detecta e reporta falha, sem criar uma
+        FormDelegation fantasma apontando pra ninguem."""
+        visit = self.make_visit()
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        url = reverse("directorates:visit-delegate", kwargs={"pk": visit.pk})
+        fake_id = str(uuid.uuid4())
+        response = self.client.post(url, {"user_ids": [fake_id]}, follow=True)
+        messages_followed = list(response.context["messages"])
+        self.assertTrue(any("não foi possível" in str(m).lower() for m in messages_followed))
+        self.assertTrue(any(m.tags == "error" for m in messages_followed))
+        self.assertFalse(FormDelegation.objects.filter(visit=visit).exists())
+
 
 @override_settings(STORAGES=STATIC_TEST_STORAGES)
 class DirectorateDetailViewRedirectTests(TestCase):

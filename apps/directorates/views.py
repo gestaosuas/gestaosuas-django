@@ -2,7 +2,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
-from django.db import OperationalError, ProgrammingError
+from django.db import DatabaseError, OperationalError, ProgrammingError, transaction
 from django.db.models import Count, Q, Sum
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views import View
@@ -1036,20 +1036,46 @@ class VisitDelegateView(VisitScopedMixin, View):
         return super().dispatch(request, *args, **kwargs)
 
     def post(self, request, pk):
+        """Aviso de sucesso/falha (2026-08-24, pedido explicito do usuario):
+        antes essa view nunca dava nenhum feedback - so um redirect silencioso
+        - entao um admin nao tinha como saber se a delegacao realmente
+        funcionou. Valida os IDs marcados contra Profile de verdade (protege
+        contra um POST adulterado com um UUID que nao corresponde a ninguem)
+        e envolve a troca em uma transacao, pra nunca deixar a visita sem
+        NENHUMA delegacao se o passo de recriacao falhar no meio."""
         visit = self.get_scoped_object()
-        user_ids = request.POST.getlist("user_ids")
+        submitted_ids = request.POST.getlist("user_ids")
 
-        # Clear existing
-        FormDelegation.objects.filter(visit=visit).delete()
+        valid_profiles = list(Profile.objects.filter(pk__in=submitted_ids)) if submitted_ids else []
+        valid_ids = {str(profile.pk) for profile in valid_profiles}
+        invalid_ids = [uid for uid in submitted_ids if uid not in valid_ids]
 
-        # Add Users
-        for uid in user_ids:
-            FormDelegation.objects.create(
-                id=uuid.uuid4(),
-                visit=visit,
-                user_id=uid,
-                delegated_by=request.user.id
-            )
+        if submitted_ids and not valid_profiles:
+            messages.error(request, "Não foi possível delegar a visita: nenhum dos usuários selecionados foi encontrado.")
+            return redirect(get_visit_list_redirect(visit.directorate))
+
+        try:
+            with transaction.atomic():
+                FormDelegation.objects.filter(visit=visit).delete()
+                for profile in valid_profiles:
+                    FormDelegation.objects.create(
+                        id=uuid.uuid4(),
+                        visit=visit,
+                        user_id=profile.pk,
+                        delegated_by=request.user.id,
+                    )
+        except DatabaseError:
+            logger.exception("Falha ao salvar delegacao da visita %s", visit.pk)
+            messages.error(request, "Ocorreu um erro ao delegar a visita. Tente novamente.")
+            return redirect(get_visit_list_redirect(visit.directorate))
+
+        if valid_profiles:
+            names = ", ".join(profile.display_name for profile in valid_profiles)
+            messages.success(request, f"Visita delegada com sucesso para: {names}.")
+        else:
+            messages.success(request, "Delegações removidas desta visita.")
+        if invalid_ids:
+            messages.error(request, "Alguns usuários selecionados não foram encontrados e não foram delegados.")
 
         return redirect(get_visit_list_redirect(visit.directorate))
 

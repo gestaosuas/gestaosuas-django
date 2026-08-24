@@ -496,6 +496,18 @@ Pedido explícito do usuário: opção de remover um usuário, restrita a admin,
 
 ---
 
+## Aviso de sucesso/falha ao delegar visita — 2026-08-24
+
+Pedido explícito do usuário, testado em Emendas e Fundos (a view é compartilhada por Subvenção/Emendas/Outros, então o fix vale pra qualquer uma): "quando eu clicar como admin delegar e selecionar um usuário, ele deve dizer se foi delegado com sucesso ou se deu falha". `VisitDelegateView.post()` (`apps/directorates/views.py`) nunca dava nenhum feedback antes — só um `redirect` silencioso após deletar+recriar os `FormDelegation` — então um admin não tinha como saber se a delegação realmente funcionou (gap já identificado na investigação do bug de 2026-08-20, mas fora de escopo naquele momento).
+
+- Os IDs marcados no modal agora são validados contra `Profile` de verdade antes de gravar (`Profile.objects.filter(pk__in=submitted_ids)`) — protege contra um POST adulterado com um UUID que não corresponde a ninguém; se nenhum dos IDs enviados for válido, a view nem chega a apagar as delegações existentes, só reporta erro (`messages.error`) e retorna.
+- O delete+recreate roda dentro de `transaction.atomic()` — se a recriação falhar no meio (`DatabaseError`), a visita nunca fica sem NENHUMA delegação por causa de uma falha parcial; o erro é logado (`logger.exception`) e reportado via `messages.error`.
+- Sucesso mostra quem recebeu a delegação pelo nome (`"Visita delegada com sucesso para: {nomes}."`); enviar o formulário sem nenhum técnico marcado é o jeito já existente de **limpar** as delegações de uma visita (comportamento pré-existente, não é falha) — vira uma mensagem de sucesso distinta ("Delegações removidas desta visita.").
+- Nenhuma mudança de template/JS foi necessária — `messages.success`/`messages.error` já renderizam como toast global em qualquer página via `templates/base.html` (`#globalToastStack`), então o aviso aparece automaticamente após o redirect que a view já fazia.
+- Testado via Django test client (`apps/directorates/tests.py::VisitDelegateViewTests` — sucesso com nome do delegado, limpar delegações mostra mensagem de remoção, UUID inexistente reporta erro e não cria `FormDelegation` fantasma) e com navegador real numa diretoria "Emendas e Fundos" de verdade (login admin temporário, abrir "Instrumental de Visita", clicar no ícone "Delegar" de um card, marcar um técnico, salvar, capturar o toast verde "Sucesso — Visita delegada com sucesso para: ..." na tela) — dados de teste (visita/OSC/usuários) criados e removidos do banco de dev na mesma sessão.
+
+---
+
 ## Débito Técnico Conhecido
 
 | # | Problema | Impacto | Prioridade |
