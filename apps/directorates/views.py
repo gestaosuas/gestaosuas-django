@@ -136,6 +136,20 @@ def build_registered_by_map(visits):
     return {profile.user_id: get_user_display_name(profile.user) for profile in profiles}
 
 
+def build_delegation_map(visits):
+    """{visit_id: [user_id, ...]} de FormDelegation - usado pra pre-marcar o
+    modal "Delegar Visita" com quem ja esta habilitado numa visita (2026-08-24,
+    pedido explicito do usuario: "a lista de delegar mostre quem esta
+    habilitado, para ao desmarcar, revogar o acesso de quem esta marcado")."""
+    visit_ids = [v.pk for v in visits]
+    if not visit_ids:
+        return {}
+    delegation_map = {}
+    for visit_id, user_id in FormDelegation.objects.filter(visit_id__in=visit_ids).values_list("visit_id", "user_id"):
+        delegation_map.setdefault(visit_id, []).append(user_id)
+    return delegation_map
+
+
 def title_name(value):
     return " ".join(part.capitalize() for part in str(value or "").split())
 
@@ -995,6 +1009,7 @@ class VisitListView(DirectorateScopedMixin, ListView):
         context["show_reports_nav"] = is_subvencao_directorate(directorate)
         context["is_emendas"] = is_emendas_directorate(directorate)
         registered_by_map = build_registered_by_map(context["visits"])
+        delegation_map = build_delegation_map(context["visits"])
         for visit in context["visits"]:
             identificacao = visit.identificacao or {}
             visit.registered_by_name = (
@@ -1009,6 +1024,8 @@ class VisitListView(DirectorateScopedMixin, ListView):
             visit.is_subvencao = is_subvencao_directorate(visit.directorate)
             relatorio = visit.parecer_tecnico or {}
             visit.relatorio_status = relatorio.get("status") if isinstance(relatorio, dict) else None
+            visit.delegated_user_ids_str = ",".join(str(uid) for uid in delegation_map.get(visit.pk, []))
+            visit.is_delegated = bool(delegation_map.get(visit.pk))
         context["profiles"] = Profile.objects.all().order_by("full_name")
         context["all_directorates"] = Directorate.objects.all().order_by("name")
         context["years_range"] = range(2023, datetime.now().year + 1)
@@ -1350,6 +1367,10 @@ class MonitoringReportListView(DirectorateScopedMixin, ListView):
         profile = getattr(self.request.user, 'profile', None)
         context["is_admin_user"] = self.request.user.is_superuser or (profile and profile.role == 'admin')
         context["profiles"] = Profile.objects.all().order_by("full_name")
+        delegation_map = build_delegation_map(context["visits"])
+        for visit in context["visits"]:
+            visit.delegated_user_ids_str = ",".join(str(uid) for uid in delegation_map.get(visit.pk, []))
+            visit.is_delegated = bool(delegation_map.get(visit.pk))
         return context
 
 class VisitReportView(VisitAccessMixin, DetailView):

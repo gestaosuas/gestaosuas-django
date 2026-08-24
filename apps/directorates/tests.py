@@ -904,6 +904,79 @@ class VisitDelegateViewTests(DirectoratesTestBase):
         self.assertFalse(FormDelegation.objects.filter(visit=visit).exists())
 
 
+class VisitDelegationContextDataTests(DirectoratesTestBase):
+    """2026-08-24, pedido explicito do usuario: "ao delegar, a lista de
+    delegar [deve] mostrar quem esta habilitado, para ao desmarcar, revogar
+    o acesso" + "crie no card algum icone pequeno indicando que aquela
+    visita esta delegada". VisitDelegateView.post() ja suportava revogar
+    (delete+recreate a partir do que estiver marcado) - o que faltava era o
+    contexto pra pre-marcar os checkboxes/mostrar o indicador. Cobre os 2
+    pontos que alimentam o template: `visit.delegated_user_ids_str` (usado
+    pelo JS pra marcar os checkboxes) e `visit.is_delegated` (usado pro
+    icone no card)."""
+
+    def test_visit_list_context_flags_delegated_visit(self):
+        visit = self.make_visit()
+        delegate = make_user(role="agente", primary_directorate=self.directorate)
+        FormDelegation.objects.create(id=uuid.uuid4(), visit=visit, user_id=delegate.pk, delegated_by=make_user(role="admin").pk)
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        response = self.client.get(reverse("directorates:visit-list", kwargs={"pk": self.directorate.pk}))
+        rendered_visit = next(v for v in response.context["visits"] if v.pk == visit.pk)
+        self.assertTrue(rendered_visit.is_delegated)
+        self.assertEqual(rendered_visit.delegated_user_ids_str, str(delegate.pk))
+        self.assertContains(response, "Delegada")
+
+    def test_visit_list_context_does_not_flag_non_delegated_visit(self):
+        visit = self.make_visit()
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        response = self.client.get(reverse("directorates:visit-list", kwargs={"pk": self.directorate.pk}))
+        rendered_visit = next(v for v in response.context["visits"] if v.pk == visit.pk)
+        self.assertFalse(rendered_visit.is_delegated)
+        self.assertEqual(rendered_visit.delegated_user_ids_str, "")
+
+    def test_visit_list_context_lists_multiple_delegated_ids(self):
+        visit = self.make_visit()
+        admin = make_user(role="admin")
+        first = make_user(role="agente", primary_directorate=self.directorate)
+        second = make_user(role="agente", primary_directorate=self.directorate)
+        FormDelegation.objects.create(id=uuid.uuid4(), visit=visit, user_id=first.pk, delegated_by=admin.pk)
+        FormDelegation.objects.create(id=uuid.uuid4(), visit=visit, user_id=second.pk, delegated_by=admin.pk)
+        self.client.force_login(admin)
+        response = self.client.get(reverse("directorates:visit-list", kwargs={"pk": self.directorate.pk}))
+        rendered_visit = next(v for v in response.context["visits"] if v.pk == visit.pk)
+        ids_in_str = set(rendered_visit.delegated_user_ids_str.split(","))
+        self.assertEqual(ids_in_str, {str(first.pk), str(second.pk)})
+
+    def test_report_list_context_flags_delegated_visit(self):
+        visit = self.make_visit()
+        visit.status = "finalized"
+        visit.save()
+        delegate = make_user(role="agente", primary_directorate=self.directorate)
+        admin = make_user(role="admin")
+        FormDelegation.objects.create(id=uuid.uuid4(), visit=visit, user_id=delegate.pk, delegated_by=admin.pk)
+        self.client.force_login(admin)
+        response = self.client.get(reverse("directorates:report-list", kwargs={"pk": self.directorate.pk}))
+        rendered_visit = next(v for v in response.context["visits"] if v.pk == visit.pk)
+        self.assertTrue(rendered_visit.is_delegated)
+        self.assertEqual(rendered_visit.delegated_user_ids_str, str(delegate.pk))
+
+    def test_unchecking_delegated_user_revokes_access(self):
+        """Comportamento ja existente (delete+recreate a partir do POST) -
+        confirma que desmarcar quem estava habilitado de fato revoga."""
+        visit = self.make_visit()
+        admin = make_user(role="admin")
+        delegate = make_user(role="agente", primary_directorate=self.directorate)
+        FormDelegation.objects.create(id=uuid.uuid4(), visit=visit, user_id=delegate.pk, delegated_by=admin.pk)
+        self.client.force_login(admin)
+        url = reverse("directorates:visit-delegate", kwargs={"pk": visit.pk})
+        response = self.client.post(url, {"user_ids": []}, follow=True)
+        self.assertFalse(FormDelegation.objects.filter(visit=visit, user_id=delegate.pk).exists())
+        messages_followed = list(response.context["messages"])
+        self.assertTrue(any("removidas" in str(m) for m in messages_followed))
+
+
 @override_settings(STORAGES=STATIC_TEST_STORAGES)
 class DirectorateDetailViewRedirectTests(TestCase):
     """DirectorateDetailView.get() nunca renderiza a própria página: sempre

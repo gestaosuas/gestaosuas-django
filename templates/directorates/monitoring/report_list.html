@@ -74,6 +74,12 @@
                             <span>{{ visit.assinaturas.tecnico1_nome }}</span>
                         </div>
                         {% endif %}
+                        {% if visit.is_delegated %}
+                        <div class="report-tech-row visit-meta-delegated" title="Visita delegada a outro usuário">
+                            <i data-lucide="users-round"></i>
+                            <span>Delegada</span>
+                        </div>
+                        {% endif %}
                     </div>
 
                     <div class="report-card-actions">
@@ -125,7 +131,7 @@
 
                         {# Delegar ── #}
                         <button type="button" class="report-action-btn btn-slate-light"
-                                onclick="openDelegateModal('{{ visit.pk }}', '{{ visit.osc.name }}')">
+                                onclick="openDelegateModal('{{ visit.pk }}', '{{ visit.osc.name|escapejs }}', '{{ visit.delegated_user_ids_str }}')">
                             <i data-lucide="users-round"></i>
                             Delegar
                         </button>
@@ -228,10 +234,14 @@
 </div>
 
 <script>
-    function openDelegateModal(visitId, oscName) {
+    function openDelegateModal(visitId, oscName, delegatedIdsStr) {
         document.getElementById('delegateOscName').innerText = 'Delegando visita à: ' + oscName;
         document.getElementById('delegateForm').action = `/directorias/visitas/${visitId}/delegar/`;
         document.getElementById('delegateForm').reset();
+        var delegatedIds = delegatedIdsStr ? delegatedIdsStr.split(',') : [];
+        document.querySelectorAll('#delegateForm .delegate-tech-item input[type="checkbox"]').forEach(function (cb) {
+            cb.checked = delegatedIds.indexOf(cb.value) !== -1;
+        });
         var searchInput = document.getElementById('delegateSearchInput');
         if (searchInput) filterDelegateTechs(searchInput);
         document.getElementById('delegateModal').style.display = 'flex';
@@ -491,6 +501,8 @@ function filterCards() {
 
 .report-date-row, .report-tech-row, .report-plan-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #64748b; font-weight: 500; margin-bottom: 3px; }
 .report-date-row i, .report-tech-row i, .report-plan-row i { width: 13px; height: 13px; color: #94a3b8; }
+.visit-meta-delegated { color: #4338ca; font-weight: 800; text-transform: uppercase; font-size: 10px; letter-spacing: .02em; }
+.visit-meta-delegated i { color: #4338ca; }
 .report-plan-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .report-card-actions { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }

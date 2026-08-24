@@ -18,6 +18,7 @@ from apps.core.notifications import log_activity
 from apps.directorates.models import Directorate, FormDelegation, MonthlyReport, Osc, Visit, WorkPlan
 from apps.directorates.forms import OscForm
 from apps.directorates.views import (
+    build_delegation_map,
     build_registered_by_map,
     get_admin_user_ids,
     get_monitoramento_theme,
@@ -164,6 +165,7 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
 
         all_visits = list(dashboard_visits_qs)
         registered_by_map = build_registered_by_map(all_visits)
+        delegation_map = build_delegation_map(all_visits)
         for visit in all_visits:
             identificacao = visit.identificacao or {}
             visit.registered_by_name = (
@@ -177,6 +179,8 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
             visit.tecnico2_display = title_name(assinaturas.get("tecnico2_nome", ""))
             relatorio = visit.parecer_tecnico or {}
             visit.relatorio_status = relatorio.get("status") if isinstance(relatorio, dict) else None
+            visit.delegated_user_ids_str = ",".join(str(uid) for uid in delegation_map.get(visit.pk, []))
+            visit.is_delegated = bool(delegation_map.get(visit.pk))
 
         _total_visits = len(stats_visits)
         _finalized_visits = len([v for v in stats_visits if v.status in ["completed", "finalized"]])

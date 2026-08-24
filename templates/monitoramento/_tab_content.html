@@ -265,6 +265,11 @@
                                         {{ visit.tecnico1_display }}{% if visit.assinaturas.tecnico1_nome and visit.assinaturas.tecnico2_nome %}, {% endif %}{{ visit.tecnico2_display }}
                                     {% else %}<span class="inline-muted">Técnicos não informados</span>{% endif %}
                                 </span>
+                                {% if visit.is_delegated %}
+                                <span class="visit-meta-row visit-meta-delegated" title="Visita delegada a outro usuário">
+                                    <i data-lucide="users-round"></i> Delegada
+                                </span>
+                                {% endif %}
                             </div>
                             <div class="visit-card-footer">
                                 <div class="inline-doc-icons">
@@ -297,7 +302,7 @@
                                     </form>
                                     {% endif %}
 
-                                    <button type="button" class="inline-revert-action" onclick="openDelegateModal('{{ visit.pk }}', '{{ visit.osc.name }}')" title="Delegar">
+                                    <button type="button" class="inline-revert-action" onclick="openDelegateModal('{{ visit.pk }}', '{{ visit.osc.name|escapejs }}', '{{ visit.delegated_user_ids_str }}')" title="Delegar">
                                         <i data-lucide="users-round"></i>
                                     </button>
 
@@ -567,6 +572,12 @@
                                 <span>{{ visit.assinaturas.tecnico1_nome }}</span>
                             </div>
                             {% endif %}
+                            {% if visit.is_delegated %}
+                            <div class="report-tech-row visit-meta-delegated" title="Visita delegada a outro usuário">
+                                <i data-lucide="users-round"></i>
+                                <span>Delegada</span>
+                            </div>
+                            {% endif %}
                         </div>
                         <div class="report-card-actions">
                             <a href="{% url 'directorates:visit-report' visit.pk 'relatorio_final' %}" class="report-action-btn {% if visit.relatorio_final.status == 'finalized' %}btn-green{% elif visit.relatorio_final.status == 'draft' %}btn-amber{% else %}btn-neutral{% endif %}">
@@ -581,7 +592,7 @@
                                 <i data-lucide="clipboard-list"></i> Instrumental
                             </a>
                             {% if is_admin_user %}
-                            <button type="button" class="report-action-btn btn-slate-light" onclick="openDelegateModal('{{ visit.pk }}', '{{ visit.osc.name }}')">
+                            <button type="button" class="report-action-btn btn-slate-light" onclick="openDelegateModal('{{ visit.pk }}', '{{ visit.osc.name|escapejs }}', '{{ visit.delegated_user_ids_str }}')">
                                 <i data-lucide="users-round"></i> Delegar
                             </button>
                             {% endif %}
@@ -871,10 +882,14 @@
 </div>
 
 <script>
-    function openDelegateModal(visitId, oscName) {
+    function openDelegateModal(visitId, oscName, delegatedIdsStr) {
         document.getElementById('delegateOscName').innerText = 'Delegando visita à: ' + oscName;
         document.getElementById('delegateForm').action = `/directorias/visitas/${visitId}/delegar/`;
         document.getElementById('delegateForm').reset();
+        var delegatedIds = delegatedIdsStr ? delegatedIdsStr.split(',') : [];
+        document.querySelectorAll('#delegateForm .delegate-tech-item input[type="checkbox"]').forEach(function (cb) {
+            cb.checked = delegatedIds.indexOf(cb.value) !== -1;
+        });
         var searchInput = document.getElementById('delegateSearchInput');
         if (searchInput) filterDelegateTechs(searchInput);
         document.getElementById('delegateModal').style.display = 'flex';
