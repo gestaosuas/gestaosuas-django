@@ -2796,7 +2796,15 @@ body.dashboard-fit-vh .metrics-stack {
 .monitoring-main-card::-webkit-scrollbar-track { background: #f1f5f9; }
 .monitoring-main-card::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 
-@media (min-width: 1025px) {
+/* Precisa ficar em 1920px, junto com os 2 blocos irmãos em
+   partials/navbar.html (2026-08-24) - essa regra só faz sentido enquanto o
+   navbar realmente estiver no modo desktop `position:absolute` (que some do
+   fluxo normal do documento e por isso exige essa compensação de
+   padding-top); nos dois breakpoints desencontrados, paginas na faixa
+   1025-1919px ganhavam ~80px de respiro a mais em cima de um navbar sticky
+   que já reserva o próprio espaço - so cosmetico (espaco em branco extra),
+   mas sem motivo pra existir com os blocos irmaos ja movidos. */
+@media (min-width: 1920px) {
     .dashboard-main:not(.cras-main):not(.beneficios-main) {
         padding-top: 80px;
     }

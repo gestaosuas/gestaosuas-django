@@ -67,8 +67,10 @@
        SINE-CP) que ja compensam a navbar (position:absolute no desktop) via
        espacamento interno. Esta pagina nao tem banner, entao precisa
        reafirmar o padding-top aqui (mesmo padrao de accounts/user_list.html)
-       - senao o titulo fica escondido atras da navbar em telas >=1025px. */
-    @media (min-width: 1025px) {
+       - senao o titulo fica escondido atras da navbar em telas >=1920px
+       (breakpoint movido de 1025px pra 1920px em 2026-08-24, junto com
+       partials/navbar.html - ver comentario la para o motivo). */
+    @media (min-width: 1920px) {
         .dashboard-main {
             padding-top: 80px !important;
         }

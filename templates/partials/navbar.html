@@ -226,8 +226,29 @@
     .user-avatar-mini { display: none; }
     .mobile-profile-card { display: none; }
 
-    /* Otimização para Tablets e Mobile */
-    @media (max-width: 1024px) {
+    /* Otimização para Tablets e Mobile (2026-08-24: breakpoint estendido de
+       1024px para 1919px - o menu desktop (.nav-main) tem largura de
+       conteudo fixa (~1905px, nao encolhe de verdade porque falta
+       min-width:0 no flex item) e ficava com 700-800px de overflow
+       horizontal em QUALQUER largura entre 1025px e ~1904px, faixa que
+       cobre exatamente paisagem de tablet (iPad ~1024-1194px, a maioria
+       dos Android landscape 1080-1200px) - reportado pelo usuario como
+       "tela trêmula" em 2 tablets reais em produção, testado/confirmado
+       via medicao direta em navegador (getBoundingClientRect), nao só
+       leitura de CSS. Sem breakpoint proprio pra esse intervalo quebrado,
+       a correção mais segura foi estender o menu mobile/hamburguer -
+       caminho de codigo ja existente e testado - em vez de tentar fazer o
+       menu desktop encolher de verdade (decisão explicita do usuário,
+       ciente de que isso muda a navbar tambem em notebooks/desktops
+       menores que 1920px, nao só tablets). O navbar (mobile e desktop) é
+       sempre `position: sticky`, nunca `fixed` — ocupa espaço no fluxo
+       normal do documento nos dois modos, então paginas que reservam
+       espaço extra pro navbar via `.dashboard-main { padding-top: 80px }`
+       (`app.css`, regra em `@media (min-width: 1920px)`, não movida junto)
+       só ganham um respiro a mais nesse intervalo, sem conteúdo escondido
+       atrás do navbar - confirmado visualmente em várias páginas antes de
+       fechar essa mudança. */
+    @media (max-width: 1919px) {
         .navbar {
             padding: 0 16px;
             background: white !important;
@@ -465,7 +486,16 @@
         }
     }
 
-    @media (min-width: 1025px) {
+    /* Precisa andar junto com o breakpoint do bloco mobile acima (2026-08-24:
+       1919px) - eram os dois "1025px" originais, cada um controlando metade
+       do mesmo liga/desliga mobile-vs-desktop (aqui: esconde o botao
+       hamburguer e troca o navbar pro modo transparente/absoluto que
+       flutua sobre o banner colorido das paginas com header proprio). Ficar
+       destravado do outro bloco reproduz exatamente o bug historico ja
+       documentado nesse arquivo (duas regras pro mesmo breakpoint
+       divergindo com o tempo) - só que dessa vez escondendo o botao de
+       menu inteiro em vez de só um detalhe visual. */
+    @media (min-width: 1920px) {
         .mobile-toggle { display: none; }
         #main-navbar {
             background: transparent;
