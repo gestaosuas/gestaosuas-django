@@ -50,14 +50,14 @@
                                     <button type="button" class="plan-icon-btn" title="Visualizar plano" onclick="openPlanPreview('{{ osc.pk }}', '{{ plan.pk }}')">
                                         <i data-lucide="eye"></i>
                                     </button>
-                                    <button type="button" class="plan-icon-btn accent" title="Objeto e descrição dos objetivos"
+                                    <button type="button" class="plan-icon-btn accent" title="Descrição do plano"
                                         data-action="{% url 'directorates:plan-objectives' plan.pk %}"
                                         data-plan-title="{{ plan.title }}"
                                         data-objeto="{{ plan.objeto }}"
                                         data-objetivos="{{ plan.objetivos }}"
                                         data-metas="{{ plan.metas }}"
                                         data-atividades="{{ plan.atividades }}"
-                                        onclick="openPlanObjectives(this)">
+                                        onclick="openWorkPlanDescription(this)">
                                         <i data-lucide="list-checks"></i>
                                     </button>
                                     {% if can_delete %}
@@ -115,6 +115,16 @@
                             <button type="button" class="plan-icon-btn" title="Visualizar plano" onclick="openPlanPreview('{{ osc.pk }}')">
                                 <i data-lucide="eye"></i>
                             </button>
+                            <button type="button" class="plan-icon-btn accent" title="Descrição do plano"
+                                data-action="{% url 'directorates:plan-objectives' latest_plan.pk %}"
+                                data-plan-title="{{ latest_plan.title }}"
+                                data-objeto="{{ latest_plan.objeto }}"
+                                data-objetivos="{{ latest_plan.objetivos }}"
+                                data-metas="{{ latest_plan.metas }}"
+                                data-atividades="{{ latest_plan.atividades }}"
+                                onclick="openWorkPlanDescription(this)">
+                                <i data-lucide="list-checks"></i>
+                            </button>
                             {% if can_delete %}
                             <a href="{% url 'directorates:plan-update' latest_plan.pk %}" class="plan-icon-btn" title="Editar plano">
                                 <i data-lucide="pencil"></i>
@@ -148,9 +158,7 @@
     </main>
 </div>
 
-{% if is_emendas %}
-{% include "directorates/monitoring/partials/plan_objectives_modal.html" %}
-{% endif %}
+{% include "directorates/monitoring/partials/work_plan_description_modal.html" %}
 
 <div id="planPreviewModal" class="plan-preview-modal" style="display:none;">
     <div class="plan-preview-dialog">

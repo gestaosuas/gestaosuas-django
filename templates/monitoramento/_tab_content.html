@@ -373,14 +373,14 @@
                                             <button type="button" class="inline-plan-icon-btn" title="Visualizar plano" onclick="openInlinePlanPreview('{{ osc.pk }}', '{{ plan.pk }}')">
                                                 <i data-lucide="eye"></i>
                                             </button>
-                                            <button type="button" class="inline-plan-icon-btn is-accent" title="Objeto e descrição dos objetivos"
+                                            <button type="button" class="inline-plan-icon-btn is-accent" title="Descrição do plano"
                                                 data-action="{% url 'directorates:plan-objectives' plan.pk %}"
                                                 data-plan-title="{{ plan.title }}"
                                                 data-objeto="{{ plan.objeto }}"
                                                 data-objetivos="{{ plan.objetivos }}"
                                                 data-metas="{{ plan.metas }}"
                                                 data-atividades="{{ plan.atividades }}"
-                                                onclick="openPlanObjectives(this)">
+                                                onclick="openWorkPlanDescription(this)">
                                                 <i data-lucide="list-checks"></i>
                                             </button>
                                             <a href="{% url 'directorates:plan-update' plan.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dplans%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-plan-icon-btn" title="Editar plano">
@@ -429,6 +429,16 @@
                                     {% if latest_plan %}
                                     <button type="button" class="inline-plan-icon-btn" title="Visualizar plano" onclick="openInlinePlanPreview('{{ osc.pk }}')">
                                         <i data-lucide="eye"></i>
+                                    </button>
+                                    <button type="button" class="inline-plan-icon-btn is-accent" title="Descrição do plano"
+                                        data-action="{% url 'directorates:plan-objectives' latest_plan.pk %}"
+                                        data-plan-title="{{ latest_plan.title }}"
+                                        data-objeto="{{ latest_plan.objeto }}"
+                                        data-objetivos="{{ latest_plan.objetivos }}"
+                                        data-metas="{{ latest_plan.metas }}"
+                                        data-atividades="{{ latest_plan.atividades }}"
+                                        onclick="openWorkPlanDescription(this)">
+                                        <i data-lucide="list-checks"></i>
                                     </button>
                                     <a href="{% url 'directorates:plan-update' latest_plan.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dplans%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-plan-icon-btn" title="Editar plano">
                                         <i data-lucide="pencil"></i>
@@ -480,8 +490,7 @@
                 </div>
             </div>
 
-            {% if is_emendas or is_fundos %}
-            {% include "directorates/monitoring/partials/plan_objectives_modal.html" %}
+            {% include "directorates/monitoring/partials/work_plan_description_modal.html" %}
             <style>
                 .inline-plan-file-row {
                     display: flex;
@@ -529,7 +538,6 @@
                     background: #dbeafe;
                 }
             </style>
-            {% endif %}
             {% elif dashboard_tab == 'reports' %}
             <section class="subvention-inline-panel" id="subventionReportPanel">
                 <div class="inline-panel-header" style="display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 12px;">

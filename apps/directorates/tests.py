@@ -32,7 +32,7 @@ from django.urls import reverse
 
 from apps.accounts.models import Profile, ProfileDirectorate, User
 from apps.directorates.models import Directorate, FormDelegation, Osc, Visit, WorkPlan
-from apps.directorates.views import is_subvencao_directorate
+from apps.directorates.views import is_emendas_directorate, is_subvencao_directorate
 
 # WhiteNoise's CompressedManifestStaticFilesStorage (config/settings.py STORAGES)
 # exige que `collectstatic` já tenha rodado (manifesto staticfiles.json). Como os
@@ -1186,6 +1186,145 @@ class WorkPlanObjectivesAndVisitLinkTests(DirectoratesTestBase):
         response = self.client.get(url)
         report_data = response.context["report_data"]
         self.assertEqual(report_data["objeto_relatorio"], "Objeto da OSC")
+
+
+class WorkPlanDescriptionSubvencaoTests(DirectoratesTestBase):
+    """"Descrição do plano" (2026-08-24, pedido explícito do usuário,
+    inicialmente "Somente em Subvenção"): mesmo recurso que Emendas e Fundos
+    já tinha (WorkPlanObjectivesView salvando objeto/objetivos/metas/
+    atividades no plano, herdados pelo Relatório de Visita) - so que sem UI
+    nenhuma pra Subvenção preencher esses 4 campos. `self.directorate` (a
+    com mais OSCs no banco de dev real) já é confirmada "Subvenção" alhures
+    nesta suíte - usada diretamente aqui, com skip se isso mudar."""
+
+    def setUp(self):
+        if not is_subvencao_directorate(self.directorate) or is_emendas_directorate(self.directorate):
+            self.skipTest("A diretoria com mais OSCs no banco de teste não é mais Subvenção (sem ser Emendas).")
+
+    def _login_admin(self):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        return admin
+
+    def test_plan_list_shows_description_button_for_subvencao_plan(self):
+        """WorkPlanObjectivesView é reaproveitada sem mudança nenhuma - só a
+        UI (ícone/modal) é nova pra Subvenção."""
+        osc = self.make_osc()
+        plan = self.make_work_plan(osc=osc)
+        self._login_admin()
+        response = self.client.get(reverse("directorates:plan-list", kwargs={"pk": self.directorate.pk}))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("Descrição do plano", html)
+        self.assertIn("Descrição do plano de trabalho", html)
+        self.assertIn(f"openWorkPlanDescription(this)", html)
+        self.assertIn(reverse("directorates:plan-objectives", kwargs={"pk": plan.pk}), html)
+
+    def test_plan_objectives_post_saves_the_four_fields_for_subvencao(self):
+        osc = self.make_osc()
+        plan = self.make_work_plan(osc=osc)
+        self._login_admin()
+        url = reverse("directorates:plan-objectives", kwargs={"pk": plan.pk})
+        response = self.client.post(
+            url,
+            {
+                "objeto": "Objeto do plano Subvenção",
+                "objetivos": "Objetivos do plano Subvenção",
+                "metas": "Metas do plano Subvenção",
+                "atividades": "Atividades do plano Subvenção",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        plan.refresh_from_db()
+        self.assertEqual(plan.objeto, "Objeto do plano Subvenção")
+        self.assertEqual(plan.objetivos, "Objetivos do plano Subvenção")
+        self.assertEqual(plan.metas, "Metas do plano Subvenção")
+        self.assertEqual(plan.atividades, "Atividades do plano Subvenção")
+
+    def test_visita_relatorio_herda_os_4_campos_do_plano_da_osc(self):
+        """Fluxo completo pedido pelo usuário: preencher a "Descrição do
+        plano" e ver os mesmos 4 textos pré-preenchidos no Relatório de
+        Visita (parecer_tecnico) de uma visita daquela OSC."""
+        osc = self.make_osc()
+        osc.objeto = "Objeto da OSC (nao deveria aparecer)"
+        osc.save()
+        plan = self.make_work_plan(osc=osc)
+        plan.objeto = "Objeto do plano de trabalho"
+        plan.objetivos = "Objetivos do plano de trabalho"
+        plan.metas = "Metas estabelecidas do plano"
+        plan.atividades = "Atividades do plano"
+        plan.save()
+        visit = self.make_visit(osc=osc)
+        visit.work_plan = plan
+        visit.save()
+        self._login_admin()
+        url = reverse(
+            "directorates:visit-report",
+            kwargs={"pk": visit.pk, "report_type": "parecer_tecnico"},
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        report_data = response.context["report_data"]
+        self.assertEqual(report_data["objeto_relatorio"], "Objeto do plano de trabalho")
+        self.assertEqual(report_data["item2_a_objetivos"], "Objetivos do plano de trabalho")
+        self.assertEqual(report_data["item2_b_metas"], "Metas estabelecidas do plano")
+        self.assertEqual(report_data["item2_c_atividades"], "Atividades do plano")
+
+    def test_description_button_also_present_for_emendas_plan(self):
+        """Usuário testou o botão que Emendas já tinha ("Objeto e descrição
+        dos objetivos") e reportou que ele não abria nada em produção - não
+        foi possível reproduzir a causa raiz com dados de teste simples
+        (o modal antigo abria normalmente num plano novo/vazio), então em
+        vez de depurar um bug não-reproduzível, o pedido virou "implementar
+        esse campo em Emendas e Fundos também" com o MESMO modal novo,
+        substituindo o antigo por completo (plan_objectives_modal.html foi
+        removido do projeto)."""
+        emendas = Directorate.objects.filter(name__icontains="emenda").first()
+        if not emendas:
+            self.skipTest("Diretoria 'Emendas e Fundos' não encontrada no banco de teste.")
+        osc = self.make_osc(directorate=emendas)
+        plan = self.make_work_plan(osc=osc, directorate=emendas)
+        self._login_admin()
+        response = self.client.get(reverse("directorates:plan-list", kwargs={"pk": emendas.pk}))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("Descrição do plano", html)
+        self.assertIn("Descrição do plano de trabalho", html)
+        self.assertIn("openWorkPlanDescription(this)", html)
+        self.assertIn(reverse("directorates:plan-objectives", kwargs={"pk": plan.pk}), html)
+        self.assertNotIn("openPlanObjectives", html)
+        self.assertNotIn("Objeto e descrição dos objetivos", html)
+
+    def test_visita_relatorio_herda_os_4_campos_do_plano_para_emendas(self):
+        """Mesmo fluxo completo do teste de Subvenção acima, mas pra Emendas
+        e Fundos - confirma que unificar o modal não quebrou a herança já
+        existente (WorkPlanObjectivesView/get_visit_report_texts nunca
+        tiveram branch por diretoria, só a UI que disparava foi trocada)."""
+        emendas = Directorate.objects.filter(name__icontains="emenda").first()
+        if not emendas:
+            self.skipTest("Diretoria 'Emendas e Fundos' não encontrada no banco de teste.")
+        osc = self.make_osc(directorate=emendas)
+        plan = self.make_work_plan(osc=osc, directorate=emendas)
+        plan.objeto = "Objeto do plano Emendas"
+        plan.objetivos = "Objetivos do plano Emendas"
+        plan.metas = "Metas do plano Emendas"
+        plan.atividades = "Atividades do plano Emendas"
+        plan.save()
+        visit = self.make_visit(osc=osc, directorate=emendas)
+        visit.work_plan = plan
+        visit.save()
+        self._login_admin()
+        url = reverse(
+            "directorates:visit-report",
+            kwargs={"pk": visit.pk, "report_type": "parecer_tecnico"},
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        report_data = response.context["report_data"]
+        self.assertEqual(report_data["objeto_relatorio"], "Objeto do plano Emendas")
+        self.assertEqual(report_data["item2_a_objetivos"], "Objetivos do plano Emendas")
+        self.assertEqual(report_data["item2_b_metas"], "Metas do plano Emendas")
+        self.assertEqual(report_data["item2_c_atividades"], "Atividades do plano Emendas")
 
 
 @override_settings(STORAGES=STATIC_TEST_STORAGES)

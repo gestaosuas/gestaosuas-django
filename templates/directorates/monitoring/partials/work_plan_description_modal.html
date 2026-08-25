@@ -1,44 +1,58 @@
 {% comment %}
-Modal para editar os textos do plano de trabalho herdados pelo relatório de
-visita (Emendas e Fundos): Objeto do Relatório + A/B/C do item 2.
-Aberto por botões com onclick="openPlanObjectives(this)" carregando:
+Modal "Descrição do plano" (2026-08-24, pedido explícito do usuário):
+edita os 4 campos do plano de trabalho herdados pelo Relatório de Visita —
+objeto, objetivos, metas, atividades — reaproveitando a MESMA view
+(WorkPlanObjectivesView) sem nenhuma mudança de backend.
+
+Pedido inicial era só pra Subvenção (Emendas e Fundos já tinha um recurso
+equivalente, plan_objectives_modal.html, com rótulos legais "A) Dos
+Objetivos"/"B) Das Metas Estabelecidas"/"C) Das Atividades"). O usuário
+então relatou que o botão de Emendas existia mas não abria nada em
+produção - não foi possível reproduzir a causa raiz com dados de teste
+simples, então em vez de depurar um bug não-reproduzível, o pedido virou
+"implementar esse campo em Emendas e Fundos também" com ESTE modal (mais
+simples, sem prefixos A/B/C). plan_objectives_modal.html foi removido -
+este arquivo é o único modal de descrição de plano no projeto agora,
+compartilhado por Subvenção e Emendas e Fundos.
+
+Aberto por botões com onclick="openWorkPlanDescription(this)" carregando:
 data-action, data-plan-title, data-objeto, data-objetivos, data-metas, data-atividades.
 {% endcomment %}
-<div id="planObjectivesModal" class="plan-objectives-modal" style="display:none;">
+<div id="workPlanDescriptionModal" class="plan-objectives-modal" style="display:none;">
     <div class="plan-objectives-dialog">
-        <form method="post" id="planObjectivesForm">
+        <form method="post" id="workPlanDescriptionForm">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
             <div class="plan-objectives-header">
                 <div>
-                    <span class="plan-objectives-eyebrow">Objeto e descrição dos objetivos</span>
-                    <h3 id="planObjectivesTitle">Plano de trabalho</h3>
-                    <p class="plan-objectives-help">Estes textos são herdados pelo Relatório de Visita (Objeto do relatório e item 2 — A, B e C).</p>
+                    <span class="plan-objectives-eyebrow" id="workPlanDescriptionPlanTitle">Plano de trabalho</span>
+                    <h3>Descrição do plano de trabalho</h3>
+                    <p class="plan-objectives-help">Estes textos são herdados pelo Relatório de Visita (Objeto, Objetivos, Metas estabelecidas e Atividades).</p>
                 </div>
-                <button type="button" class="plan-objectives-close" onclick="closePlanObjectives()" aria-label="Fechar">
+                <button type="button" class="plan-objectives-close" onclick="closeWorkPlanDescription()" aria-label="Fechar">
                     <i data-lucide="x"></i>
                 </button>
             </div>
             <div class="plan-objectives-body">
                 <div class="plan-objectives-field">
-                    <label for="planObjetoInput">Objeto do Relatório</label>
-                    <textarea id="planObjetoInput" name="objeto" rows="4"></textarea>
+                    <label for="workPlanObjetoInput">Objeto</label>
+                    <textarea id="workPlanObjetoInput" name="objeto" rows="4"></textarea>
                 </div>
                 <div class="plan-objectives-field">
-                    <label for="planObjetivosInput">A) Dos Objetivos</label>
-                    <textarea id="planObjetivosInput" name="objetivos" rows="4"></textarea>
+                    <label for="workPlanObjetivosInput">Objetivos</label>
+                    <textarea id="workPlanObjetivosInput" name="objetivos" rows="4"></textarea>
                 </div>
                 <div class="plan-objectives-field">
-                    <label for="planMetasInput">B) Das Metas Estabelecidas</label>
-                    <textarea id="planMetasInput" name="metas" rows="4"></textarea>
+                    <label for="workPlanMetasInput">Metas estabelecidas</label>
+                    <textarea id="workPlanMetasInput" name="metas" rows="4"></textarea>
                 </div>
                 <div class="plan-objectives-field">
-                    <label for="planAtividadesInput">C) Das Atividades</label>
-                    <textarea id="planAtividadesInput" name="atividades" rows="4"></textarea>
+                    <label for="workPlanAtividadesInput">Atividades</label>
+                    <textarea id="workPlanAtividadesInput" name="atividades" rows="4"></textarea>
                 </div>
             </div>
             <div class="plan-objectives-actions">
-                <button type="button" class="plan-objectives-cancel" onclick="closePlanObjectives()">Cancelar</button>
+                <button type="button" class="plan-objectives-cancel" onclick="closeWorkPlanDescription()">Cancelar</button>
                 <button type="submit" class="plan-objectives-save"><i data-lucide="check"></i> Salvar</button>
             </div>
         </form>
@@ -46,33 +60,40 @@ data-action, data-plan-title, data-objeto, data-objetivos, data-metas, data-ativ
 </div>
 
 <script>
-function openPlanObjectives(button) {
-    var modal = document.getElementById("planObjectivesModal");
-    var form = document.getElementById("planObjectivesForm");
+function openWorkPlanDescription(button) {
+    var modal = document.getElementById("workPlanDescriptionModal");
+    var form = document.getElementById("workPlanDescriptionForm");
     form.action = button.dataset.action;
-    document.getElementById("planObjectivesTitle").textContent = button.dataset.planTitle || "Plano de trabalho";
-    document.getElementById("planObjetoInput").value = button.dataset.objeto || "";
-    document.getElementById("planObjetivosInput").value = button.dataset.objetivos || "";
-    document.getElementById("planMetasInput").value = button.dataset.metas || "";
-    document.getElementById("planAtividadesInput").value = button.dataset.atividades || "";
+    document.getElementById("workPlanDescriptionPlanTitle").textContent = button.dataset.planTitle || "Plano de trabalho";
+    document.getElementById("workPlanObjetoInput").value = button.dataset.objeto || "";
+    document.getElementById("workPlanObjetivosInput").value = button.dataset.objetivos || "";
+    document.getElementById("workPlanMetasInput").value = button.dataset.metas || "";
+    document.getElementById("workPlanAtividadesInput").value = button.dataset.atividades || "";
     modal.style.display = "flex";
     document.body.classList.add("modal-open");
     if (window.lucide) { lucide.createIcons(); }
 }
 
-function closePlanObjectives() {
-    document.getElementById("planObjectivesModal").style.display = "none";
+function closeWorkPlanDescription() {
+    document.getElementById("workPlanDescriptionModal").style.display = "none";
     document.body.classList.remove("modal-open");
 }
 
-document.getElementById("planObjectivesModal").addEventListener("click", function(event) {
-    if (event.target.id === "planObjectivesModal") {
-        closePlanObjectives();
+document.getElementById("workPlanDescriptionModal").addEventListener("click", function(event) {
+    if (event.target.id === "workPlanDescriptionModal") {
+        closeWorkPlanDescription();
     }
 });
 </script>
 
 <style>
+    /* Classes .plan-objectives-* NAO existem em app.css nem em nenhum outro
+       lugar global - so estao definidas dentro de plan_objectives_modal.html
+       (modal irmao de Emendas), que so e incluido quando is_emendas=true.
+       Como este partial e incluido pro caso contrario (Subvencao), precisa
+       da propria copia do CSS - senao o modal abriria sem estilo nenhum
+       (mesma classe de bug ja documentada neste projeto: assumir que CSS
+       "deve existir em algum lugar" sem checar). */
     .plan-objectives-modal {
         position: fixed;
         inset: 0;

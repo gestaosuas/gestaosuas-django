@@ -1138,7 +1138,10 @@ class WorkPlanListView(DirectorateScopedMixin, ListView):
 
 class WorkPlanObjectivesView(WorkPlanScopedMixin, View):
     """Salva os textos do plano herdados pelo relatório de visita
-    (Emendas e Fundos): objeto, objetivos, metas e atividades."""
+    (Emendas e Fundos, e desde 2026-08-24 também Subvenção via o icone
+    "Descrição do plano"): objeto, objetivos, metas e atividades. View
+    generica, sem branch por tipo de diretoria - so o gatilho na UI
+    (icone/modal) difere entre as duas."""
 
     def post(self, request, pk):
         plan = self.get_scoped_object()
