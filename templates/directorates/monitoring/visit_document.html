@@ -106,6 +106,12 @@
                     <span>Total / Mês</span>
                     <p><strong>{{ object.atendimento.total_mes|default:0 }}</strong></p>
                 </div>
+                {% if object.atendimento.lista_espera == 'sim' %}
+                <div class="visit-doc-card">
+                    <span>Lista de Espera</span>
+                    <p><strong>{{ object.atendimento.lista_espera_quantidade|default:0 }}</strong> pessoas</p>
+                </div>
+                {% endif %}
                 <div class="visit-doc-card">
                     <span>Capacidade Subvencionada</span>
                     <p>{% if object.osc.subsidized_count == -1 %}Conforme Demanda{% else %}{{ object.osc.subsidized_count|default:0 }} usuários{% endif %}</p>

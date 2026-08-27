@@ -977,6 +977,173 @@ class VisitDelegationContextDataTests(DirectoratesTestBase):
         self.assertTrue(any("removidas" in str(m) for m in messages_followed))
 
 
+class VisitRevertViewTests(DirectoratesTestBase):
+    """2026-08-27, bug real reportado pelo usuário: reverter o Instrumental
+    de Visita voltava só `visit.status` pra rascunho, nunca
+    `parecer_tecnico['status']` (Relatório de Visita) - se o Relatório de
+    Visita já tinha sido finalizado antes do revert, ao finalizar o
+    Instrumental de novo ele reaparecia direto como finalizado (estado
+    velho preservado), em vez de voltar como rascunho e só liberar de novo
+    quando o Instrumental for finalizado (regra normal, já garantida pela
+    UI que esconde o Relatório de Visita enquanto visit.status != finalized)."""
+
+    def _login_admin(self):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        return admin
+
+    def test_revert_resets_parecer_tecnico_status_to_draft(self):
+        visit = self.make_visit()
+        visit.status = "finalized"
+        visit.parecer_tecnico = {"status": "finalized", "objeto_relatorio": "Texto já digitado"}
+        visit.save()
+        self._login_admin()
+        response = self.client.post(reverse("directorates:visit-revert", kwargs={"pk": visit.pk}))
+        self.assertEqual(response.status_code, 302)
+        visit.refresh_from_db()
+        self.assertEqual(visit.status, "draft")
+        self.assertEqual(visit.parecer_tecnico["status"], "draft")
+        # Conteúdo já digitado não pode ser apagado, só o status regride.
+        self.assertEqual(visit.parecer_tecnico["objeto_relatorio"], "Texto já digitado")
+
+    def test_revert_does_not_crash_when_parecer_tecnico_never_started(self):
+        visit = self.make_visit()
+        visit.status = "finalized"
+        visit.save()
+        self._login_admin()
+        response = self.client.post(reverse("directorates:visit-revert", kwargs={"pk": visit.pk}))
+        self.assertEqual(response.status_code, 302)
+        visit.refresh_from_db()
+        self.assertEqual(visit.status, "draft")
+        self.assertFalse(visit.parecer_tecnico)
+
+    def test_revert_still_admin_only(self):
+        visit = self.make_visit()
+        visit.status = "finalized"
+        visit.save()
+        agente = make_user(role="agente", primary_directorate=self.directorate)
+        self.client.force_login(agente)
+        response = self.client.post(reverse("directorates:visit-revert", kwargs={"pk": visit.pk}))
+        self.assertEqual(response.status_code, 403)
+        visit.refresh_from_db()
+        self.assertEqual(visit.status, "finalized")
+
+
+class VisitDocumentWaitingListTests(DirectoratesTestBase):
+    """2026-08-27, bug real reportado pelo usuário (Emendas e Fundos, mas a
+    view/template são compartilhadas com Subvenção): a quantidade de "Lista
+    de Espera" aparecia no formulário enquanto a visita era rascunho, mas
+    sumia do documento/PDF final depois de finalizar - o template do
+    documento (visit_document.html) e o PDF (pdf_documents.py) nunca
+    tinham essa linha na tabela "II. Dados de Atendimento", só o formulário
+    de edição (visit_instrumental.html) mostrava."""
+
+    def _login_admin(self):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        return admin
+
+    def _make_finalized_visit_with_waiting_list(self, lista_espera="sim", quantidade=7):
+        visit = self.make_visit()
+        visit.status = "finalized"
+        visit.atendimento = {
+            "presentes": {"manha": 10, "tarde": 8, "total": 18},
+            "total_mes": 40,
+            "lista_espera": lista_espera,
+            "lista_espera_quantidade": quantidade,
+        }
+        visit.save()
+        return visit
+
+    def test_document_shows_waiting_list_quantity_when_marked_yes(self):
+        visit = self._make_finalized_visit_with_waiting_list(lista_espera="sim", quantidade=7)
+        self._login_admin()
+        response = self.client.get(reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("Lista de Espera", html)
+        self.assertIn("7", html)
+
+    def test_document_hides_waiting_list_card_when_marked_no(self):
+        visit = self._make_finalized_visit_with_waiting_list(lista_espera="nao", quantidade=0)
+        self._login_admin()
+        response = self.client.get(reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertNotIn("Lista de Espera", html)
+
+    def test_pdf_export_shows_waiting_list_quantity(self):
+        import fitz
+
+        visit = self._make_finalized_visit_with_waiting_list(lista_espera="sim", quantidade=12)
+        self._login_admin()
+        response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}) + "?export=pdf"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        pdf = fitz.open(stream=response.content, filetype="pdf")
+        text = "".join(page.get_text() for page in pdf)
+        pdf.close()
+        self.assertIn("Lista de Espera", text)
+        self.assertIn("12", text)
+
+
+class VisitCardRegisteredByDirectorateTests(DirectoratesTestBase):
+    """2026-08-27, pedido explícito do usuário: nos cards de visita de
+    Subvenção/Emendas e Fundos, mostrar de qual diretoria é o perfil de
+    quem registrou aquela visita - "isso vai servir só para controle de
+    quem é administrador" (admin-only, não aparece pra diretor/agente)."""
+
+    def _login_admin(self):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        return admin
+
+    def test_admin_sees_creator_directorate_on_visit_list_card(self):
+        other_directorate = self.other_directorate
+        owner = make_user(role="agente", primary_directorate=other_directorate)
+        visit = self.make_visit(user=owner)
+        self._login_admin()
+        response = self.client.get(reverse("directorates:visit-list", kwargs={"pk": self.directorate.pk}))
+        rendered_visit = next(v for v in response.context["visits"] if v.pk == visit.pk)
+        self.assertEqual(rendered_visit.registered_by_directorate, other_directorate.name)
+        self.assertContains(response, other_directorate.name)
+
+    def test_admin_sees_sem_diretoria_when_creator_has_no_primary_directorate(self):
+        owner = make_user(role="agente", primary_directorate=None)
+        visit = self.make_visit(user=owner)
+        self._login_admin()
+        response = self.client.get(reverse("directorates:visit-list", kwargs={"pk": self.directorate.pk}))
+        rendered_visit = next(v for v in response.context["visits"] if v.pk == visit.pk)
+        self.assertIsNone(rendered_visit.registered_by_directorate)
+        self.assertContains(response, "Sem diretoria")
+
+    def test_non_admin_does_not_see_directorate_pill(self):
+        """Checa o VALOR renderizado (nome da diretoria), não a classe CSS -
+        `.registered-by-directorate-pill` aparece sempre no <style> da
+        página, independente de is_admin_user, então checar a classe CSS
+        crua dava falso positivo."""
+        owner = make_user(role="agente", primary_directorate=self.other_directorate)
+        self.make_visit(user=owner)
+        diretor = make_user(role="diretor", primary_directorate=self.directorate)
+        self.client.force_login(diretor)
+        response = self.client.get(reverse("directorates:visit-list", kwargs={"pk": self.directorate.pk}))
+        self.assertNotIn(self.other_directorate.name, response.content.decode())
+        self.assertFalse(response.context["is_admin_user"])
+
+    def test_admin_sees_creator_directorate_on_monitoramento_dashboard(self):
+        owner = make_user(role="agente", primary_directorate=self.other_directorate)
+        visit = self.make_visit(user=owner)
+        self._login_admin()
+        response = self.client.get(
+            reverse("monitoramento:home", kwargs={"pk": self.directorate.pk}) + "?tab=visits"
+        )
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn(self.other_directorate.name, html)
+
+
 @override_settings(STORAGES=STATIC_TEST_STORAGES)
 class DirectorateDetailViewRedirectTests(TestCase):
     """DirectorateDetailView.get() nunca renderiza a própria página: sempre

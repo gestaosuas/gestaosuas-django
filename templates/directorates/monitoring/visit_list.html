@@ -99,6 +99,12 @@
                         <div class="registered-by-avatar">{{ visit.registered_by_name|first|default:"?" }}</div>
                         <span title="{{ visit.registered_by_name|title }}">{{ visit.registered_by_name|title }}</span>
                     </div>
+                    {% if is_admin_user %}
+                    <div class="registered-by-directorate-pill" title="Diretoria vinculada ao perfil de quem registrou esta visita">
+                        <i data-lucide="building-2"></i>
+                        <span>{{ visit.registered_by_directorate|default:"Sem diretoria" }}</span>
+                    </div>
+                    {% endif %}
                     {% if visit.is_delegated %}
                     <div class="delegated-pill" title="Visita delegada a outro usuário">
                         <i data-lucide="users-round"></i>
@@ -506,6 +512,14 @@
         text-transform: capitalize;
         overflow-wrap: break-word;
     }
+
+    .registered-by-directorate-pill {
+        display: inline-flex; align-items: center; gap: 5px;
+        max-width: 100%; margin-top: 4px;
+        color: #b45309; font-size: 9px; font-weight: 800;
+        text-transform: uppercase; letter-spacing: .02em;
+    }
+    .registered-by-directorate-pill i { width: 11px; height: 11px; flex-shrink: 0; stroke-width: 2.6px; }
 
     .visit-card-meta { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
     .visit-card-meta-row { display: flex; flex-direction: column; gap: 3px; min-width: 0; }

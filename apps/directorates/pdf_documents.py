@@ -150,14 +150,17 @@ def render_visit_document_pdf(context):
     presencas = f"Manhã: {presentes.get('manha', 0)} | Tarde: {presentes.get('tarde', 0)} | Total: {presentes.get('total', 0)}"
     subsidized = osc.subsidized_count
     capacidade = "Conforme Demanda" if subsidized == -1 else f"{subsidized or 0} usuários"
+    grid_rows = [
+        ("Horário de Funcionamento", horario),
+        ("Usuários Presentes", presencas),
+        ("Total / Mês", atendimento.get("total_mes", 0)),
+    ]
+    if atendimento.get("lista_espera") == "sim":
+        grid_rows.append(("Lista de Espera", f"{atendimento.get('lista_espera_quantidade', 0)} pessoas"))
+    grid_rows.append(("Capacidade Subvencionada", capacidade))
     grid_table = pdfmod.styled_table(
         ["Campo", "Valor"],
-        [
-            ("Horário de Funcionamento", horario),
-            ("Usuários Presentes", presencas),
-            ("Total / Mês", atendimento.get("total_mes", 0)),
-            ("Capacidade Subvencionada", capacidade),
-        ],
+        grid_rows,
         styles, col_widths=[55 * pdfmod.mm, None],
     )
     body_blocks = [grid_table]

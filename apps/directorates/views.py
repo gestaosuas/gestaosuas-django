@@ -136,6 +136,24 @@ def build_registered_by_map(visits):
     return {profile.user_id: get_user_display_name(profile.user) for profile in profiles}
 
 
+def build_registered_by_directorate_map(visits):
+    """{user_id: nome_da_diretoria_primaria} - usado pra mostrar, no card da
+    visita, de qual diretoria e o perfil de quem a criou (2026-08-27, pedido
+    explicito do usuario, admin-only: "configure para dizer de qual
+    diretoria e a pessoa que enviou aquela visita... isso vai servir so
+    para controle de quem e administrador"). Diferente de
+    build_registered_by_map (que resolve o NOME de quem registrou) - aqui e
+    a diretoria PRIMARIA do perfil, que pode nao bater com a diretoria da
+    propria visita (ex.: agente vinculado a mais de uma diretoria, ou visita
+    admin-criada sem diretoria primaria nenhuma - o helper retorna None
+    nesses casos, tratado como "Sem diretoria" no template)."""
+    user_ids = {v.user_id for v in visits if v.user_id}
+    if not user_ids:
+        return {}
+    profiles = Profile.objects.filter(user_id__in=user_ids).select_related("primary_directorate")
+    return {profile.user_id: profile.primary_directorate.name if profile.primary_directorate else None for profile in profiles}
+
+
 def build_delegation_map(visits):
     """{visit_id: [user_id, ...]} de FormDelegation - usado pra pre-marcar o
     modal "Delegar Visita" com quem ja esta habilitado numa visita (2026-08-24,
@@ -1009,6 +1027,7 @@ class VisitListView(DirectorateScopedMixin, ListView):
         context["show_reports_nav"] = is_subvencao_directorate(directorate)
         context["is_emendas"] = is_emendas_directorate(directorate)
         registered_by_map = build_registered_by_map(context["visits"])
+        registered_by_directorate_map = build_registered_by_directorate_map(context["visits"])
         delegation_map = build_delegation_map(context["visits"])
         for visit in context["visits"]:
             identificacao = visit.identificacao or {}
@@ -1026,6 +1045,7 @@ class VisitListView(DirectorateScopedMixin, ListView):
             visit.relatorio_status = relatorio.get("status") if isinstance(relatorio, dict) else None
             visit.delegated_user_ids_str = ",".join(str(uid) for uid in delegation_map.get(visit.pk, []))
             visit.is_delegated = bool(delegation_map.get(visit.pk))
+            visit.registered_by_directorate = registered_by_directorate_map.get(visit.user_id)
         context["profiles"] = Profile.objects.all().order_by("full_name")
         context["all_directorates"] = Directorate.objects.all().order_by("name")
         context["years_range"] = range(2023, datetime.now().year + 1)
@@ -2308,7 +2328,21 @@ class VisitDeleteDocumentView(VisitAccessMixin, View):
 class VisitRevertView(VisitScopedMixin, View):
     """Reverte o status (instrumental inteiro) para 'draft'. So admin
     (restrito 2026-08-16 - antes o dono, mesmo diretor/agente, tambem podia;
-    usuario pediu exclusividade admin, mesma regra do RevertReportView)."""
+    usuario pediu exclusividade admin, mesma regra do RevertReportView).
+
+    2026-08-27, bug real reportado pelo usuario: reverter so mexia em
+    visit.status, nunca em parecer_tecnico (Relatorio de Visita) - a UI ja
+    esconde o acesso ao Relatorio de Visita enquanto visit.status nao volta
+    a 'finalized' (ver visit_list.html/_tab_content.html, `visit.status !=
+    'finalized'` mostra so "Editar Instrumental"), mas se o parecer_tecnico
+    ja tinha sido finalizado ANTES do revert, ao finalizar o instrumental de
+    novo ele reaparecia direto como finalizado (estado antigo preservado),
+    em vez de voltar pra rascunho como o usuario esperava ("ao reverter, ele
+    tornara os 2 relatorios como rascunho, e o de visita so liberado quando
+    finalizar o primeiro seguindo a regra normalmente"). Corrigido resetando
+    parecer_tecnico['status'] junto, mesmo padrao ja usado por
+    RevertReportView pra relatorio_final/parecer_conclusivo - preserva o
+    CONTEUDO ja digitado no parecer_tecnico, so marca como rascunho de novo."""
 
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -2322,6 +2356,10 @@ class VisitRevertView(VisitScopedMixin, View):
     def post(self, request, pk):
         visit = self.get_scoped_object()
         visit.status = "draft"
+        parecer_tecnico = visit.parecer_tecnico
+        if isinstance(parecer_tecnico, dict) and parecer_tecnico.get("status"):
+            parecer_tecnico["status"] = "draft"
+            visit.parecer_tecnico = parecer_tecnico
         visit.save()
         next_url = request.POST.get("next") or request.GET.get("next")
         if next_url and next_url.startswith("/"):

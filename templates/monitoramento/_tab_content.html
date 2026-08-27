@@ -270,6 +270,11 @@
                                     <i data-lucide="users-round"></i> Delegada
                                 </span>
                                 {% endif %}
+                                {% if is_admin_user %}
+                                <span class="visit-meta-row visit-meta-directorate" title="Diretoria vinculada ao perfil de quem registrou esta visita">
+                                    <i data-lucide="building-2"></i> {{ visit.registered_by_directorate|default:"Sem diretoria" }}
+                                </span>
+                                {% endif %}
                             </div>
                             <div class="visit-card-footer">
                                 <div class="inline-doc-icons">
