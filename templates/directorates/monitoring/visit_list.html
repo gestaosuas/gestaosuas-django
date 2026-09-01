@@ -68,11 +68,24 @@
             <i data-lucide="search"></i>
             <input type="text" class="filter-input" placeholder="Filtrar por OSC..." id="osc-filter">
         </div>
+        {% if is_admin_user %}
+        <div class="visit-card-search visit-directorate-filter">
+            <i data-lucide="building-2"></i>
+            <select class="filter-input" id="registered-directorate-filter">
+                <option value="">Todas as diretorias</option>
+                {% for d in all_directorates %}
+                <option value="{{ d.name }}">{{ d.name }}</option>
+                {% endfor %}
+                <option value="Admin">Admin</option>
+                <option value="Sem diretoria">Sem diretoria</option>
+            </select>
+        </div>
+        {% endif %}
     </div>
 
     <div class="visit-cards-grid" id="visit-cards-grid">
         {% for visit in visits %}
-        <div class="visit-card" data-osc="{{ visit.osc.name|lower }}">
+        <div class="visit-card" data-osc="{{ visit.osc.name|lower }}" {% if is_admin_user %}data-registered-directorate="{{ visit.registered_by_directorate|default:'Sem diretoria' }}"{% endif %}>
             <div class="visit-card-top">
                 {% if visit.is_subvencao %}
                     {% if visit.status != 'completed' and visit.status != 'finalized' %}
@@ -309,18 +322,26 @@
         if (empty) empty.style.display = visibleCount === 0 ? '' : 'none';
     }
 
-    document.getElementById('osc-filter')?.addEventListener('input', function () {
-        var q = this.value.toLowerCase().trim();
+    function applyVisitCardFilters() {
+        var oscInput = document.getElementById('osc-filter');
+        var directorateSelect = document.getElementById('registered-directorate-filter');
+        var q = oscInput ? oscInput.value.toLowerCase().trim() : '';
+        var directorate = directorateSelect ? directorateSelect.value : '';
         var visible = 0;
         document.querySelectorAll('#visit-cards-grid .visit-card').forEach(function (card) {
-            var show = !q || (card.dataset.osc || '').includes(q);
+            var matchesOsc = !q || (card.dataset.osc || '').includes(q);
+            var matchesDirectorate = !directorate || card.dataset.registeredDirectorate === directorate;
+            var show = matchesOsc && matchesDirectorate;
             card.style.display = show ? '' : 'none';
             if (show) visible++;
         });
         var initialEmpty = document.getElementById('visit-cards-empty-initial');
         var searchEmpty = document.getElementById('visit-cards-empty-search');
-        if (searchEmpty) searchEmpty.style.display = (q && visible === 0 && !initialEmpty) ? 'block' : 'none';
-    });
+        if (searchEmpty) searchEmpty.style.display = ((q || directorate) && visible === 0 && !initialEmpty) ? 'block' : 'none';
+    }
+
+    document.getElementById('osc-filter')?.addEventListener('input', applyVisitCardFilters);
+    document.getElementById('registered-directorate-filter')?.addEventListener('change', applyVisitCardFilters);
 </script>
 
 <style>
@@ -409,6 +430,18 @@
         padding-left: 30px;
         font-size: 11px;
         border-radius: 999px;
+    }
+
+    .visit-directorate-filter {
+        width: 190px;
+        margin-left: 10px;
+    }
+
+    .visit-directorate-filter select.filter-input {
+        appearance: none;
+        -webkit-appearance: none;
+        background: #fff;
+        cursor: pointer;
     }
 
     .btn-nova-visita {

@@ -1167,6 +1167,64 @@ class VisitCardRegisteredByDirectorateTests(DirectoratesTestBase):
         self.assertIn(self.other_directorate.name, html)
 
 
+class VisitDirectorateFilterSelectTests(DirectoratesTestBase):
+    """2026-09-01, pedido explícito do usuário: um selectbox com todas as
+    diretorias nas páginas de Instrumental de Visita (Subvenção/Emendas e
+    Fundos), admin-only, pra filtrar os cards pela mesma "diretoria de quem
+    registrou" já exibida (entrada anterior de 2026-08-27). Filtro é 100%
+    client-side (JS lê `data-registered-directorate` de cada `.visit-card`)
+    - os testes aqui cobrem o que o Django efetivamente controla: o select
+    renderiza (ou não) e o atributo de dado só vaza no HTML pra quem tem
+    permissão de ver a informação."""
+
+    def _login_admin(self):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        return admin
+
+    def test_admin_sees_directorate_select_with_all_directorates(self):
+        self._login_admin()
+        response = self.client.get(reverse("directorates:visit-list", kwargs={"pk": self.directorate.pk}))
+        html = response.content.decode()
+        self.assertIn('id="registered-directorate-filter"', html)
+        self.assertIn(self.directorate.name, html)
+        self.assertIn(self.other_directorate.name, html)
+        self.assertIn('<option value="Admin">Admin</option>', html)
+        self.assertIn('<option value="Sem diretoria">Sem diretoria</option>', html)
+
+    def test_non_admin_does_not_see_directorate_select(self):
+        diretor = make_user(role="diretor", primary_directorate=self.directorate)
+        self.client.force_login(diretor)
+        response = self.client.get(reverse("directorates:visit-list", kwargs={"pk": self.directorate.pk}))
+        self.assertNotIn('id="registered-directorate-filter"', response.content.decode())
+
+    def test_card_carries_registered_directorate_data_attribute_for_admin(self):
+        owner = make_user(role="agente", primary_directorate=self.other_directorate)
+        self.make_visit(user=owner)
+        self._login_admin()
+        response = self.client.get(reverse("directorates:visit-list", kwargs={"pk": self.directorate.pk}))
+        self.assertIn(f'data-registered-directorate="{self.other_directorate.name}"', response.content.decode())
+
+    def test_card_does_not_carry_data_attribute_for_non_admin(self):
+        """A pill visual já era escondida pra não-admin; o atributo data-*
+        cru no HTML precisa sumir também, senão vaza no dev tools/view
+        source mesmo sem a pill aparecer na tela."""
+        owner = make_user(role="agente", primary_directorate=self.other_directorate)
+        self.make_visit(user=owner)
+        diretor = make_user(role="diretor", primary_directorate=self.directorate)
+        self.client.force_login(diretor)
+        response = self.client.get(reverse("directorates:visit-list", kwargs={"pk": self.directorate.pk}))
+        self.assertNotIn("data-registered-directorate", response.content.decode())
+
+    def test_admin_sees_directorate_select_on_monitoramento_dashboard(self):
+        self._login_admin()
+        response = self.client.get(
+            reverse("monitoramento:home", kwargs={"pk": self.directorate.pk}) + "?tab=visits"
+        )
+        html = response.content.decode()
+        self.assertIn('id="inline-registered-directorate-filter"', html)
+
+
 @override_settings(STORAGES=STATIC_TEST_STORAGES)
 class DirectorateDetailViewRedirectTests(TestCase):
     """DirectorateDetailView.get() nunca renderiza a própria página: sempre

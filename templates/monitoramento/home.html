@@ -946,6 +946,22 @@
     padding: 0 14px 0 38px;
 }
 
+.inline-directorate-filter select {
+    width: 100%;
+    height: 36px;
+    padding: 0 14px 0 38px;
+    border: 1px solid #dbe7f3;
+    border-radius: 11px;
+    background: rgba(255,255,255,.78);
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 700;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
 .inline-filter-select {
     max-width: 280px;
     padding: 0 14px;
@@ -2071,19 +2087,24 @@
         if (typeFilter) typeFilter.addEventListener("change", filterInlineOscTable);
 
         var visitSearchInput = document.getElementById("inline-visit-search");
+        var visitDirectorateSelect = document.getElementById("inline-registered-directorate-filter");
         function filterInlineVisitTable() {
             var q = ((visitSearchInput && visitSearchInput.value) || "").toLowerCase();
+            var directorate = (visitDirectorateSelect && visitDirectorateSelect.value) || "";
             var visible = 0;
             document.querySelectorAll("#inline-visit-grid .visit-card").forEach(function (card) {
-                var show = !q || (card.dataset.osc || "").includes(q);
+                var matchesOsc = !q || (card.dataset.osc || "").includes(q);
+                var matchesDirectorate = !directorate || card.dataset.registeredDirectorate === directorate;
+                var show = matchesOsc && matchesDirectorate;
                 card.style.display = show ? "" : "none";
                 if (show) visible++;
             });
             var initialEmpty = document.getElementById("inline-visit-empty-initial");
             var searchEmpty = document.getElementById("inline-visit-empty-search");
-            if (searchEmpty) searchEmpty.style.display = (q && visible === 0 && !initialEmpty) ? "flex" : "none";
+            if (searchEmpty) searchEmpty.style.display = ((q || directorate) && visible === 0 && !initialEmpty) ? "flex" : "none";
         }
         if (visitSearchInput) visitSearchInput.addEventListener("input", filterInlineVisitTable);
+        if (visitDirectorateSelect) visitDirectorateSelect.addEventListener("change", filterInlineVisitTable);
 
         var planSearchInput = document.getElementById("inline-plan-search");
         if (planSearchInput) {

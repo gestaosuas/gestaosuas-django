@@ -228,6 +228,19 @@
                             <i data-lucide="search"></i>
                             <input type="text" id="inline-visit-search" placeholder="Filtrar por OSC..." autocomplete="off">
                         </div>
+                        {% if is_admin_user %}
+                        <div class="inline-search inline-directorate-filter">
+                            <i data-lucide="building-2"></i>
+                            <select id="inline-registered-directorate-filter">
+                                <option value="">Todas as diretorias</option>
+                                {% for d in all_directorates %}
+                                <option value="{{ d.name }}">{{ d.name }}</option>
+                                {% endfor %}
+                                <option value="Admin">Admin</option>
+                                <option value="Sem diretoria">Sem diretoria</option>
+                            </select>
+                        </div>
+                        {% endif %}
                         <a href="{% url 'directorates:visit-create' directorate.pk %}?next={% url 'monitoramento:home' directorate.pk %}%3Ftab%3Dvisits%26bimestre%3D{{ selected_bimester }}%26year%3D{{ selected_year }}" class="inline-primary-btn inline-link-btn">
                             <i data-lucide="plus"></i>
                             Nova Visita
@@ -238,7 +251,7 @@
                 <div class="inline-table-card">
                     <div class="visit-cards-grid" id="inline-visit-grid">
                         {% for visit in dashboard_visits %}
-                        <div class="visit-card" data-osc="{{ visit.osc.name|lower }}">
+                        <div class="visit-card" data-osc="{{ visit.osc.name|lower }}" {% if is_admin_user %}data-registered-directorate="{{ visit.registered_by_directorate|default:'Sem diretoria' }}"{% endif %}>
                             <div class="visit-card-header">
                                 <span class="visit-status-dot {% if visit.status == 'completed' or visit.status == 'finalized' %}is-finalized{% else %}is-draft{% endif %}"></span>
                                 <h3 class="visit-card-osc-name" title="{{ visit.osc.name }}">{{ visit.osc.name }}</h3>
