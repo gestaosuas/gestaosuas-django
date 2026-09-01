@@ -137,21 +137,34 @@ def build_registered_by_map(visits):
 
 
 def build_registered_by_directorate_map(visits):
-    """{user_id: nome_da_diretoria_primaria} - usado pra mostrar, no card da
-    visita, de qual diretoria e o perfil de quem a criou (2026-08-27, pedido
-    explicito do usuario, admin-only: "configure para dizer de qual
-    diretoria e a pessoa que enviou aquela visita... isso vai servir so
-    para controle de quem e administrador"). Diferente de
+    """{user_id: nome_da_diretoria_primaria ou "Admin"} - usado pra mostrar,
+    no card da visita, de qual diretoria e o perfil de quem a criou
+    (2026-08-27, pedido explicito do usuario, admin-only: "configure para
+    dizer de qual diretoria e a pessoa que enviou aquela visita... isso vai
+    servir so para controle de quem e administrador"). Diferente de
     build_registered_by_map (que resolve o NOME de quem registrou) - aqui e
     a diretoria PRIMARIA do perfil, que pode nao bater com a diretoria da
-    propria visita (ex.: agente vinculado a mais de uma diretoria, ou visita
-    admin-criada sem diretoria primaria nenhuma - o helper retorna None
-    nesses casos, tratado como "Sem diretoria" no template)."""
+    propria visita (ex.: agente vinculado a mais de uma diretoria) - o
+    helper retorna None quando nao ha diretoria primaria nenhuma, tratado
+    como "Sem diretoria" no template.
+
+    2026-09-01, pedido explicito do usuario: quem for admin mostra "Admin"
+    em vez da diretoria primaria (ou de "Sem diretoria", que era o caso mais
+    comum pra admin, ja que essas contas normalmente nao tem
+    primary_directorate nenhuma) - mesma definicao de "admin" ja usada em
+    get_admin_user_ids() (is_superuser OU profile.role == "admin"), pra
+    ficar consistente com o resto do sistema."""
     user_ids = {v.user_id for v in visits if v.user_id}
     if not user_ids:
         return {}
-    profiles = Profile.objects.filter(user_id__in=user_ids).select_related("primary_directorate")
-    return {profile.user_id: profile.primary_directorate.name if profile.primary_directorate else None for profile in profiles}
+    profiles = Profile.objects.filter(user_id__in=user_ids).select_related("primary_directorate", "user")
+    result = {}
+    for profile in profiles:
+        if profile.user.is_superuser or profile.role == "admin":
+            result[profile.user_id] = "Admin"
+        else:
+            result[profile.user_id] = profile.primary_directorate.name if profile.primary_directorate else None
+    return result
 
 
 def build_delegation_map(visits):

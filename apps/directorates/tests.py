@@ -1119,6 +1119,29 @@ class VisitCardRegisteredByDirectorateTests(DirectoratesTestBase):
         self.assertIsNone(rendered_visit.registered_by_directorate)
         self.assertContains(response, "Sem diretoria")
 
+    def test_admin_sees_admin_label_when_creator_is_admin_role(self):
+        """2026-09-01, pedido explícito do usuário: quem criou a visita
+        sendo admin mostra "Admin" no lugar da diretoria (ou de "Sem
+        diretoria", que era o caso mais comum pra conta admin, já que
+        normalmente não tem primary_directorate nenhuma)."""
+        creator_admin = make_user(role="admin")
+        visit = self.make_visit(user=creator_admin)
+        self._login_admin()
+        response = self.client.get(reverse("directorates:visit-list", kwargs={"pk": self.directorate.pk}))
+        rendered_visit = next(v for v in response.context["visits"] if v.pk == visit.pk)
+        self.assertEqual(rendered_visit.registered_by_directorate, "Admin")
+        self.assertContains(response, "Admin")
+
+    def test_admin_sees_admin_label_when_creator_is_superuser_without_admin_role(self):
+        """Mesma definição de "admin" já usada em get_admin_user_ids():
+        is_superuser conta mesmo que profile.role não seja "admin"."""
+        creator_superuser = make_user(role="user", is_superuser=True)
+        visit = self.make_visit(user=creator_superuser)
+        self._login_admin()
+        response = self.client.get(reverse("directorates:visit-list", kwargs={"pk": self.directorate.pk}))
+        rendered_visit = next(v for v in response.context["visits"] if v.pk == visit.pk)
+        self.assertEqual(rendered_visit.registered_by_directorate, "Admin")
+
     def test_non_admin_does_not_see_directorate_pill(self):
         """Checa o VALOR renderizado (nome da diretoria), não a classe CSS -
         `.registered-by-directorate-pill` aparece sempre no <style> da
