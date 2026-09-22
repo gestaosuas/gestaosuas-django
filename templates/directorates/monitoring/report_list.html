@@ -113,12 +113,14 @@
                             {% endif %}
                         </a>
 
+                        {% if not is_subvencao_reports %}
                         {# Instrumental ── #}
                         <a href="{% url 'directorates:visit-instrumental' visit.pk %}"
                            class="report-action-btn btn-slate-light">
                             <i data-lucide="clipboard-list"></i>
                             Instrumental
                         </a>
+                        {% endif %}
 
                         {% if is_admin_user %}
                         {# Reverter ambos para rascunho ── #}

@@ -23,6 +23,7 @@ from apps.directorates.views import (
     build_registered_by_map,
     get_admin_user_ids,
     get_monitoramento_theme,
+    is_emendas_directorate,
     is_subvencao_directorate,
 )
 from apps.core.utils import (
@@ -184,6 +185,28 @@ class MonitoramentoHomeView(MonitoramentoBaseMixin, DetailView):
             visit.delegated_user_ids_str = ",".join(str(uid) for uid in delegation_map.get(visit.pk, []))
             visit.is_delegated = bool(delegation_map.get(visit.pk))
             visit.registered_by_directorate = registered_by_directorate_map.get(visit.user_id)
+
+        # Subvencao (nao Emendas e Fundos): aba "Relatorios e Pareceres" mostra
+        # 1 card por OSC (visita finalizada mais recente), nao 1 por visita -
+        # mesma regra de MonitoringReportListView (apps/directorates/views.py).
+        # A aba "Instrumental de Visita" continua usando `all_visits` sem
+        # agrupar, por isso essa lista fica separada em vez de substituir
+        # `dashboard_visits`.
+        is_subvencao_reports = is_subvencao_directorate(directorate) and not is_emendas_directorate(directorate)
+        context["is_subvencao_reports"] = is_subvencao_reports
+        if is_subvencao_reports:
+            seen_osc_ids = set()
+            dashboard_report_visits = []
+            for visit in all_visits:
+                if visit.status not in ("finalized", "completed"):
+                    continue
+                if visit.osc_id in seen_osc_ids:
+                    continue
+                seen_osc_ids.add(visit.osc_id)
+                dashboard_report_visits.append(visit)
+        else:
+            dashboard_report_visits = all_visits
+        context["dashboard_report_visits"] = dashboard_report_visits
 
         _total_visits = len(stats_visits)
         _finalized_visits = len([v for v in stats_visits if v.status in ["completed", "finalized"]])

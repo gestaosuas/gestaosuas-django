@@ -1403,8 +1403,29 @@ class MonitoringReportListView(DirectorateScopedMixin, ListView):
         profile = getattr(self.request.user, 'profile', None)
         context["is_admin_user"] = self.request.user.is_superuser or (profile and profile.role == 'admin')
         context["profiles"] = Profile.objects.all().order_by("full_name")
-        delegation_map = build_delegation_map(context["visits"])
-        for visit in context["visits"]:
+        is_subvencao_reports = is_subvencao_directorate(directorate) and not is_emendas_directorate(directorate)
+        context["is_subvencao_reports"] = is_subvencao_reports
+        visits = context["visits"]
+        if is_subvencao_reports:
+            # Subvencao (nao Emendas e Fundos): 1 card por OSC em vez de 1 por
+            # visita - a visita finalizada mais recente representa a OSC,
+            # mesmo padrao ja usado por "latest_plan" em plan_list.html.
+            # So descarta visitas finalizadas "extras" da mesma OSC - visitas
+            # em rascunho continuam na lista (o template ja as ignora pra
+            # renderizar cards, igual sempre fez; nao remover daqui evita
+            # mudar o que outras partes do contexto/pagina esperam ver).
+            seen_osc_ids = set()
+            grouped_visits = []
+            for visit in visits:
+                if visit.status in ("finalized", "completed"):
+                    if visit.osc_id in seen_osc_ids:
+                        continue
+                    seen_osc_ids.add(visit.osc_id)
+                grouped_visits.append(visit)
+            visits = grouped_visits
+            context["visits"] = visits
+        delegation_map = build_delegation_map(visits)
+        for visit in visits:
             visit.delegated_user_ids_str = ",".join(str(uid) for uid in delegation_map.get(visit.pk, []))
             visit.is_delegated = bool(delegation_map.get(visit.pk))
         return context

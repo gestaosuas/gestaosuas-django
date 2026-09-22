@@ -24,7 +24,7 @@ Nenhuma `Directorate` existente é criada/alterada/apagada — só lida via
 usados nos testes são sempre criados do zero dentro do teste.
 """
 import uuid
-from datetime import date, time
+from datetime import date, time, timedelta
 
 from django.db.models import Count
 from django.test import TestCase, override_settings
@@ -975,6 +975,98 @@ class VisitDelegationContextDataTests(DirectoratesTestBase):
         self.assertFalse(FormDelegation.objects.filter(visit=visit, user_id=delegate.pk).exists())
         messages_followed = list(response.context["messages"])
         self.assertTrue(any("removidas" in str(m) for m in messages_followed))
+
+
+class ReportListGroupedByOscTests(DirectoratesTestBase):
+    """2026-09-02, pedido explicito do usuario: "Somente para subvenção...
+    ao invés de cada visita gerar um card daquela osc, o sistema deve gerar
+    somente um card para cada osc individual" - Emendas e Fundos continua
+    com 1 card por visita, sem mudanca. `MonitoringReportListView` agora
+    agrupa visitas finalizadas por OSC (mantendo a mais recente por
+    visit_date) so quando `is_subvencao_directorate(d) and not
+    is_emendas_directorate(d)` - mesmo criterio de "Subvencao pura" usado
+    pra distinguir das duas diretorias que `is_subvencao_directorate`
+    normalmente trata como equivalentes. O botao "Instrumental" tambem some
+    do card nesse caso (pedido explicito), ja que um card agora pode
+    representar varias visitas - nao faria sentido linkar pra so uma."""
+
+    def test_report_list_groups_multiple_finalized_visits_by_osc_in_subvencao(self):
+        osc = self.make_osc()
+        older = self.make_visit(osc=osc)
+        older.status = "finalized"
+        older.visit_date = date.today() - timedelta(days=10)
+        older.save()
+        newer = self.make_visit(osc=osc)
+        newer.status = "finalized"
+        newer.visit_date = date.today()
+        newer.save()
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        # bimestre=all: as datas de teste podem cair em bimestres diferentes
+        # dependendo do dia em que a suite roda - o agrupamento por OSC deve
+        # ser testado independente desse filtro pre-existente.
+        response = self.client.get(reverse("directorates:report-list", kwargs={"pk": self.directorate.pk}) + "?bimestre=all")
+        osc_visits = [v for v in response.context["visits"] if v.osc_id == osc.pk]
+        self.assertEqual(len(osc_visits), 1)
+        self.assertEqual(osc_visits[0].pk, newer.pk)
+
+    def test_report_list_ignores_draft_visits_when_picking_the_osc_card(self):
+        """Uma visita em rascunho pra mesma OSC nunca virou card (o template
+        ja filtrava por status finalizado/completo antes desta mudanca) - ela
+        continua em `context["visits"]` sem alteracao (mesmo comportamento
+        de sempre, preserva os testes que dependem disso), so nao pode virar
+        um 2o card renderizado nem ser escolhida como representante no lugar
+        da visita finalizada."""
+        osc = self.make_osc()
+        finalized = self.make_visit(osc=osc)
+        finalized.status = "finalized"
+        finalized.visit_date = date.today() - timedelta(days=5)
+        finalized.save()
+        draft = self.make_visit(osc=osc)
+        draft.status = "draft"
+        draft.visit_date = date.today()
+        draft.save()
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        response = self.client.get(reverse("directorates:report-list", kwargs={"pk": self.directorate.pk}) + "?bimestre=all")
+        marker = f'data-osc="{osc.name.lower()}"'.encode()
+        self.assertEqual(response.content.count(marker), 1)
+        self.assertIn(draft, response.context["visits"])
+
+    def test_report_list_does_not_group_visits_by_osc_in_emendas(self):
+        osc = self.make_osc(directorate=self.other_directorate)
+        v1 = self.make_visit(osc=osc, directorate=self.other_directorate)
+        v1.status = "finalized"
+        v1.save()
+        v2 = self.make_visit(osc=osc, directorate=self.other_directorate)
+        v2.status = "finalized"
+        v2.save()
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        response = self.client.get(reverse("directorates:report-list", kwargs={"pk": self.other_directorate.pk}) + "?bimestre=all")
+        osc_visits = [v for v in response.context["visits"] if v.osc_id == osc.pk]
+        self.assertEqual(len(osc_visits), 2)
+
+    def test_report_list_hides_instrumental_button_in_subvencao(self):
+        visit = self.make_visit()
+        visit.status = "finalized"
+        visit.save()
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        response = self.client.get(reverse("directorates:report-list", kwargs={"pk": self.directorate.pk}))
+        instrumental_url = reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
+        self.assertNotContains(response, instrumental_url)
+
+    def test_report_list_keeps_instrumental_button_in_emendas(self):
+        osc = self.make_osc(directorate=self.other_directorate)
+        visit = self.make_visit(osc=osc, directorate=self.other_directorate)
+        visit.status = "finalized"
+        visit.save()
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        response = self.client.get(reverse("directorates:report-list", kwargs={"pk": self.other_directorate.pk}))
+        instrumental_url = reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
+        self.assertContains(response, instrumental_url)
 
 
 class VisitRevertViewTests(DirectoratesTestBase):

@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, time
+from datetime import date, time, timedelta
 
 from django.test import TestCase
 from django.urls import reverse
@@ -294,3 +294,90 @@ class MonitoramentoAgentePeerVisibilityTests(TestCase):
             reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
         )
         self.assertEqual(response.status_code, 403)
+
+
+class MonitoramentoReportsTabGroupedByOscTests(TestCase):
+    """2026-09-02, pedido explicito do usuario: mesma regra de agrupamento
+    de `ReportListGroupedByOscTests` (apps/directorates/tests.py), mas pra
+    aba inline "Relatorios e Pareceres" de monitoramento:home?tab=reports.
+    A aba "Instrumental de Visita" (?tab=visits, `dashboard_visits`) nao
+    pode ser afetada - so a aba de relatorios usa a lista agrupada
+    (`dashboard_report_visits`), daí os 2 testes que conferem visits
+    tambem aparecerem sem agrupar na aba de Instrumental."""
+
+    def setUp(self):
+        self.password = "senha12345"
+
+    def test_reports_tab_groups_multiple_finalized_visits_by_osc_in_subvencao(self):
+        directorate = make_directorate(name=f"Subvenção Teste {uuid.uuid4().hex[:8]}")
+        osc = make_osc(directorate)
+        older = make_visit(directorate, osc=osc)
+        older.status = "finalized"
+        older.visit_date = date.today() - timedelta(days=10)
+        older.save()
+        newer = make_visit(directorate, osc=osc)
+        newer.status = "finalized"
+        newer.visit_date = date.today()
+        newer.save()
+        admin, _ = make_user(password=self.password, role="admin")
+        self.client.login(username=admin.username, password=self.password)
+        # bimestre=all: evita flakiness se a data de teste cair num bimestre
+        # diferente do atual dependendo do dia em que a suite roda.
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=reports&bimestre=all")
+        osc_visits = [v for v in response.context["dashboard_report_visits"] if v.osc_id == osc.pk]
+        self.assertEqual(len(osc_visits), 1)
+        self.assertEqual(osc_visits[0].pk, newer.pk)
+
+    def test_reports_tab_does_not_group_visits_by_osc_in_emendas(self):
+        directorate = make_directorate(name=f"Emendas e Fundos Teste {uuid.uuid4().hex[:8]}")
+        osc = make_osc(directorate)
+        v1 = make_visit(directorate, osc=osc)
+        v1.status = "finalized"
+        v1.save()
+        v2 = make_visit(directorate, osc=osc)
+        v2.status = "finalized"
+        v2.save()
+        admin, _ = make_user(password=self.password, role="admin")
+        self.client.login(username=admin.username, password=self.password)
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=reports")
+        osc_visits = [v for v in response.context["dashboard_report_visits"] if v.osc_id == osc.pk]
+        self.assertEqual(len(osc_visits), 2)
+
+    def test_visits_tab_keeps_both_visits_ungrouped_in_subvencao(self):
+        """A aba "Instrumental de Visita" nunca deve ser afetada pelo
+        agrupamento - so a de "Relatorios e Pareceres"."""
+        directorate = make_directorate(name=f"Subvenção Teste {uuid.uuid4().hex[:8]}")
+        osc = make_osc(directorate)
+        v1 = make_visit(directorate, osc=osc)
+        v1.status = "finalized"
+        v1.save()
+        v2 = make_visit(directorate, osc=osc)
+        v2.status = "finalized"
+        v2.save()
+        admin, _ = make_user(password=self.password, role="admin")
+        self.client.login(username=admin.username, password=self.password)
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=visits")
+        osc_visits = [v for v in response.context["dashboard_visits"] if v.osc_id == osc.pk]
+        self.assertEqual(len(osc_visits), 2)
+
+    def test_reports_tab_hides_instrumental_button_in_subvencao(self):
+        directorate = make_directorate(name=f"Subvenção Teste {uuid.uuid4().hex[:8]}")
+        visit = make_visit(directorate)
+        visit.status = "finalized"
+        visit.save()
+        admin, _ = make_user(password=self.password, role="admin")
+        self.client.login(username=admin.username, password=self.password)
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=reports")
+        instrumental_url = reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
+        self.assertNotContains(response, instrumental_url)
+
+    def test_reports_tab_keeps_instrumental_button_in_emendas(self):
+        directorate = make_directorate(name=f"Emendas e Fundos Teste {uuid.uuid4().hex[:8]}")
+        visit = make_visit(directorate)
+        visit.status = "finalized"
+        visit.save()
+        admin, _ = make_user(password=self.password, role="admin")
+        self.client.login(username=admin.username, password=self.password)
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=reports")
+        instrumental_url = reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
+        self.assertContains(response, instrumental_url)

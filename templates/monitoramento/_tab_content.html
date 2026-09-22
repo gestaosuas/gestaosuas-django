@@ -261,7 +261,10 @@
                                 {{ visit.registered_by_name|title }}
                             </span>
                             <div class="visit-card-meta">
-                                <span class="visit-meta-row"><i data-lucide="calendar"></i> {{ visit.visit_date|date:"d/m/Y" }} · {{ visit.visit_time|time:"H:i" }}</span>
+                                <span class="visit-meta-row"><i data-lucide="calendar-plus"></i> Criada em {{ visit.created_at|date:"d/m/Y" }} · {{ visit.created_at|time:"H:i" }}</span>
+                                {% if visit.status == 'completed' or visit.status == 'finalized' %}
+                                <span class="visit-meta-row"><i data-lucide="calendar-check"></i> Finalizada em {{ visit.updated_at|date:"d/m/Y" }} · {{ visit.updated_at|time:"H:i" }}</span>
+                                {% endif %}
                                 {% if is_emendas %}
                                 <span class="visit-meta-row">
                                     <i data-lucide="hash"></i>
@@ -569,7 +572,7 @@
 
                 <div class="inline-table-card" style="margin-top: 16px; padding: 20px; background: rgba(255,255,255,0.4);">
                     <div class="report-cards-grid" id="inline-report-grid">
-                    {% for visit in dashboard_visits %}
+                    {% for visit in dashboard_report_visits %}
                     {% if visit.status == 'finalized' or visit.status == 'completed' %}
                     <div class="report-card" data-osc="{{ visit.osc.name|lower }}">
                         <div class="report-card-header">
@@ -614,9 +617,11 @@
                                 <i data-lucide="check-circle-2"></i> Parecer Conclusivo
                                 {% if visit.parecer_conclusivo.status == 'finalized' %}<span class="btn-badge">✓</span>{% elif visit.parecer_conclusivo.status == 'draft' %}<span class="btn-badge-draft">Rascunho</span>{% endif %}
                             </a>
+                            {% if not is_subvencao_reports %}
                             <a href="{% url 'directorates:visit-instrumental' visit.pk %}" class="report-action-btn btn-slate-light">
                                 <i data-lucide="clipboard-list"></i> Instrumental
                             </a>
+                            {% endif %}
                             {% if is_admin_user %}
                             <button type="button" class="report-action-btn btn-slate-light" onclick="openDelegateModal('{{ visit.pk }}', '{{ visit.osc.name|escapejs }}', '{{ visit.delegated_user_ids_str }}')">
                                 <i data-lucide="users-round"></i> Delegar

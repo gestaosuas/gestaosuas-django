@@ -105,9 +105,15 @@
                 <div class="visit-card-title-wrap">
                     <span class="osc-name">{{ visit.osc.name }}</span>
                     <div style="display: flex; align-items: center; gap: 8px; margin-top: 3px;">
-                        <i data-lucide="calendar" style="width: 12px; color: #94a3b8; flex-shrink:0;"></i>
-                        <span class="visit-date-text">{{ visit.visit_date|date:"d/m/Y" }}</span>
+                        <i data-lucide="calendar-plus" style="width: 12px; color: #94a3b8; flex-shrink:0;"></i>
+                        <span class="visit-date-text">Criada em {{ visit.created_at|date:"d/m/Y" }} · {{ visit.created_at|time:"H:i" }}</span>
                     </div>
+                    {% if visit.status == 'completed' or visit.status == 'finalized' %}
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 3px;">
+                        <i data-lucide="calendar-check" style="width: 12px; color: #94a3b8; flex-shrink:0;"></i>
+                        <span class="visit-date-text">Finalizada em {{ visit.updated_at|date:"d/m/Y" }} · {{ visit.updated_at|time:"H:i" }}</span>
+                    </div>
+                    {% endif %}
                     <div class="registered-by-pill">
                         <div class="registered-by-avatar">{{ visit.registered_by_name|first|default:"?" }}</div>
                         <span title="{{ visit.registered_by_name|title }}">{{ visit.registered_by_name|title }}</span>

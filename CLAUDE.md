@@ -565,6 +565,38 @@ Testado via Django test client (`apps/directorates/tests.py`: `VisitCardRegister
 
 ---
 
+## Relatórios e Pareceres de Subvenção — 1 card por OSC em vez de 1 por visita (2026-09-02)
+
+Pedido explícito do usuário: "Somente para subvenção... ao invés de cada visita gerar um card daquela osc, o sistema deve gerar somente um card para cada osc individual". Emendas e Fundos não muda — continua 1 card por visita finalizada.
+
+- `MonitoringReportListView.get_context_data()` (`apps/directorates/views.py`) e `MonitoramentoHomeView.get_context_data()` (`apps/monitoramento/views.py`, aba `?tab=reports`) agrupam visitas finalizadas por `osc_id`, mantendo só a de `visit_date` mais recente, só quando `is_subvencao_directorate(d) and not is_emendas_directorate(d)` (o mesmo critério de "Subvenção pura" já usado noutros pontos pra distinguir das duas diretorias que `is_subvencao_directorate` normalmente trata como equivalentes). Visita em rascunho nunca virava card (filtro de status já existia antes) e continua não contando pro agrupamento.
+- A aba "Instrumental de Visita" (`?tab=visits`, `dashboard_visits`) **não** é afetada — só a lista usada pelos Relatórios e Pareceres (`context["visits"]` em `report_list.html`, `dashboard_report_visits` novo em `_tab_content.html`) passou a ser a versão agrupada.
+- Botão "Instrumental" some do card nos dois templates (`report_list.html`, `_tab_content.html`) quando `is_subvencao_reports` é `True` — como um card pode agora representar várias visitas, não faz sentido linkar pra só uma delas.
+- Testado via Django test client (`apps/directorates/tests.py::ReportListGroupedByOscTests`, `apps/monitoramento/tests.py::MonitoramentoReportsTabGroupedByOscTests`): agrupamento mantém a visita mais recente, ignora rascunho na escolha do card, não agrupa em Emendas e Fundos, botão Instrumental some em Subvenção e continua em Emendas, e a aba "Instrumental de Visita" nunca agrupa.
+
+---
+
+## Mapa (`/mapas/`) bloqueado pelo OpenStreetMap — trocado pra tiles Esri, satélite como padrão (2026-09-22)
+
+Usuário reportou a página de mapas (`templates/core/map.html`) inteira coberta por tiles com "Access blocked — App is not following the tile usage policy of OpenStreetMap's volunteer-run servers: osm.wiki/Blocked", em vez do mapa. Hipótese inicial do usuário (reduzir acessos movendo a tela de login) estava errada — os tiles são baixados **direto pelo navegador de cada usuário**, não pelo servidor Django, então volume de login não tem relação. Causa raiz real: o tema "Padrão" do seletor de mapa (`L.tileLayer`, linha ~297) apontava direto pra `tile.openstreetmap.org`, o servidor de **demonstração/teste** da OSM Foundation — a política deles (`osm.wiki/Blocked`) proíbe uso em produção sem seguir regras de cache/volume, e como os usuários da Secretaria provavelmente compartilham o mesmo IP público de rede corporativa, esse IP foi bloqueado pelo excesso de requisições de tiles.
+
+Corrigido trocando a fonte de tiles do tema "Padrão" pro mesmo provedor Esri (`server.arcgisonline.com`) já usado sem problemas no tema "Satélite" — `World_Street_Map` em vez de `World_Imagery` (mesma URL pattern, só troca o nome do serviço; chave do objeto `tileLayers` renomeada de `osm` pra `streets`, já que não são mais tiles do OSM). Pedido explícito do usuário: a camada que carrega por padrão ao abrir o mapa (antes "Padrão"/OSM) virou **Satélite** — `currentLayer` inicial e o `checked` do rádio no dropdown de tema mudaram de `osm`/"Padrão" pra `satellite`/"Satélite"; o tema "Padrão" continua existindo no seletor (agora com tiles Esri, não mais bloqueado), só não é mais o que carrega por padrão.
+
+Testado com navegador real (login com conta temporária criada/removida na mesma sessão): tema "Satélite" carrega automaticamente e renderiza imagem aérea sem nenhum tile de erro; alternando manualmente pra "Padrão" no dropdown também renderiza normalmente (ruas/rodovias da Esri); zero erros de console, zero requisições falhas nas duas opções. Endpoint Esri confirmado via `curl` retornando HTTP 200/`image/jpeg` antes do teste em navegador.
+
+---
+
+## Cards de "Instrumental de Visita" — data de criação + data de finalização (2026-09-22)
+
+Pedido explícito do usuário: os cards de visita mostravam só uma data (`visit_date · visit_time`) — trocado por duas linhas: "Criada em" (data de criação real do registro) e, só quando a visita está finalizada, "Finalizada em" abaixo.
+
+- **`visit.created_at`** (`TimeStampedUUIDModel`, `auto_now_add`) é a fonte da 1ª linha — mais preciso que `visit_date`/`visit_time`, que são campos preenchidos pelo usuário no formulário ("Data da Visita" + "Turno") e podem representar uma data retroativa (visita técnica que ocorreu antes do registro no sistema), não a data real de criação.
+- **"Finalizada em" usa `visit.updated_at`** (`auto_now`), só renderizado quando `status` é `'finalized'`/`'completed'` — **não existe coluna dedicada de data de finalização** em `visits` (nenhum `finalized_at`). `updated_at` é a melhor aproximação disponível sem alterar schema: na prática fica congelada no momento da finalização, já que o Instrumental trava edição depois de finalizado (só reabre via "Reverter para Rascunho", que já é tratado como uma nova finalização legítima ao finalizar de novo). Ressalva conhecida: uma ação que ainda salva a visita depois de finalizada sem passar por revert (ex.: `VisitUploadNotificationView`, upload de PDF de notificação) bumping `updated_at` mesmo sem uma "refinalização" real — caso raro, não corrigido agora; se precisar de precisão garantida, a solução correta seria uma coluna `finalized_at` real (ALTER TABLE + `pending_alters.sql`, sem histórico anterior pra popular).
+- Aplicado nos dois lugares que renderizam esse card: `templates/monitoramento/_tab_content.html` (aba "Instrumental de Visita" do dashboard) e `templates/directorates/monitoring/visit_list.html` (página avulsa) — ícones `calendar-plus`/`calendar-check` (lucide) pra diferenciar visualmente as duas linhas.
+- Testado com navegador real (conta admin temporária, criada/removida na mesma sessão) em "Emendas e Fundos": visita rascunho mostra só "Criada em"; visita finalizada mostra as duas linhas, com "Finalizada em" batendo com o `updated_at` real da última alteração — confirmado nas duas telas (dashboard e página avulsa), zero erros de console.
+
+---
+
 ## Débito Técnico Conhecido
 
 | # | Problema | Impacto | Prioridade |
@@ -652,10 +684,10 @@ Testado com um fluxo completo via Django test client (criar visita → finalizar
 
 **Bug real reportado pelo usuário em produção — "delegar visita pra um agente parece não funcionar" (2026-08-20)**: causa raiz era uma regressão da mudança acima (2026-08-19). Nos 3 lugares que passaram a usar `.exclude(user_id__in=get_admin_user_ids())` puro pra dar visibilidade de diretoria inteira ao agente em Subvenção/Emendas e Fundos — `VisitListView.get_queryset()`, `MonitoringReportListView.get_queryset()` (`apps/directorates/views.py`), `MonitoramentoHomeView.get_context_data()` (`apps/monitoramento/views.py`) — essa exclusão virou **absoluta**: nem uma `FormDelegation` explícita conseguia furá-la. Isso quebrou justamente o caso de uso mais comum de delegação (um admin cria a visita e delega pra um agente preencher, já que "Cadastrar OSC"/criar visita continua acessível a admin em qualquer diretoria) — a visita ficava permanentemente invisível pro agente delegado em qualquer lista/dashboard, mesmo com o `FormDelegation` salvo corretamente no banco. `VisitAccessMixin.dispatch()` (acesso direto por URL) nunca teve esse bug — `is_delegated` sempre foi checado incondicionalmente ali — mas sem nenhum link/card apontando pra visita em lugar nenhum, o acesso direto era inatingível na prática (ninguém digita UUID de visita na mão). Corrigido trocando `qs.exclude(user_id__in=admin_ids)` por `qs.filter(Q(id__in=delegated_visit_ids) | ~Q(user_id__in=admin_ids))` nos 3 pontos — visita delegada continua visível mesmo quando quem criou foi um admin. Cobertura de teste: `test_agente_sees_admin_created_visit_when_delegated` (`apps/directorates/tests.py`) e `test_agente_sees_admin_created_visit_in_subvencao_when_delegated` (`apps/monitoramento/tests.py`).
 
-Na mesma investigação, achados adicionais (não corrigidos ainda, fora do escopo do bug reportado — avaliar se vale endereçar numa sessão futura):
-- `VisitDelegateView.post()` não dá nenhum feedback de sucesso/erro (`messages.success`/`messages.error`) — o admin não tem confirmação nenhuma de que a delegação foi salva além do redirect silencioso.
-- O modal "Delegar Visita" (`visit_list.html`/`_tab_content.html`/`report_list.html`) nunca pré-marca os checkboxes de quem já está delegado na visita — `openDelegateModal()` só faz `.reset()` — então reabrir o modal numa visita já delegada mostra a lista vazia, sem indicar o estado atual.
-- `context["profiles"]` do modal é `Profile.objects.all()` sem filtrar por diretoria — lista técnicos do sistema inteiro, não só da diretoria da visita.
+Na mesma investigação, achados adicionais identificados como débito técnico (não corrigidos naquele momento, fora do escopo do bug reportado):
+- **[Corrigido em 2026-08-24]** `VisitDelegateView.post()` não dava nenhum feedback de sucesso/erro — ver entrada "Aviso de sucesso/falha ao delegar visita" abaixo.
+- **[Corrigido em 2026-08-24]** O modal "Delegar Visita" nunca pré-marcava os checkboxes de quem já estava delegado — ver entrada "Modal 'Delegar' pré-marca quem já está habilitado..." abaixo.
+- `context["profiles"]` do modal continua `Profile.objects.all()` sem filtrar por diretoria — lista técnicos do sistema inteiro, não só da diretoria da visita. Ainda não corrigido.
 - `FormDelegation.directorate_id` continua sempre `NULL` (já documentado como inofensivo — ver nota "Bug real achado e corrigido no mesmo levantamento" de 2026-08-16 acima).
 - `VisitDelegateViewTests` (3 dos 4 testes) estavam quebrados desde 2026-08-16 (commit `191e915`, que restringiu delegar a admin-only) porque ainda logavam como `role="diretor"` esperando 302 — corrigidos nesta sessão pra usar admin como ator, e o teste de "diretor sem acesso à diretoria" foi trocado por um teste explícito de "diretor não pode mais delegar" (esse cenário de diretoria não se aplica mais, porque admin nunca é bloqueado por diretoria).
 

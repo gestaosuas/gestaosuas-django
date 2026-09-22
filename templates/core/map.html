@@ -241,16 +241,16 @@
             <div class="filter-item">
                 <div class="multi-select-container" style="width: 160px;">
                     <div class="multi-select-trigger" id="themeTrigger">
-                        <span id="themeLabel">Padrão</span>
+                        <span id="themeLabel">Satélite</span>
                         <i data-lucide="chevron-down" style="width: 12px;"></i>
                     </div>
                     <div class="multi-select-dropdown" id="themeDropdown">
                         <label class="select-option">
-                            <input type="radio" name="mapTheme" value="osm" data-name="Padrão" checked>
+                            <input type="radio" name="mapTheme" value="streets" data-name="Padrão">
                             <span>Padrão</span>
                         </label>
                         <label class="select-option">
-                            <input type="radio" name="mapTheme" value="satellite" data-name="Satélite">
+                            <input type="radio" name="mapTheme" value="satellite" data-name="Satélite" checked>
                             <span>Satélite</span>
                         </label>
                         <label class="select-option">
@@ -294,8 +294,8 @@
                 const map = L.map('map').setView([-18.9186, -48.2772], 13);
                 
                 const tileLayers = {
-                    osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '© OpenStreetMap contributors'
+                    streets: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+                        attribution: 'Tiles © Esri'
                     }),
                     satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                         attribution: 'Tiles © Esri'
@@ -305,7 +305,7 @@
                     })
                 };
 
-                let currentLayer = tileLayers.osm;
+                let currentLayer = tileLayers.satellite;
                 currentLayer.addTo(map);
 
                 const markers = [];
