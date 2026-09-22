@@ -597,6 +597,16 @@ Pedido explícito do usuário: os cards de visita mostravam só uma data (`visit
 
 ---
 
+## Relatório Final — label "Valor autorizado por lei" sem o ano em Emendas e Fundos (2026-09-22)
+
+Pedido explícito do usuário: em "Relatórios e Pareceres" → Relatório Final → "1. Dados da Parceria", o campo "Valor autorizado por lei para o exercício de {{ system_reference_year }}" deve virar só "Valor autorizado por lei" **somente em Emendas e Fundos** — Subvenção continua com o texto completo (com o ano), sem mudança.
+
+- Dois lugares tinham o texto fixo, sem diferenciar diretoria: `templates/directorates/monitoring/report_form.html` (tela de edição/visualização) e `apps/directorates/pdf_documents.py` (`_build_report_pdf_story`, export `?export=pdf`) — ambos já recebem a flag local `is_emendas` (`"emenda" in normalized_dir_name or "fundo" in normalized_dir_name`, calculada em `VisitReportView.get_context_data()`, distinta da `is_subvencao_directorate()` mais ampla usada noutros pontos do código, que trata Subvenção e Emendas como equivalentes). Trocado pra `{% if is_emendas %}Valor autorizado por lei{% else %}...para o exercício de {{ system_reference_year }}{% endif %}` no template e um ternário equivalente no `valor_label` do PDF.
+- **Não mexido de propósito**: o mesmo label em "Parecer Conclusivo" (texto diferente, "Valor autorizado por lei e repassado", sem ano) não foi tocado — o pedido foi só sobre o Relatório Final.
+- Testado com navegador real (conta admin temporária, criada/removida na mesma sessão): Subvenção mostra "VALOR AUTORIZADO POR LEI PARA O EXERCÍCIO DE 2026" (inalterado), Emendas e Fundos mostra só "VALOR AUTORIZADO POR LEI" — zero erros de console. Lógica do PDF confirmada via shell (mesmo ternário, mesma saída esperada pras duas diretorias).
+
+---
+
 ## Débito Técnico Conhecido
 
 | # | Problema | Impacto | Prioridade |

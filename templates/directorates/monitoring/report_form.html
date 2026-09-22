@@ -110,7 +110,7 @@
                                 <input type="text" id="vigencia" value="{{ report_data.vigencia|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-field">
                             </div>
                             <div style="grid-column: span 2;">
-                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Valor autorizado por lei para o exercício de {{ system_reference_year }}</label>
+                                <label style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">{% if is_emendas %}Valor autorizado por lei{% else %}Valor autorizado por lei para o exercício de {{ system_reference_year }}{% endif %}</label>
                                 <input type="text" id="valor_autorizado" value="{{ report_data.valor_autorizado|default:'' }}" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-field">
                             </div>
                             {% if report_data.status != 'finalized' or report_data.anotacoes %}

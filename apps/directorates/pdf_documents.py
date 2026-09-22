@@ -384,7 +384,7 @@ def render_visit_report_pdf(context):
     story = []
 
     if report_type == "relatorio_final":
-        valor_label = f"Valor autorizado por lei para o exercício de {_get_reference_year()}"
+        valor_label = "Valor autorizado por lei" if is_emendas else f"Valor autorizado por lei para o exercício de {_get_reference_year()}"
         story.extend(pdfmod.heading_with_body(
             Paragraph("1. Dados da Parceria", styles["h2"]),
             _partnership_data_table(report_data, is_subvencao, styles, valor_label=valor_label, anotacoes=report_data.get("anotacoes")),
