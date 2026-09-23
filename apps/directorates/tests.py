@@ -1633,6 +1633,24 @@ class RelatorioFinalItem4EmendasTests(DirectoratesTestBase):
         self.assertNotIn("Uberlândia, 17 de agosto de 2026", text)
         self.assertNotIn("Uberlândia, 18 de agosto de 2026", text)
 
+    def test_emendas_backfills_missing_dates_on_preexisting_report_data(self):
+        """Bug real reportado pelo usuário (2026-09-23): uma visita cujo
+        relatorio_final já existe no banco (ainda que com um schema antigo/
+        incompleto, ex. só chaves de PSE herdadas de outro tipo de
+        relatório) cai no ramo "else" de VisitReportView.get_context_data(),
+        que só faz backfill de `osc_name` - `local_data`/
+        `homologacao_local_data` ficavam None pra sempre nesse caso, então a
+        data nunca aparecia no formulário nem no PDF, mesmo em Emendas."""
+        visit = self.make_visit(directorate=self.emendas)
+        visit.relatorio_final = {"item5_enabled": False}
+        visit.save()
+        self._login_admin()
+        response = self.client.get(self._report_url(visit))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn('id="local_data" value="Uberlândia,', html)
+        self.assertIn('id="homologacao_local_data" value="Uberlândia,', html)
+
 
 class WorkPlanDescriptionSubvencaoTests(DirectoratesTestBase):
     """"Descrição do plano" (2026-08-24, pedido explícito do usuário,

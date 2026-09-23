@@ -1517,6 +1517,10 @@ class VisitReportView(VisitAccessMixin, DetailView):
             else:
                 if not report_data.get("osc_name"):
                     report_data["osc_name"] = self.object.osc.name
+                if not report_data.get("local_data"):
+                    report_data["local_data"] = local_date_default
+                if not report_data.get("homologacao_local_data"):
+                    report_data["homologacao_local_data"] = local_date_default
 
         elif report_type == "parecer_conclusivo":
             if not report_data:
