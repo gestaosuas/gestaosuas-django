@@ -395,14 +395,22 @@ def render_visit_report_pdf(context):
         story.extend(pdfmod.heading_with_body(
             Paragraph("3. Referências", styles["h2"]), Paragraph(report_data.get("referencias") or "Não informado.", styles["body"]),
         ))
-        item4_blocks = pdfmod.glue_headings([
+        item4_letter_resultados = "c" if is_emendas else "d"
+        item4_letter_execucao = "d" if is_emendas else "e"
+        item4_items = [
             Paragraph("a) Dos objetivos:", styles["h3"]), Paragraph(report_data.get("objetivos") or "Não informado.", styles["body"]),
             Paragraph("b) Das metas estabelecidas:", styles["h3"]), Paragraph(report_data.get("metas") or "Não informado.", styles["body"]),
-            Paragraph("c) Das atividades:", styles["h3"]), Paragraph(report_data.get("atividades") or "Não informado.", styles["body"]),
-            Paragraph("d) Dos resultados:", styles["h3"]), Paragraph(report_data.get("resultados") or "Não informado.", styles["body"]),
-            Paragraph("e) Da execução financeira:", styles["h3"]),
+        ]
+        if not is_emendas:
+            item4_items += [
+                Paragraph("c) Das atividades:", styles["h3"]), Paragraph(report_data.get("atividades") or "Não informado.", styles["body"]),
+            ]
+        item4_items += [
+            Paragraph(f"{item4_letter_resultados}) Dos resultados:", styles["h3"]), Paragraph(report_data.get("resultados") or "Não informado.", styles["body"]),
+            Paragraph(f"{item4_letter_execucao}) Da execução financeira:", styles["h3"]),
             Paragraph(report_data.get("execucao_financeira") or "Não informado.", styles["body"]),
-        ], styles)
+        ]
+        item4_blocks = pdfmod.glue_headings(item4_items, styles)
         story.extend(pdfmod.heading_with_body(
             Paragraph("4. Descrição dos Objetivos, Metas, Atividades Previstas, Resultados e Execução Financeira", styles["h2"]), item4_blocks[0],
         ))
@@ -410,6 +418,8 @@ def render_visit_report_pdf(context):
         story.extend(pdfmod.heading_with_body(
             Paragraph("5. Cumprimento do Objeto", styles["h2"]), Paragraph(report_data.get("cumprimento_objeto_final") or "Não informado.", styles["body"]),
         ))
+        if is_emendas and report_data.get("local_data"):
+            story.append(Paragraph(report_data.get("local_data"), styles["date_right"]))
         if is_subvencao:
             story.extend(pdfmod.heading_with_body(
                 Paragraph("6. Conclusão", styles["h2"]), Paragraph(report_data.get("conclusao") or "Não informado.", styles["body"]),
@@ -429,6 +439,8 @@ def render_visit_report_pdf(context):
             Paragraph("Homologação da Comissão de Monitoramento e Avaliação", styles["h2"]),
             Paragraph(report_data.get("texto_homologacao") or "Não informado.", styles["body"]),
         ))
+        if is_emendas and report_data.get("homologacao_local_data"):
+            story.append(Paragraph(report_data.get("homologacao_local_data"), styles["date_right"]))
         comissao = _signature_pair(
             report_data, "signature_comissao_tecnico", "comissao_tecnico_nome", "Comissão de Monitoramento — Técnico",
             "signature_comissao_financeiro", "comissao_financeiro_nome", "Comissão de Monitoramento — Financeiro",

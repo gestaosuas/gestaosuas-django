@@ -14,7 +14,7 @@ from django.contrib.staticfiles import finders
 from django.http import HttpResponse
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
@@ -72,6 +72,9 @@ def build_styles():
                                  fontSize=7.5, leading=10, textColor=TEXT_MUTED, spaceAfter=1),
         "value": ParagraphStyle("DocValue", parent=base["Normal"], fontName="Helvetica",
                                  fontSize=9.5, leading=12, textColor=TEXT_DARK, spaceAfter=6),
+        "date_right": ParagraphStyle("DocDateRight", parent=base["Normal"], fontName="Helvetica-Bold",
+                                      fontSize=9.5, leading=14, textColor=TEXT_DARK, alignment=TA_RIGHT,
+                                      spaceBefore=4, spaceAfter=10),
         "cell": ParagraphStyle("DocCell", parent=base["Normal"], fontName="Helvetica",
                                 fontSize=8.5, leading=11, textColor=TEXT_DARK),
         "cell_header": ParagraphStyle("DocCellHeader", parent=base["Normal"], fontName="Helvetica-Bold",

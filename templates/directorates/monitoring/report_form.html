@@ -149,16 +149,18 @@
                             <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">b) Das metas estabelecidas:</label>
                             <textarea id="metas" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.metas }}</textarea>
                         </div>
+                        {% if not is_emendas %}
                         <div>
                             <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">c) Das atividades:</label>
                             <textarea id="atividades" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.atividades }}</textarea>
                         </div>
+                        {% endif %}
                         <div>
-                            <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">d) Dos resultados:</label>
+                            <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">{% if is_emendas %}c{% else %}d{% endif %}) Dos resultados:</label>
                             <textarea id="resultados" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.resultados }}</textarea>
                         </div>
                         <div>
-                            <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">e) Da execução financeira:</label>
+                            <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">{% if is_emendas %}d{% else %}e{% endif %}) Da execução financeira:</label>
                             <textarea id="execucao_financeira" {% if report_data.status == 'finalized' %}readonly{% endif %} class="doc-textarea">{{ report_data.execucao_financeira }}</textarea>
                         </div>
                     </section>

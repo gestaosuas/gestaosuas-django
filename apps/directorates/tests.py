@@ -1528,6 +1528,112 @@ class WorkPlanObjectivesAndVisitLinkTests(DirectoratesTestBase):
         self.assertEqual(report_data["objeto_relatorio"], "Objeto da OSC")
 
 
+class RelatorioFinalItem4EmendasTests(DirectoratesTestBase):
+    """2026-09-23, pedido explícito do usuário, só em Emendas e Fundos: o
+    item 4 do Relatório Final perde o sub-item "c) Das atividades" (vira
+    a/b/c/d, com "Dos resultados"/"Da execução financeira" reletrados), e o
+    PDF passa a mostrar a data (local_data/homologacao_local_data) abaixo do
+    item 5 e abaixo da Homologação. Subvenção não muda em nada."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        directorates = list(Directorate.objects.order_by("name"))
+        cls.emendas = next((d for d in directorates if is_emendas_directorate(d)), None)
+        cls.subvencao = next(
+            (d for d in directorates if is_subvencao_directorate(d) and not is_emendas_directorate(d)),
+            None,
+        )
+
+    def setUp(self):
+        if not self.emendas or not self.subvencao:
+            self.skipTest("Diretorias 'Emendas e Fundos'/'Subvenção' não encontradas no banco de teste.")
+
+    def _login_admin(self):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        return admin
+
+    def _make_visit_with_report(self, directorate):
+        visit = self.make_visit(directorate=directorate)
+        visit.relatorio_final = {
+            "osc_name": visit.osc.name,
+            "objetivos": "Texto dos objetivos",
+            "metas": "Texto das metas",
+            "atividades": "Texto das atividades",
+            "resultados": "Texto dos resultados",
+            "execucao_financeira": "Texto da execução financeira",
+            "cumprimento_objeto_final": "Texto do cumprimento do objeto",
+            "texto_homologacao": "Texto da homologação",
+            "local_data": "Uberlândia, 17 de agosto de 2026",
+            "homologacao_local_data": "Uberlândia, 18 de agosto de 2026",
+            "status": "draft",
+        }
+        visit.save()
+        return visit
+
+    def _report_url(self, visit):
+        return reverse(
+            "directorates:visit-report",
+            kwargs={"pk": visit.pk, "report_type": "relatorio_final"},
+        )
+
+    def test_emendas_form_drops_atividades_and_relabels(self):
+        visit = self._make_visit_with_report(self.emendas)
+        self._login_admin()
+        response = self.client.get(self._report_url(visit))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertNotIn("Das atividades", html)
+        self.assertIn("c) Dos resultados", html)
+        self.assertIn("d) Da execução financeira", html)
+
+    def test_subvencao_form_keeps_atividades_untouched(self):
+        visit = self._make_visit_with_report(self.subvencao)
+        self._login_admin()
+        response = self.client.get(self._report_url(visit))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("c) Das atividades", html)
+        self.assertIn("d) Dos resultados", html)
+        self.assertIn("e) Da execução financeira", html)
+
+    def test_emendas_pdf_drops_atividades_and_shows_dates(self):
+        import fitz
+
+        visit = self._make_visit_with_report(self.emendas)
+        self._login_admin()
+        response = self.client.get(self._report_url(visit) + "?export=pdf")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        pdf = fitz.open(stream=response.content, filetype="pdf")
+        text = "".join(page.get_text() for page in pdf)
+        pdf.close()
+        self.assertNotIn("Das atividades", text)
+        self.assertNotIn("Texto das atividades", text)
+        self.assertIn("c) Dos resultados", text)
+        self.assertIn("d) Da execução financeira", text)
+        self.assertIn("Uberlândia, 17 de agosto de 2026", text)
+        self.assertIn("Uberlândia, 18 de agosto de 2026", text)
+
+    def test_subvencao_pdf_keeps_atividades_and_has_no_date(self):
+        import fitz
+
+        visit = self._make_visit_with_report(self.subvencao)
+        self._login_admin()
+        response = self.client.get(self._report_url(visit) + "?export=pdf")
+        self.assertEqual(response.status_code, 200)
+        pdf = fitz.open(stream=response.content, filetype="pdf")
+        text = "".join(page.get_text() for page in pdf)
+        pdf.close()
+        self.assertIn("Das atividades", text)
+        self.assertIn("Texto das atividades", text)
+        self.assertIn("d) Dos resultados", text)
+        self.assertIn("e) Da execução financeira", text)
+        self.assertNotIn("Uberlândia, 17 de agosto de 2026", text)
+        self.assertNotIn("Uberlândia, 18 de agosto de 2026", text)
+
+
 class WorkPlanDescriptionSubvencaoTests(DirectoratesTestBase):
     """"Descrição do plano" (2026-08-24, pedido explícito do usuário,
     inicialmente "Somente em Subvenção"): mesmo recurso que Emendas e Fundos
