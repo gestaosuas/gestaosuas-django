@@ -1738,6 +1738,71 @@ class RelatorioFinalItem4EmendasTests(DirectoratesTestBase):
         self.assertIn('id="homologacao_local_data" value="Uberlândia,', html)
 
 
+class PartnershipTableOscRowTests(DirectoratesTestBase):
+    """2026-10-05, pedido explícito do usuário: na tabela "Dados da
+    Parceria" do PDF (botão Imprimir/Visualizar) do Relatório Final e do
+    Parecer Conclusivo, adicionar uma linha "OSC" com o nome da OSC, acima
+    da linha "CNPJ" - o nome só aparecia no cabeçalho do documento, nunca
+    na própria tabela. Vale pras duas diretorias (Subvenção/Emendas e
+    Fundos) e pros dois tipos de relatório - `_partnership_data_table()`
+    (apps/directorates/pdf_documents.py) é compartilhada pelos dois, então
+    uma mudança só resolve os 4 casos. Só o PDF - o formulário web
+    (report_form.html) já mostrava "OSC parceira" como campo próprio, fora
+    da tabela, não mexido."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        directorates = list(Directorate.objects.order_by("name"))
+        cls.emendas = next((d for d in directorates if is_emendas_directorate(d)), None)
+        cls.subvencao = next(
+            (d for d in directorates if is_subvencao_directorate(d) and not is_emendas_directorate(d)),
+            None,
+        )
+
+    def setUp(self):
+        if not self.emendas or not self.subvencao:
+            self.skipTest("Diretorias 'Emendas e Fundos'/'Subvenção' não encontradas no banco de teste.")
+
+    def _login_admin(self):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        return admin
+
+    def _assert_osc_row_above_cnpj(self, directorate, report_type):
+        import fitz
+
+        osc = self.make_osc(name=f"OSC Teste PDF {uuid.uuid4().hex[:8]}", directorate=directorate)
+        visit = self.make_visit(osc=osc, directorate=directorate)
+        visit.status = "finalized"
+        setattr(visit, report_type, {"osc_name": osc.name, "cnpj": "12.345.678/0001-99", "status": "draft"})
+        visit.save()
+        self._login_admin()
+        url = reverse(
+            "directorates:visit-report",
+            kwargs={"pk": visit.pk, "report_type": report_type},
+        )
+        response = self.client.get(url + "?export=pdf")
+        self.assertEqual(response.status_code, 200)
+        pdf = fitz.open(stream=response.content, filetype="pdf")
+        text = "".join(page.get_text() for page in pdf)
+        pdf.close()
+        self.assertIn(osc.name, text)
+        self.assertLess(text.find("OSC"), text.find("CNPJ"))
+
+    def test_relatorio_final_subvencao(self):
+        self._assert_osc_row_above_cnpj(self.subvencao, "relatorio_final")
+
+    def test_relatorio_final_emendas(self):
+        self._assert_osc_row_above_cnpj(self.emendas, "relatorio_final")
+
+    def test_parecer_conclusivo_subvencao(self):
+        self._assert_osc_row_above_cnpj(self.subvencao, "parecer_conclusivo")
+
+    def test_parecer_conclusivo_emendas(self):
+        self._assert_osc_row_above_cnpj(self.emendas, "parecer_conclusivo")
+
+
 class WorkPlanDescriptionSubvencaoTests(DirectoratesTestBase):
     """"Descrição do plano" (2026-08-24, pedido explícito do usuário,
     inicialmente "Somente em Subvenção"): mesmo recurso que Emendas e Fundos

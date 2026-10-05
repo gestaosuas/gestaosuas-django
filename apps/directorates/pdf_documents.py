@@ -290,6 +290,7 @@ def _get_reference_year():
 
 def _partnership_data_table(report_data, is_subvencao, styles, valor_label="Valor autorizado por lei e repassado", anotacoes=None):
     rows = [
+        ("OSC", report_data.get("osc_name") or "-"),
         ("CNPJ", report_data.get("cnpj") or "-"),
     ]
     if not is_subvencao:
