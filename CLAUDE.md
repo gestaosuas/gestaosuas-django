@@ -533,6 +533,21 @@ Usuário reportou, na mesma leva de pedidos acima: "no modo tablet, quando entro
 
 ---
 
+## Navbar sumindo em notebooks/desktops reais — nova faixa "compacta" 1280-1919px (2026-10-05)
+
+Usuário reportou em produção (`gestaosuasuberlandia.com.br`): ao clicar na logo e cair em `/directorias/`, a navbar some e vira o layout de hambúrguer "como se estivesse em tablet" — e confirmou que isso também acontecia em "alguns computadores" de verdade, não só numa página específica.
+
+**Causa raiz**: exatamente o trade-off já documentado e aceito na entrada acima (2026-08-24) — o breakpoint do hambúrguer tinha sido estendido pra `max-width: 1919px` pra resolver o overflow em tablet, e a navbar desktop só reaparecia a partir de **1920px**. Medido ao vivo (`browser-automation`, `/directorias/`, várias larguras): **toda largura comum de notebook/desktop reproduzia o hambúrguer** — 1920 ✅, mas 1900/1680/1600/1536/1440/1366/1280 ❌ todas em modo hambúrguer. 1536px em particular é a largura efetiva de praticamente qualquer monitor "1920x1080" com escala de 125% do Windows (configuração padrão recomendada pelo próprio Windows nesse tamanho de tela) — ou seja, não é um caso raro, é a maioria dos computadores reais sem 4K/ultrawide a 100% de escala.
+
+**Pedido do usuário**: "acredito que seja mais fácil implementar a navbar até 720p o resto pra baixo ficaria menu hambúrguer" — ou seja, mostrar a navbar desktop a partir de 1280px (720p de largura), hambúrguer só abaixo disso. Só mudar o número do breakpoint de volta, porém, reintroduziria exatamente o bug de overflow de 2026-08-24 na faixa 1280-1919px (a causa raiz dele — `.nav-main` sem `min-width:0` — nunca tinha sido corrigida, só contornada escondendo a navbar nessa faixa inteira). Então a correção implementada resolve as duas pontas:
+
+- **Breakpoint do hambúrguer reduzido de volta**: `max-width: 1919px` → `max-width: 1279px` (`partials/navbar.html`). Tablets (1025-1279px, onde o bug original de 2026-08-24 foi reportado) continuam no hambúrguer, sem regressão.
+- **Nova faixa "Navbar compacta"**: `@media (min-width: 1280px) and (max-width: 1919px)` — usa a navbar horizontal normal (mesma do `app.css`, com o tema/gradiente por diretoria de sempre), não mais o hambúrguer nem a transparente-flutuante (essa só entra a partir de 1920px, inalterada). Resolve a causa raiz do overflow: `.nav-main { min-width: 0; }` deixa o flex item encolher de verdade, e `.nav-label` (classe nova nos `<span>` de texto dos 6 itens do menu: Dashboard/Diretorias/Monitoramento/Usuários/Configurações/Mapas, cada `<button>`/`<a>` ganhou também `title="..."` pra acessibilidade) fica `display:none` nessa faixa — vira um menu só de ícones, indo de ~1905px de conteúdo pra ~350px, cabendo folgado mesmo nos 1280px mais apertados. Os dropdowns (Diretorias/Monitoramento/Mapas/Dashboard) continuam com texto completo normal ao abrir — só o botão-gatilho fica sem label; o chevron (seta) do dropdown foi mantido visível de propósito, pra ainda dar a dica visual de "isso abre um menu" mesmo sem texto.
+- `.mobile-toggle` explicitamente escondido na faixa nova (senão ficaria com `display` nativo do `<button>`, aparecendo ao lado da navbar já visível).
+- Testado ao vivo nos limites exatos da faixa (1279/1280/1366/1440/1536/1600/1680/1900/1919/1920px) em `/directorias/` (sem banner próprio) e numa página com banner colorido (`Subvenção`, `/monitoramento/<slug>/`): zero overflow horizontal em todas, zero erro de console, navbar compacta/ícones em 1280-1919, navbar completa com texto a partir de 1920 (idêntica a antes), hambúrguer abaixo de 1280 (inclusive testado clicando de verdade pra confirmar que ainda abre) e larguras de celular/tablet retrato (390/768/1024px) sem overflow nenhum.
+
+---
+
 ## Ícone "Descrição do plano" no Plano de Trabalho (Subvenção e Emendas e Fundos) — 2026-08-24
 
 Pedido explícito do usuário: um ícone/botão associado a cada plano de trabalho que abre um modal "Descrição do plano de trabalho" com 4 campos de texto (Objeto, Objetivos, Metas estabelecidas, Atividades) — os mesmos 4 itens que já aparecem pré-preenchidos no "Relatório de Visita" (etapa habilitada ao finalizar o Instrumental de Visita), puxados por OSC/plano.

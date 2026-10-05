@@ -24,9 +24,9 @@
 
         {% if request.user.is_superuser or user_profile.role == 'admin' %}
         <div class="nav-group">
-            <button class="nav-btn {% if '/tv' in request.path or request.resolver_match.url_name == 'notifications-list' %}active{% endif %}">
+            <button class="nav-btn {% if '/tv' in request.path or request.resolver_match.url_name == 'notifications-list' %}active{% endif %}" title="Dashboard">
                 <i data-lucide="monitor-play"></i>
-                <span>Dashboard</span>
+                <span class="nav-label">Dashboard</span>
                 <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
             </button>
             <div class="nav-dropdown">
@@ -41,9 +41,9 @@
         {% endif %}
 
         <div class="nav-group">
-            <button class="nav-btn">
+            <button class="nav-btn" title="Diretorias">
                 <i data-lucide="building-2"></i>
-                <span>Diretorias</span>
+                <span class="nav-label">Diretorias</span>
                 <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
             </button>
             <div class="nav-dropdown">
@@ -56,9 +56,9 @@
         </div>
 
         <div class="nav-group">
-            <button class="nav-btn">
+            <button class="nav-btn" title="Monitoramento">
                 <i data-lucide="bar-chart-3"></i>
-                <span>Monitoramento</span>
+                <span class="nav-label">Monitoramento</span>
                 <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
             </button>
             <div class="nav-dropdown">
@@ -76,21 +76,21 @@
         </div>
 
         {% if request.user.is_superuser or user_profile.role == 'admin' %}
-        <a href="{% url 'accounts:user_list' %}" class="nav-link {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}">
+        <a href="{% url 'accounts:user_list' %}" class="nav-link {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}" title="Usuários">
             <i data-lucide="users"></i>
-            <span>Usuários</span>
+            <span class="nav-label">Usuários</span>
         </a>
 
-        <a href="{% url 'core:settings' %}" class="nav-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}">
+        <a href="{% url 'core:settings' %}" class="nav-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}" title="Configurações">
             <i data-lucide="settings"></i>
-            <span>Configurações</span>
+            <span class="nav-label">Configurações</span>
         </a>
         {% endif %}
 
         <div class="nav-group">
-            <button class="nav-btn">
+            <button class="nav-btn" title="Mapas">
                 <i data-lucide="map-pin"></i>
-                <span>Mapas</span>
+                <span class="nav-label">Mapas</span>
                 <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
             </button>
             <div class="nav-dropdown">
@@ -226,29 +226,24 @@
     .user-avatar-mini { display: none; }
     .mobile-profile-card { display: none; }
 
-    /* Otimização para Tablets e Mobile (2026-08-24: breakpoint estendido de
-       1024px para 1919px - o menu desktop (.nav-main) tem largura de
-       conteudo fixa (~1905px, nao encolhe de verdade porque falta
-       min-width:0 no flex item) e ficava com 700-800px de overflow
-       horizontal em QUALQUER largura entre 1025px e ~1904px, faixa que
-       cobre exatamente paisagem de tablet (iPad ~1024-1194px, a maioria
-       dos Android landscape 1080-1200px) - reportado pelo usuario como
-       "tela trêmula" em 2 tablets reais em produção, testado/confirmado
-       via medicao direta em navegador (getBoundingClientRect), nao só
-       leitura de CSS. Sem breakpoint proprio pra esse intervalo quebrado,
-       a correção mais segura foi estender o menu mobile/hamburguer -
-       caminho de codigo ja existente e testado - em vez de tentar fazer o
-       menu desktop encolher de verdade (decisão explicita do usuário,
-       ciente de que isso muda a navbar tambem em notebooks/desktops
-       menores que 1920px, nao só tablets). O navbar (mobile e desktop) é
-       sempre `position: sticky`, nunca `fixed` — ocupa espaço no fluxo
-       normal do documento nos dois modos, então paginas que reservam
-       espaço extra pro navbar via `.dashboard-main { padding-top: 80px }`
-       (`app.css`, regra em `@media (min-width: 1920px)`, não movida junto)
-       só ganham um respiro a mais nesse intervalo, sem conteúdo escondido
-       atrás do navbar - confirmado visualmente em várias páginas antes de
-       fechar essa mudança. */
-    @media (max-width: 1919px) {
+    /* Otimização para Mobile/tablet retrato (2026-10-05: breakpoint reduzido
+       de volta de 1919px para 1279px). Historico: em 2026-08-24, esse
+       breakpoint tinha sido estendido de 1024px pra 1919px pra resolver um
+       bug real de overflow horizontal em tablets (a faixa 1025-1904px
+       tinha 700-800px de rolagem lateral, porque .nav-main nao encolhia de
+       verdade - flex item sem min-width:0). A extensao resolveu o tablet,
+       mas como efeito colateral escondia a navbar inteira (virava
+       hamburguer) em QUALQUER notebook/desktop com largura CSS menor que
+       1920px - ou seja, a maioria dos computadores reais (ex.: um monitor
+       1920x1080 com escala de 125% do Windows renderiza a 1536px de CSS).
+       Reportado pelo usuario em producao ("alguns computadores... nao
+       mostram a navbar"). Corrigido de volta restaurando o breakpoint
+       mobile pra 1279px (hamburguer so abaixo de 720p de largura) e
+       resolvendo o bug de overflow na causa raiz, no bloco "Navbar
+       compacta" logo abaixo (1280-1919px): min-width:0 no .nav-main +
+       .nav-label escondido (vira icon-only) encolhe o conteudo de ~1905px
+       pra ~350px, cabendo confortavelmente mesmo a 1280px. */
+    @media (max-width: 1279px) {
         .navbar {
             padding: 0 16px;
             background: white !important;
@@ -486,15 +481,56 @@
         }
     }
 
-    /* Precisa andar junto com o breakpoint do bloco mobile acima (2026-08-24:
-       1919px) - eram os dois "1025px" originais, cada um controlando metade
-       do mesmo liga/desliga mobile-vs-desktop (aqui: esconde o botao
-       hamburguer e troca o navbar pro modo transparente/absoluto que
-       flutua sobre o banner colorido das paginas com header proprio). Ficar
-       destravado do outro bloco reproduz exatamente o bug historico ja
-       documentado nesse arquivo (duas regras pro mesmo breakpoint
-       divergindo com o tempo) - só que dessa vez escondendo o botao de
-       menu inteiro em vez de só um detalhe visual. */
+    /* Navbar compacta (2026-10-05, nova faixa intermediaria): 1280-1919px
+       (notebooks e monitores comuns, incluindo qualquer "1920x1080" com
+       escala >100% do Windows) usa a navbar horizontal normal do app.css
+       (mesmo gradiente/tema por diretoria de sempre, nao a transparente-
+       flutuante que so entra em 1920px+ mais abaixo) em vez do hamburguer -
+       mas .nav-main precisa de min-width:0 pra conseguir encolher de
+       verdade (sem isso, o flex item trava na largura de conteudo ~1905px
+       e volta a vazar - mesmo bug de overflow que motivou estender o
+       hamburguer em 2026-08-24, ver comentario do bloco mobile acima).
+       Esconder .nav-label (vira icon-only, com title="" no HTML cobrindo
+       acessibilidade/tooltip) encolhe o conteudo todo pra ~350px, cabendo
+       folgado mesmo nos 1280px mais apertados - os dropdowns (Diretorias/
+       Monitoramento/Mapas/Dashboard) continuam com texto completo normal,
+       só o botao-gatilho fica sem label. */
+    @media (min-width: 1280px) and (max-width: 1919px) {
+        .mobile-toggle {
+            display: none;
+        }
+
+        .nav-main {
+            min-width: 0;
+            gap: 2px;
+        }
+
+        .nav-link, .nav-btn {
+            padding: 10px 12px;
+            gap: 0;
+        }
+
+        .nav-label {
+            display: none;
+        }
+
+        .user-info-mini {
+            display: none;
+        }
+
+        .user-profile-mini {
+            padding-right: 12px;
+        }
+    }
+
+    /* Precisa andar junto com o breakpoint do bloco "Navbar compacta" acima
+       (2026-10-05: 1919px) - cada um controla metade do mesmo liga/desliga
+       compacto-vs-grande (aqui: esconde o botao hamburguer, ja escondido
+       pelo bloco compacto tambem, e troca o navbar pro modo transparente/
+       absoluto que flutua sobre o banner colorido das paginas com header
+       proprio). Ficar destravado do outro bloco reproduz exatamente o bug
+       historico ja documentado nesse arquivo (duas regras pro mesmo
+       breakpoint divergindo com o tempo). */
     @media (min-width: 1920px) {
         .mobile-toggle { display: none; }
         #main-navbar {
