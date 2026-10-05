@@ -381,3 +381,49 @@ class MonitoramentoReportsTabGroupedByOscTests(TestCase):
         response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=reports")
         instrumental_url = reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk})
         self.assertContains(response, instrumental_url)
+
+
+class ReportsTabRevertButtonTests(TestCase):
+    """2026-10-05, mesmo pedido de `ReportRevertButtonTests`
+    (apps/directorates/tests.py), aplicado tambem na aba inline
+    "Relatorios e Pareceres" (monitoramento:home?tab=reports), que antes
+    desta mudanca nao tinha nenhum botao de reverter report."""
+
+    def setUp(self):
+        self.password = "senha12345"
+
+    def test_revert_button_shows_only_when_relatorio_final_finalized(self):
+        directorate = make_directorate(name=f"Subvenção Teste {uuid.uuid4().hex[:8]}")
+        visit = make_visit(directorate)
+        visit.status = "finalized"
+        visit.relatorio_final = {"status": "finalized"}
+        visit.save()
+        admin, _ = make_user(password=self.password, role="admin")
+        self.client.login(username=admin.username, password=self.password)
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=reports")
+        self.assertContains(response, "Reverter Relatório Final")
+        self.assertNotContains(response, "Reverter Parecer Conclusivo")
+
+    def test_no_revert_button_when_neither_finalized(self):
+        directorate = make_directorate(name=f"Emendas e Fundos Teste {uuid.uuid4().hex[:8]}")
+        visit = make_visit(directorate)
+        visit.status = "finalized"
+        visit.save()
+        admin, _ = make_user(password=self.password, role="admin")
+        self.client.login(username=admin.username, password=self.password)
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=reports")
+        self.assertNotContains(response, "Reverter Relatório Final")
+        self.assertNotContains(response, "Reverter Parecer Conclusivo")
+
+    def test_revert_buttons_hidden_for_non_admin(self):
+        directorate = make_directorate(name=f"Emendas e Fundos Teste {uuid.uuid4().hex[:8]}")
+        visit = make_visit(directorate)
+        visit.status = "finalized"
+        visit.relatorio_final = {"status": "finalized"}
+        visit.parecer_conclusivo = {"status": "finalized"}
+        visit.save()
+        diretor, _ = make_user(password=self.password, role=Profile.ROLE_DIRECTOR, primary_directorate=directorate)
+        self.client.login(username=diretor.username, password=self.password)
+        response = self.client.get(reverse("monitoramento:home", kwargs={"pk": directorate.pk}) + "?tab=reports")
+        self.assertNotContains(response, "Reverter Relatório Final")
+        self.assertNotContains(response, "Reverter Parecer Conclusivo")

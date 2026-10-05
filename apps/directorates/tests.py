@@ -1069,6 +1069,92 @@ class ReportListGroupedByOscTests(DirectoratesTestBase):
         self.assertContains(response, instrumental_url)
 
 
+class ReportRevertButtonTests(DirectoratesTestBase):
+    """2026-10-05, pedido explicito do usuario: no card de "Relatorios e
+    Pareceres", um botao por relatorio (Relatorio Final / Parecer
+    Conclusivo), admin-only, que so aparece quando aquele relatorio
+    especifico estiver finalizado - cada um reverte so o seu, sem mexer no
+    outro. Antes existia um unico botao "Reverter para Rascunho" que
+    revertia os dois juntos, sempre visivel pra admin mesmo que nenhum dos
+    dois estivesse finalizado. O endpoint (`RevertReportView`,
+    `visit-report-revert`) ja existia e ja era admin-only desde 2026-08-16;
+    essa classe cobre o endpoint pela primeira vez, junto com os botoes."""
+
+    def _login_admin(self):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        return admin
+
+    def test_revert_button_shows_only_when_relatorio_final_finalized(self):
+        visit = self.make_visit()
+        visit.status = "finalized"
+        visit.relatorio_final = {"status": "finalized"}
+        visit.save()
+        self._login_admin()
+        response = self.client.get(reverse("directorates:report-list", kwargs={"pk": self.directorate.pk}))
+        self.assertContains(response, "Reverter Relatório Final")
+        self.assertNotContains(response, "Reverter Parecer Conclusivo")
+
+    def test_revert_button_shows_only_when_parecer_conclusivo_finalized(self):
+        visit = self.make_visit()
+        visit.status = "finalized"
+        visit.parecer_conclusivo = {"status": "finalized"}
+        visit.save()
+        self._login_admin()
+        response = self.client.get(reverse("directorates:report-list", kwargs={"pk": self.directorate.pk}))
+        self.assertContains(response, "Reverter Parecer Conclusivo")
+        self.assertNotContains(response, "Reverter Relatório Final")
+
+    def test_no_revert_button_when_neither_finalized(self):
+        visit = self.make_visit()
+        visit.status = "finalized"
+        visit.save()
+        self._login_admin()
+        response = self.client.get(reverse("directorates:report-list", kwargs={"pk": self.directorate.pk}))
+        self.assertNotContains(response, "Reverter Relatório Final")
+        self.assertNotContains(response, "Reverter Parecer Conclusivo")
+
+    def test_revert_buttons_hidden_for_non_admin(self):
+        visit = self.make_visit()
+        visit.status = "finalized"
+        visit.relatorio_final = {"status": "finalized"}
+        visit.parecer_conclusivo = {"status": "finalized"}
+        visit.save()
+        diretor = make_user(role="diretor", primary_directorate=self.directorate)
+        self.client.force_login(diretor)
+        response = self.client.get(reverse("directorates:report-list", kwargs={"pk": self.directorate.pk}))
+        self.assertNotContains(response, "Reverter Relatório Final")
+        self.assertNotContains(response, "Reverter Parecer Conclusivo")
+
+    def test_revert_endpoint_sets_only_that_report_back_to_draft(self):
+        visit = self.make_visit()
+        visit.status = "finalized"
+        visit.relatorio_final = {"status": "finalized", "objetivos": "texto real"}
+        visit.parecer_conclusivo = {"status": "finalized", "conclusao": "outro texto"}
+        visit.save()
+        self._login_admin()
+        url = reverse("directorates:visit-report-revert", kwargs={"pk": visit.pk, "report_type": "relatorio_final"})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["success"])
+        visit.refresh_from_db()
+        self.assertEqual(visit.relatorio_final["status"], "draft")
+        self.assertEqual(visit.relatorio_final["objetivos"], "texto real")
+        self.assertEqual(visit.parecer_conclusivo["status"], "finalized")
+
+    def test_revert_endpoint_forbidden_for_non_admin(self):
+        visit = self.make_visit()
+        visit.relatorio_final = {"status": "finalized"}
+        visit.save()
+        diretor = make_user(role="diretor", primary_directorate=self.directorate)
+        self.client.force_login(diretor)
+        url = reverse("directorates:visit-report-revert", kwargs={"pk": visit.pk, "report_type": "relatorio_final"})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 403)
+        visit.refresh_from_db()
+        self.assertEqual(visit.relatorio_final["status"], "finalized")
+
+
 class VisitRevertViewTests(DirectoratesTestBase):
     """2026-08-27, bug real reportado pelo usuário: reverter o Instrumental
     de Visita voltava só `visit.status` pra rascunho, nunca

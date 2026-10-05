@@ -623,6 +623,16 @@
                             </a>
                             {% endif %}
                             {% if is_admin_user %}
+                            {% if visit.relatorio_final.status == 'finalized' %}
+                            <button type="button" class="report-action-btn btn-revert" onclick="revertSingleReport('{{ visit.pk }}', 'relatorio_final', 'Relatório Final', this)">
+                                <i data-lucide="rotate-ccw"></i> Reverter Relatório Final
+                            </button>
+                            {% endif %}
+                            {% if visit.parecer_conclusivo.status == 'finalized' %}
+                            <button type="button" class="report-action-btn btn-revert" onclick="revertSingleReport('{{ visit.pk }}', 'parecer_conclusivo', 'Parecer Conclusivo', this)">
+                                <i data-lucide="rotate-ccw"></i> Reverter Parecer Conclusivo
+                            </button>
+                            {% endif %}
                             <button type="button" class="report-action-btn btn-slate-light" onclick="openDelegateModal('{{ visit.pk }}', '{{ visit.osc.name|escapejs }}', '{{ visit.delegated_user_ids_str }}')">
                                 <i data-lucide="users-round"></i> Delegar
                             </button>
@@ -942,6 +952,42 @@
         });
         var empty = document.getElementById('delegateTechEmpty');
         if (empty) empty.style.display = visibleCount === 0 ? '' : 'none';
+    }
+
+    function revertReport(visitId, reportType, btn) {
+        return fetch(`/directorias/visitas/${visitId}/relatorio/${reportType}/reverter/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        }).then(r => r.json());
+    }
+
+    async function revertSingleReport(visitId, reportType, reportLabel, btn) {
+        if (!confirm(`Reverter ${reportLabel} para rascunho?\n\nPoderá ser editado novamente.`)) return;
+
+        btn.disabled = true;
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i data-lucide="loader-circle" style="animation:spin 1s linear infinite;width:14px;height:14px;"></i> Revertendo...';
+        lucide.createIcons();
+
+        try {
+            const r = await revertReport(visitId, reportType, btn);
+            if (r.success) {
+                window.location.reload();
+            } else {
+                alert('Erro ao reverter: ' + (r.error || 'tente novamente.'));
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                lucide.createIcons();
+            }
+        } catch {
+            alert('Erro de conexão. Tente novamente.');
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            lucide.createIcons();
+        }
     }
 </script>
 {% endif %}

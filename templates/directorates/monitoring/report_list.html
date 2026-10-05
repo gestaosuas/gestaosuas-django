@@ -123,13 +123,23 @@
                         {% endif %}
 
                         {% if is_admin_user %}
-                        {# Reverter ambos para rascunho ── #}
-                        <button type="button" class="report-action-btn btn-revert-both"
-                                id="revert-btn-{{ visit.pk }}"
-                                onclick="revertBothReports('{{ visit.pk }}', this)">
+                        {# Reverter Relatório Final ── só aparece se ele estiver finalizado #}
+                        {% if visit.relatorio_final.status == 'finalized' %}
+                        <button type="button" class="report-action-btn btn-revert"
+                                onclick="revertSingleReport('{{ visit.pk }}', 'relatorio_final', 'Relatório Final', this)">
                             <i data-lucide="rotate-ccw"></i>
-                            Reverter para Rascunho
+                            Reverter Relatório Final
                         </button>
+                        {% endif %}
+
+                        {# Reverter Parecer Conclusivo ── só aparece se ele estiver finalizado #}
+                        {% if visit.parecer_conclusivo.status == 'finalized' %}
+                        <button type="button" class="report-action-btn btn-revert"
+                                onclick="revertSingleReport('{{ visit.pk }}', 'parecer_conclusivo', 'Parecer Conclusivo', this)">
+                            <i data-lucide="rotate-ccw"></i>
+                            Reverter Parecer Conclusivo
+                        </button>
+                        {% endif %}
 
                         {# Delegar ── #}
                         <button type="button" class="report-action-btn btn-slate-light"
@@ -280,27 +290,29 @@ function revertReport(visitId, reportType, btn) {
     }).then(r => r.json());
 }
 
-async function revertBothReports(visitId, btn) {
-    if (!confirm('Reverter Relatório Final e Parecer Conclusivo para rascunho?\n\nAmbos poderão ser editados novamente.')) return;
+async function revertSingleReport(visitId, reportType, reportLabel, btn) {
+    if (!confirm(`Reverter ${reportLabel} para rascunho?\n\nPoderá ser editado novamente.`)) return;
 
     btn.disabled = true;
+    const originalHtml = btn.innerHTML;
     btn.innerHTML = '<i data-lucide="loader-circle" style="animation:spin 1s linear infinite;width:14px;height:14px;"></i> Revertendo...';
     lucide.createIcons();
 
     try {
-        const [r1, r2] = await Promise.all([
-            revertReport(visitId, 'relatorio_final', btn),
-            revertReport(visitId, 'parecer_conclusivo', btn)
-        ]);
-        if (r1.success || r2.success) {
+        const r = await revertReport(visitId, reportType, btn);
+        if (r.success) {
             window.location.reload();
         } else {
-            alert('Erro ao reverter: ' + (r1.error || r2.error || 'tente novamente.'));
+            alert('Erro ao reverter: ' + (r.error || 'tente novamente.'));
             btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            lucide.createIcons();
         }
     } catch {
         alert('Erro de conexão. Tente novamente.');
         btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        lucide.createIcons();
     }
 }
 
@@ -530,15 +542,15 @@ function filterCards() {
 .btn-slate-light { background: #f8fafc; color: #64748b; border: 1.5px solid #e2e8f0; }
 .btn-slate-light:hover { background: #f1f5f9; color: #1e293b; }
 
-.btn-revert-both {
+.btn-revert {
     background: #fef2f2;
     border: 1.5px solid #fecaca;
     color: #dc2626;
     cursor: pointer;
     justify-content: center;
 }
-.btn-revert-both:hover { background: #dc2626; color: white; border-color: #dc2626; }
-.btn-revert-both:disabled { opacity: .5; cursor: not-allowed; }
+.btn-revert:hover { background: #dc2626; color: white; border-color: #dc2626; }
+.btn-revert:disabled { opacity: .5; cursor: not-allowed; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .notif-section { margin-top: 4px; padding: 10px 12px; background: #f8fafc; border-radius: 10px; border: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 6px; }
