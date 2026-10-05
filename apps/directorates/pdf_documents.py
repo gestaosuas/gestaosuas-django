@@ -300,7 +300,7 @@ def _partnership_data_table(report_data, is_subvencao, styles, valor_label="Valo
     rows.append((valor_label, report_data.get("valor_autorizado") or "-"))
     if anotacoes:
         rows.append(("Anotações", anotacoes))
-    return pdfmod.styled_table(["Campo", "Valor"], rows, styles, col_widths=[60 * pdfmod.mm, None])
+    return pdfmod.styled_table(None, rows, styles, col_widths=[60 * pdfmod.mm, None])
 
 
 def _signature_pair(report_data, key_a, name_a, label_a, key_b, name_b, label_b):

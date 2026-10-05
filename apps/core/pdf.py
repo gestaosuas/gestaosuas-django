@@ -244,28 +244,35 @@ def label_value(label, value, styles):
 
 
 def styled_table(headers, rows, styles, col_widths=None, header_bg=BRAND_BLUE):
-    """Table com repeatRows=1: quando a tabela precisa quebrar entre paginas,
-    o ReportLab automaticamente repete a linha de cabecalho na pagina
-    seguinte e nunca deixa so o cabecalho (sem nenhuma linha de dado) sozinho
-    numa pagina -- se nao cabe cabecalho + 1 linha, a tabela inteira desce."""
-    header_row = [Paragraph(str(h), styles["cell_header"]) for h in headers]
-    data = [header_row]
+    """Table com repeatRows=1 quando ha cabecalho: quando a tabela precisa
+    quebrar entre paginas, o ReportLab automaticamente repete a linha de
+    cabecalho na pagina seguinte e nunca deixa so o cabecalho (sem nenhuma
+    linha de dado) sozinho numa pagina -- se nao cabe cabecalho + 1 linha,
+    a tabela inteira desce. `headers=None` omite a linha de cabecalho
+    inteira (sem faixa colorida na primeira linha nem repeticao entre
+    paginas)."""
+    has_header = headers is not None
+    data = []
+    if has_header:
+        data.append([Paragraph(str(h), styles["cell_header"]) for h in headers])
     for row in rows:
         data.append([
             cell if isinstance(cell, Flowable) else Paragraph(str(cell) if cell not in (None, "") else "-", styles["cell"])
             for cell in row
         ])
-    table = Table(data, colWidths=col_widths, repeatRows=1)
-    table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), header_bg),
+    table = Table(data, colWidths=col_widths, repeatRows=1 if has_header else 0)
+    style_commands = [
         ("GRID", (0, 0), (-1, -1), 0.5, BORDER_GRAY),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("LEFTPADDING", (0, 0), (-1, -1), 5),
         ("RIGHTPADDING", (0, 0), (-1, -1), 5),
         ("TOPPADDING", (0, 0), (-1, -1), 4),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BRAND_BLUE_SOFT]),
-    ]))
+        ("ROWBACKGROUNDS", (0, 1 if has_header else 0), (-1, -1), [colors.white, BRAND_BLUE_SOFT]),
+    ]
+    if has_header:
+        style_commands.insert(0, ("BACKGROUND", (0, 0), (-1, 0), header_bg))
+    table.setStyle(TableStyle(style_commands))
     return table
 
 
