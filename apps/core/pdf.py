@@ -639,6 +639,14 @@ def _load_image_reader(url):
         path = url
         if path.startswith("/media/"):
             path = path[len("/media/"):]
+        elif path.startswith("/media-protegido/"):
+            # Upload local (fallback do upload_to_supabase, ou qualquer outro
+            # documento salvo via _save_file_locally): a URL e a rota
+            # protegida (core:protected-media), nao um caminho de arquivo —
+            # sem isso, os.path.join(MEDIA_ROOT, url_absoluta) descarta o
+            # MEDIA_ROOT (componente absoluto sempre vence no os.path.join) e
+            # o arquivo nunca e encontrado, mesmo existindo em disco.
+            path = path[len("/media-protegido/"):].rstrip("/")
         full_path = os.path.join(str(settings.MEDIA_ROOT), path)
         if os.path.exists(full_path):
             with open(full_path, "rb") as fh:
@@ -668,7 +676,15 @@ def photo_grid(documents, styles, columns=2):
         except Exception:
             continue
         caption = Paragraph(doc.get("name") or doc.get("type") or "", styles["caption"])
-        cells.append(KeepTogether([img, caption]))
+        # Lista simples, nao KeepTogether: dentro de uma celula de Table, o
+        # Platypus ja empilha os flowables normalmente - KeepTogether.wrap()
+        # devolve de proposito uma altura "infinita" (~16777215pt, sentinela)
+        # quando o conteudo nao cabe no espaco restante da pagina, pra forcar
+        # o doc template a decidir via split() (ver nota em heading_with_body
+        # acima). Isso funciona pra flowables de topo de story, mas o
+        # algoritmo de Table nao entende esse sentinela - toma a altura ao pe
+        # da letra e todo o grid de fotos vira LayoutError ("too large").
+        cells.append([img, caption])
 
     if not cells:
         return Paragraph("Nenhuma foto/evidencia anexada.", styles["body_empty"])

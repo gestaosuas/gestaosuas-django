@@ -1267,6 +1267,148 @@ class VisitDocumentWaitingListTests(DirectoratesTestBase):
         self.assertIn("12", text)
 
 
+class VisitDocumentPhotoPrintingTests(DirectoratesTestBase):
+    """2026-10-14, bug real reportado pelo usuário: fotos anexadas à visita
+    ("Fotos / Evidências") não apareciam no PDF do botão "Imprimir"
+    (`render_visit_document_pdf`/`photo_grid`, `apps/core/pdf.py`) - pedido
+    explícito do usuário pra cobrir Subvenção, Emendas e Fundos e Outros
+    (a seção de fotos não é condicionada por diretoria, então um fix só
+    resolve as três). Duas causas raiz encontradas e corrigidas juntas:
+
+    1. `_load_image_reader()` só sabia resolver URLs http(s) (upload bem
+       sucedido no Supabase Storage) ou prefixadas com `/media/` (Django
+       servindo direto, só com DEBUG=True). Quando `upload_to_supabase()`
+       cai no fallback local (`_save_file_locally()`, usado sempre que
+       `SUPABASE_URL`/`SUPABASE_ANON_KEY` não estão configurados - como é o
+       caso neste ambiente de dev, e muito provavelmente em produção
+       também, já que o projeto migrou pra fora do Supabase), a URL salva é
+       a rota `core:protected-media` (`/media-protegido/<path>/`) - nem
+       http(s) nem `/media/`. `_load_image_reader` caía no ramo de arquivo
+       local, mas sem tirar esse prefixo: `os.path.join(MEDIA_ROOT,
+       url_absoluta)` descarta o MEDIA_ROOT (um componente absoluto sempre
+       vence no os.path.join), o arquivo nunca era encontrado, e a foto
+       era silenciosamente pulada (comportamento documentado da função -
+       "falhas de download individuais sao ignoradas").
+    2. Mesmo com o arquivo encontrado, `photo_grid()` quebrava o PDF
+       inteiro com `LayoutError` ("too large") - cada foto era envolvida
+       num `KeepTogether([img, caption])` usado como CÉLULA de uma
+       `Table`. `KeepTogether.wrap()` devolve de propósito uma altura
+       "infinita" (~16777215pt, sentinela) quando o conteúdo não cabe no
+       espaço restante da página, pra forçar o doc template a decidir via
+       `split()` - funciona pra flowables de topo de story (como já usado
+       em `heading_with_body`/`PinnedToBottom`), mas uma `Table` não
+       entende esse sentinela e toma a altura ao pé da letra. Corrigido
+       trocando pra uma lista simples `[img, caption]` como célula (o
+       Platypus já empilha flowables numa célula de Table nativamente,
+       sem precisar de KeepTogether)."""
+
+    def _login_admin(self):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        return admin
+
+    def _attach_local_photo(self, visit, filename="foto_teste.png", size=(600, 400)):
+        import os
+
+        from django.conf import settings
+        from django.urls import reverse as _reverse
+        from PIL import Image as PILImage
+
+        rel_path = f"visitas/evidencias/{visit.pk}/{filename}"
+        full_path = os.path.join(str(settings.MEDIA_ROOT), rel_path)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        PILImage.new("RGB", size, color="red").save(full_path, format="PNG")
+        self.addCleanup(lambda: os.path.exists(full_path) and os.remove(full_path))
+        photo_url = _reverse("core:protected-media", kwargs={"file_path": rel_path})
+        visit.documents = [{
+            "name": filename,
+            "type": "Foto / Evidência",
+            "field": "fotos_camera",
+            "url": photo_url,
+            "uploaded_at": "2026-10-14T12:00:00",
+        }]
+        visit.save()
+        return visit
+
+    def test_locally_stored_photo_embeds_in_pdf_without_crashing(self):
+        import fitz
+
+        visit = self.make_visit()
+        visit.status = "finalized"
+        visit.save()
+        self._attach_local_photo(visit)
+        self._login_admin()
+        response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}) + "?export=pdf"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        pdf = fitz.open(stream=response.content, filetype="pdf")
+        has_image = any(len(page.get_images()) > 0 for page in pdf)
+        text = "".join(page.get_text() for page in pdf)
+        pdf.close()
+        self.assertTrue(has_image)
+        self.assertIn("foto_teste.png", text)
+        self.assertNotIn("Nenhuma foto", text)
+
+    def test_outros_visit_also_prints_photos(self):
+        import fitz
+
+        outros = next(
+            (d for d in Directorate.objects.order_by("name") if is_outros_directorate(d)), None
+        )
+        if not outros:
+            self.skipTest("Diretoria 'Outros' não encontrada no banco de teste.")
+        visit = self.make_visit(directorate=outros)
+        visit.status = "finalized"
+        visit.save()
+        self._attach_local_photo(visit, filename="foto_outros.png")
+        self._login_admin()
+        response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}) + "?export=pdf"
+        )
+        self.assertEqual(response.status_code, 200)
+        pdf = fitz.open(stream=response.content, filetype="pdf")
+        has_image = any(len(page.get_images()) > 0 for page in pdf)
+        pdf.close()
+        self.assertTrue(has_image)
+
+    def test_multiple_photos_do_not_cause_layout_error(self):
+        visit = self.make_visit()
+        visit.status = "finalized"
+        visit.save()
+        import os
+
+        from django.conf import settings
+        from django.urls import reverse as _reverse
+        from PIL import Image as PILImage
+
+        docs = []
+        paths = []
+        for i in range(4):
+            rel_path = f"visitas/evidencias/{visit.pk}/foto_multi_{i}.png"
+            full_path = os.path.join(str(settings.MEDIA_ROOT), rel_path)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            PILImage.new("RGB", (700, 500), color=(i * 40, 80, 160)).save(full_path, format="PNG")
+            paths.append(full_path)
+            docs.append({
+                "name": f"foto_multi_{i}.png",
+                "type": "Foto / Evidência",
+                "field": "fotos_camera",
+                "url": _reverse("core:protected-media", kwargs={"file_path": rel_path}),
+                "uploaded_at": "2026-10-14T12:00:00",
+            })
+        self.addCleanup(lambda: [os.path.exists(p) and os.remove(p) for p in paths])
+        visit.documents = docs
+        visit.save()
+        self._login_admin()
+        response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}) + "?export=pdf"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+
+
 class VisitDocumentOutrosObservacoesTests(DirectoratesTestBase):
     """2026-10-14, bug real reportado pelo usuário: em "Outros", o campo
     "Observações" preenchido na seção II (Dados de Atendimento) nunca
