@@ -152,19 +152,19 @@
                     <h3>Recomendações</h3>
                     <p>{{ object.atendimento.recomendacoes_atendimento|default:"Sem recomendações registradas."|linebreaks }}</p>
                 </div>
-            {% else %}
+            {% elif is_outros_visit %}
                 <div class="visit-doc-text-block">
-                    <h3>Aplicação do Recurso e Prestação de Contas</h3>
+                    <h3>Discriminação do Serviço</h3>
                     <p>{{ object.atendimento.aplicacao_recurso|default:"Não informado."|linebreaks }}</p>
                 </div>
                 <div class="visit-doc-text-block">
-                    <h3>Resultados da Aplicacao dos Recursos</h3>
-                    <p>{{ object.atendimento.resultados_recursos|default:"Não informado."|linebreaks }}</p>
+                    <h3>Observações</h3>
+                    <p>{{ object.atendimento.observacoes_atendimento|default:"Sem observações registradas."|linebreaks }}</p>
                 </div>
             {% endif %}
         </section>
 
-        {% if not is_emendas_visit %}
+        {% if not is_emendas_visit and not is_outros_visit %}
         <section class="visit-document-section">
             <div class="section-doc-header">
                 <i data-lucide="users-2"></i>
@@ -203,7 +203,7 @@
         </section>
         {% endif %}
 
-        {% if not is_emendas_visit %}
+        {% if not is_emendas_visit and not is_outros_visit %}
         <section class="visit-document-section page-break-before">
             <div class="section-doc-header">
                 <i data-lucide="clipboard-list"></i>

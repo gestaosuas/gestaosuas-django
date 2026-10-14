@@ -118,6 +118,7 @@ def render_visit_document_pdf(context):
     extra_visits = context.get("extra_visits", [])
     is_subvencao_visit = context.get("is_subvencao_visit")
     is_emendas_visit = context.get("is_emendas_visit")
+    is_outros_visit = context.get("is_outros_visit")
     identificacao = visit.identificacao or {}
     atendimento = visit.atendimento or {}
     assinaturas = visit.assinaturas or {}
@@ -182,16 +183,16 @@ def render_visit_document_pdf(context):
         body_blocks.append(Paragraph(atendimento.get("observacoes_atendimento") or "Sem observações registradas.", styles["body"]))
         body_blocks.append(Paragraph("Recomendações", styles["h3"]))
         body_blocks.append(Paragraph(atendimento.get("recomendacoes_atendimento") or "Sem recomendações registradas.", styles["body"]))
-    else:
-        body_blocks.append(Paragraph("Aplicação do Recurso e Prestação de Contas", styles["h3"]))
+    elif is_outros_visit:
+        body_blocks.append(Paragraph("Discriminação do Serviço", styles["h3"]))
         body_blocks.append(Paragraph(atendimento.get("aplicacao_recurso") or "Não informado.", styles["body"]))
-        body_blocks.append(Paragraph("Resultados da Aplicação dos Recursos", styles["h3"]))
-        body_blocks.append(Paragraph(atendimento.get("resultados_recursos") or "Não informado.", styles["body"]))
+        body_blocks.append(Paragraph("Observações", styles["h3"]))
+        body_blocks.append(Paragraph(atendimento.get("observacoes_atendimento") or "Sem observações registradas.", styles["body"]))
     body_blocks = pdfmod.glue_headings(body_blocks, styles)
     story.extend(pdfmod.heading_with_body(Paragraph("II. Dados de Atendimento", styles["h2"]), body_blocks[0]))
     story.extend(body_blocks[1:])
 
-    if not is_emendas_visit:
+    if not is_emendas_visit and not is_outros_visit:
         # III. Colaboradores / Recursos Humanos
         rh_rows = [
             [

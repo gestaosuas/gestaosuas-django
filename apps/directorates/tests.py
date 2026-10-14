@@ -32,7 +32,7 @@ from django.urls import reverse
 
 from apps.accounts.models import Profile, ProfileDirectorate, User
 from apps.directorates.models import Directorate, FormDelegation, Osc, Visit, WorkPlan
-from apps.directorates.views import is_emendas_directorate, is_subvencao_directorate
+from apps.directorates.views import is_emendas_directorate, is_outros_directorate, is_subvencao_directorate
 
 # WhiteNoise's CompressedManifestStaticFilesStorage (config/settings.py STORAGES)
 # exige que `collectstatic` já tenha rodado (manifesto staticfiles.json). Como os
@@ -1265,6 +1265,87 @@ class VisitDocumentWaitingListTests(DirectoratesTestBase):
         pdf.close()
         self.assertIn("Lista de Espera", text)
         self.assertIn("12", text)
+
+
+class VisitDocumentOutrosObservacoesTests(DirectoratesTestBase):
+    """2026-10-14, bug real reportado pelo usuário: em "Outros", o campo
+    "Observações" preenchido na seção II (Dados de Atendimento) nunca
+    aparecia no documento finalizado nem no PDF (botão Imprimir) - ficava
+    perdido. Causa raiz: `visit_document.html`/`pdf_documents.py` tratavam
+    "Outros" com o mesmo `else`/ramo genérico herdado de antes da
+    simplificação do formulário de Nova Visita (2026-07-25), que só lia
+    `aplicacao_recurso`/`resultados_recursos` (rótulo errado "Aplicação do
+    Recurso e Prestação de Contas") - mas o formulário real de "Outros"
+    (visit_instrumental.html) só tem "Discriminação do Serviço"
+    (`aplicacao_recurso`, rótulo diferente) e "Observações"
+    (`observacoes_atendimento`), nunca `resultados_recursos`. De brinde,
+    as seções III (Colaboradores/Recursos Humanos) e IV (Observações e
+    Recomendações Técnicas) - que também nunca existem no formulário de
+    "Outros" - ficaram sempre vazias no documento ("Nenhum colaborador
+    registrado."/"Sem observações registradas."); agora somem pra "Outros",
+    igual já sumiam pra "Emendas e Fundos"."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        directorates = list(Directorate.objects.order_by("name"))
+        cls.outros = next((d for d in directorates if is_outros_directorate(d)), None)
+
+    def setUp(self):
+        if not self.outros:
+            self.skipTest("Diretoria 'Outros' não encontrada no banco de teste.")
+
+    def _login_admin(self):
+        admin = make_user(role="admin")
+        self.client.force_login(admin)
+        return admin
+
+    def _make_finalized_outros_visit(self):
+        visit = self.make_visit(directorate=self.outros)
+        visit.status = "finalized"
+        visit.atendimento = {
+            "aplicacao_recurso": "Texto da discriminação do serviço prestado",
+            "observacoes_atendimento": "Texto das observações da equipe técnica",
+        }
+        visit.save()
+        return visit
+
+    def test_document_shows_discriminacao_and_observacoes_with_correct_labels(self):
+        visit = self._make_finalized_outros_visit()
+        self._login_admin()
+        response = self.client.get(reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("Discriminação do Serviço", html)
+        self.assertIn("Texto da discriminação do serviço prestado", html)
+        self.assertIn("Texto das observações da equipe técnica", html)
+        self.assertNotIn("Aplicação do Recurso e Prestação de Contas", html)
+
+    def test_document_hides_empty_colaboradores_and_observacoes_tecnicas_sections(self):
+        visit = self._make_finalized_outros_visit()
+        self._login_admin()
+        response = self.client.get(reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}))
+        html = response.content.decode()
+        self.assertNotIn("Recursos Humanos", html)
+        self.assertNotIn("Observações e Recomendações Técnicas", html)
+
+    def test_pdf_shows_discriminacao_and_observacoes(self):
+        import fitz
+
+        visit = self._make_finalized_outros_visit()
+        self._login_admin()
+        response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}) + "?export=pdf"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        pdf = fitz.open(stream=response.content, filetype="pdf")
+        text = "".join(page.get_text() for page in pdf)
+        pdf.close()
+        self.assertIn("Discriminação do Serviço", text)
+        self.assertIn("Texto da discriminação do serviço prestado", text)
+        self.assertIn("Texto das observações da equipe técnica", text)
+        self.assertNotIn("Aplicação do Recurso e Prestação de Contas", text)
 
 
 class VisitCardRegisteredByDirectorateTests(DirectoratesTestBase):
