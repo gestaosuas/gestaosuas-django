@@ -633,7 +633,7 @@ def _load_image_reader(url):
         if url.startswith("http://") or url.startswith("https://"):
             with urlopen(url, timeout=8) as resp:
                 data = resp.read()
-            return io.BytesIO(data)
+            return _fix_image_orientation(io.BytesIO(data))
         from django.conf import settings
         import os
         path = url
@@ -650,10 +650,36 @@ def _load_image_reader(url):
         full_path = os.path.join(str(settings.MEDIA_ROOT), path)
         if os.path.exists(full_path):
             with open(full_path, "rb") as fh:
-                return io.BytesIO(fh.read())
+                return _fix_image_orientation(io.BytesIO(fh.read()))
     except Exception:
         return None
     return None
+
+
+def _fix_image_orientation(buf):
+    """Fotos tiradas direto da camera do celular costumam vir com os
+    pixels na orientacao fisica do sensor + uma tag `Orientation` no EXIF
+    dizendo como rotacionar/espelhar pra exibir corretamente - navegador e
+    app de fotos aplicam isso automaticamente, mas o ImageReader/Image do
+    ReportLab le os pixels crus e ignora o EXIF, entao a foto aparecia de
+    lado ou de cabeca para baixo so no PDF. Reaplica a rotacao nos pixels
+    de verdade (`ImageOps.exif_transpose`) antes de entregar pro
+    ReportLab."""
+    try:
+        from PIL import Image as PILImage, ImageOps
+        buf.seek(0)
+        img = PILImage.open(buf)
+        original_format = img.format or "PNG"
+        transposed = ImageOps.exif_transpose(img) or img
+        if original_format == "JPEG" and transposed.mode in ("RGBA", "P", "LA"):
+            transposed = transposed.convert("RGB")
+        out = io.BytesIO()
+        transposed.save(out, format=original_format)
+        out.seek(0)
+        return out
+    except Exception:
+        buf.seek(0)
+        return buf
 
 
 def photo_grid(documents, styles, columns=2):

@@ -1408,6 +1408,66 @@ class VisitDocumentPhotoPrintingTests(DirectoratesTestBase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/pdf")
 
+    def test_photo_with_exif_orientation_is_rotated_before_embedding(self):
+        """2026-10-14, bug real reportado pelo usuário: fotos tiradas direto
+        da câmera do celular apareciam de cabeça para baixo/de lado no PDF.
+        Causa: o celular grava os pixels na orientação física do sensor e
+        só marca a rotação correta na tag EXIF `Orientation` - navegador e
+        app de fotos aplicam isso automaticamente, mas o `ImageReader`/
+        `Image` do ReportLab leem os pixels crus e ignoram o EXIF. Corrigido
+        reaplicando a rotação de verdade nos pixels (`ImageOps.exif_transpose`)
+        em `_fix_image_orientation()` antes de entregar pro ReportLab."""
+        import io
+        import os
+
+        import fitz
+        from django.conf import settings
+        from PIL import Image as PILImage
+
+        visit = self.make_visit()
+        visit.status = "finalized"
+        visit.save()
+
+        # Orientation=6 (comum em fotos de celular em retrato) exige rotacao
+        # de 90 graus para exibir corretamente - uma imagem retrato (100x200)
+        # vira paisagem (200x100) depois de corrigida.
+        img = PILImage.new("RGB", (100, 200), color="green")
+        exif = img.getexif()
+        exif[0x0112] = 6
+        rel_path = f"visitas/evidencias/{visit.pk}/foto_exif.jpg"
+        full_path = os.path.join(str(settings.MEDIA_ROOT), rel_path)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        img.save(full_path, format="JPEG", exif=exif)
+        self.addCleanup(lambda: os.path.exists(full_path) and os.remove(full_path))
+
+        visit.documents = [{
+            "name": "foto_exif.jpg",
+            "type": "Foto / Evidência",
+            "field": "fotos_camera",
+            "url": reverse("core:protected-media", kwargs={"file_path": rel_path}),
+            "uploaded_at": "2026-10-14T12:00:00",
+        }]
+        visit.save()
+        self._login_admin()
+        response = self.client.get(
+            reverse("directorates:visit-instrumental", kwargs={"pk": visit.pk}) + "?export=pdf"
+        )
+        self.assertEqual(response.status_code, 200)
+        pdf = fitz.open(stream=response.content, filetype="pdf")
+        embedded_sizes = []
+        for page in pdf:
+            for img_info in page.get_images(full=True):
+                xref = img_info[0]
+                base = pdf.extract_image(xref)
+                embedded = PILImage.open(io.BytesIO(base["image"]))
+                embedded_sizes.append(embedded.size)
+        pdf.close()
+        # A logo do cabecalho tambem conta como imagem embutida - so
+        # confirma que PELO MENOS uma imagem embutida saiu "deitada"
+        # (largura > altura), provando que a rotacao de 90 graus do EXIF
+        # foi aplicada nos pixels reais antes de entrar no PDF.
+        self.assertTrue(any(w > h for w, h in embedded_sizes), embedded_sizes)
+
 
 class VisitDocumentOutrosObservacoesTests(DirectoratesTestBase):
     """2026-10-14, bug real reportado pelo usuário: em "Outros", o campo
