@@ -622,6 +622,23 @@ Pedido explícito do usuário: em "Relatórios e Pareceres" → Relatório Final
 
 ---
 
+## Nova unidade CEAI "Tapuirama" (2026-10-27)
+
+Pedido explícito do usuário: criar a unidade "Tapuirama" no CEAI, com as mesmas funcionalidades das 5 unidades territoriais já existentes (Brasil, Laranjeiras, Luizote, Guarani, Morumbi).
+
+**Unidades do CEAI não são uma linha de banco** — são strings livres no campo `unit` de `CeaiCategory`/`CeaiOficina` (`apps/ceai/models.py`) e dentro de `Submission.data["units"][<unidade>]`. "Criar" uma unidade nova é só incluí-la nas listas centrais que o resto do app itera; nenhuma migration nem seed de dados é necessária (a unidade começa sem categorias/oficinas cadastradas, exatamente como qualquer unidade nova ficaria).
+
+- `CEAI_UNITS` (`apps/ceai/constants.py`) — lista canônica, usada por `CeaiDashboardView`, `CeaiUpdateDataView` (formulário de lançamento), `CeaiOficinasView`/`CeaiCategoriesView` (gestão por unidade) e `apps/accounts/views.py` (`UserPermissionsView.get_unit_options_map`, lista de unidades marcáveis ao conceder acesso por unidade a um agente).
+- `CeaiDataListView.get_context_data()` ("Ver Dados") tinha uma **segunda lista hardcoded e duplicada** (`all_territorial_units`, só com as 5 unidades + "Condomínio do Idoso" fixas) — achado ao mapear todos os lugares que precisavam da unidade nova. Trocada por `CEAI_UNITS + ["Condomínio do Idoso"]`, eliminando a duplicação (units futuras só precisam entrar em `CEAI_UNITS`, essa lista deriva automaticamente).
+- Testado (7 testes novos em `apps/ceai/tests.py::CeaiTapuiramaUnitTests` + suíte completa de `apps.ceai`/`apps.accounts`, 25+46 testes, sem regressão) e com navegador real: dashboard lista "Tapuirama" no filtro de unidades, "Ver Dados" inclui a unidade, formulário "Atualizar Dados" (`/ceai/unidade/Tapuirama/atualizar/`) renderiza igual a qualquer outra unidade ("CEAI - UNIDADE TAPUIRAMA"), categorias/oficinas funcionam. Zero erros de console.
+
+**Ajuste de layout no mesmo dia**: usuário reportou que, com a 6ª unidade, o painel "Gerenciar Unidade" (`templates/ceai/dashboard.html`) quebrou o card de Tapuirama pra uma 2ª linha — e a página inteira usa `body_class = dashboard-fit-vh` (trava em 100vh + `overflow:hidden`, mesmo bug já documentado neste arquivo em 2026-07-25 pro CEAI), então não havia NENHUMA forma de rolar até esse card cortado. Dois ajustes:
+- `.unit-cards-container-modern` trocou de `grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))` (que só cabia 5 colunas) pra `repeat(6, 1fr)` fixo — as 6 unidades cabem numa linha só, com breakpoints em 1400px/640px pra não espremer demais em telas menores.
+- `.management-overlay` ganhou `max-height: calc(100vh - 220px); overflow-y: auto;` — rede de segurança: se o conteúdo não couber de novo no futuro (unidade nova, zoom, janela estreita), o painel rola internamente em vez de cortar sem alternativa, mesmo padrão que `.charts-stack`/`.metrics-stack` já usam nessa mesma página sob `dashboard-fit-vh`.
+- Confirmado com navegador real: as 6 unidades alinhadas na mesma linha (mesmo `top` via `getBoundingClientRect`), e testado forçando uma viewport bem baixa (500px) pra confirmar que o painel passa a rolar (`scrollHeight > clientHeight`) em vez de cortar.
+
+---
+
 ## Débito Técnico Conhecido
 
 | # | Problema | Impacto | Prioridade |

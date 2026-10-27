@@ -561,7 +561,7 @@ class CeaiDataListView(ExcelExportMixin, CeaiBaseMixin, RoleRequiredMixin, Templ
             year=year
         ).order_by("month")
 
-        all_territorial_units = ["Brasil", "Laranjeiras", "Luizote", "Guarani", "Morumbi", "Condomínio do Idoso"]
+        all_territorial_units = CEAI_UNITS + ["Condomínio do Idoso"]
         all_visible_units = self.filter_units(all_territorial_units)
         if unit_filter != "all" and unit_filter not in all_visible_units:
             # Unidade fora da permissao do usuario (ou inexistente): cai pra

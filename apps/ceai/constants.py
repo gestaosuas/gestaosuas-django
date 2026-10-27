@@ -3,7 +3,8 @@ CEAI_UNITS = [
     "Laranjeiras",
     "Luizote",
     "Guarani",
-    "Morumbi"
+    "Morumbi",
+    "Tapuirama"
 ]
 
 CEAI_FORM_DEFINITION = {

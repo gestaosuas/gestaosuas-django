@@ -270,3 +270,102 @@ class CeaiDashboardAndListViewsTests(CeaiTestDataMixin, TestCase):
     def test_categories_view(self):
         response = self.client.get(reverse("ceai:categories", kwargs={"unit": "Brasil"}))
         self.assertEqual(response.status_code, 200)
+
+
+class CeaiTapuiramaUnitTests(CeaiTestDataMixin, TestCase):
+    """2026-10-27, pedido explícito do usuário: criar a unidade "Tapuirama"
+    no CEAI com as mesmas funcionalidades das demais (Brasil/Laranjeiras/
+    Luizote/Guarani/Morumbi). Unidades do CEAI não são uma linha de banco —
+    são strings livres no campo `unit` de `CeaiCategory`/`CeaiOficina` e nas
+    submissions (`Submission.data["units"][<unidade>]`), então "criar" a
+    unidade é só incluí-la nas listas centrais (`CEAI_UNITS`,
+    `apps/ceai/constants.py`, e o antigo `all_territorial_units` duplicado
+    em `CeaiDataListView`, agora derivado de `CEAI_UNITS` em vez de
+    duplicado à mão) — tudo mais (dashboard, formulário de lançamento,
+    categorias/oficinas, Ver Dados, exportar Excel, permissões por unidade)
+    já é 100% dirigido por essas listas, sem nenhum código específico por
+    unidade pra replicar."""
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+
+    def test_tapuirama_in_ceai_units_constant(self):
+        from apps.ceai.constants import CEAI_UNITS
+
+        self.assertIn("Tapuirama", CEAI_UNITS)
+
+    def test_dashboard_lists_tapuirama_as_a_unit(self):
+        response = self.client.get(reverse("ceai:dashboard"), {"year": 2025})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Tapuirama", response.context["units"])
+
+    def test_data_list_includes_tapuirama_in_visible_units(self):
+        response = self.client.get(reverse("ceai:data_list"), {"year": 2025})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Tapuirama", response.context["visible_units"])
+        unit_names = [u["name"] for u in response.context["units_data"]]
+        self.assertIn("Tapuirama", unit_names)
+
+    def test_update_data_view_works_for_tapuirama(self):
+        url = reverse("ceai:update_data", kwargs={"unit": "Tapuirama"})
+        response = self.client.get(url, {"month": 3, "year": 2025})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["unit"], "Tapuirama")
+
+        response = self.client.post(url, {
+            "month": 3, "year": 2025,
+            "inseridos_masc": "2", "inseridos_fem": "1",
+        })
+        self.assertRedirects(response, reverse("ceai:dashboard"))
+        submission = Submission.objects.get(
+            directorate_id=self.ceai_directorate.id, month=3, year=2025
+        )
+        self.assertIn("Tapuirama", submission.data["units"])
+        self.assertEqual(submission.data["units"]["Tapuirama"].get("inseridos_masc"), "2")
+
+    def test_oficinas_and_categories_views_work_for_tapuirama(self):
+        response = self.client.get(reverse("ceai:oficinas", kwargs={"unit": "Tapuirama"}))
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(reverse("ceai:categories", kwargs={"unit": "Tapuirama"}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_category_and_oficina_api_create_for_tapuirama(self):
+        import json
+
+        response = self.client.post(
+            reverse("ceai:api_categories"),
+            data=json.dumps({"unit": "Tapuirama", "name": "Categoria Teste Tapuirama"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        from apps.ceai.models import CeaiCategory
+
+        category = CeaiCategory.objects.get(unit="Tapuirama", name="Categoria Teste Tapuirama")
+
+        response = self.client.post(
+            reverse("ceai:api_oficinas"),
+            data=json.dumps({
+                "unit": "Tapuirama",
+                "activity_name": "Oficina Teste Tapuirama",
+                "category_id": str(category.id),
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        from apps.ceai.models import CeaiOficina
+
+        self.assertTrue(
+            CeaiOficina.objects.filter(unit="Tapuirama", activity_name="Oficina Teste Tapuirama").exists()
+        )
+
+        # Limpeza: unidade nova não deve deixar categoria/oficina de teste
+        # para trás no banco de dev compartilhado.
+        CeaiOficina.objects.filter(unit="Tapuirama", activity_name="Oficina Teste Tapuirama").delete()
+        category.delete()
+
+    def test_agente_user_permissions_offer_tapuirama_as_an_option(self):
+        from apps.accounts.views import UserPermissionsView
+
+        view = UserPermissionsView()
+        unit_options = view.get_unit_options_map([self.ceai_directorate])
+        self.assertIn("Tapuirama", unit_options[str(self.ceai_directorate.pk)])

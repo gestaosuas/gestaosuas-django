@@ -362,7 +362,19 @@ async function deleteOficina(id) {
 .btn-premium-action { display: flex; align-items: center; gap: 8px; background: #3b82f6; color: white; border: none; padding: 10px 18px; border-radius: 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
 
 /* MANAGEMENT MENU */
-.management-overlay { background: #fff; padding: 32px; border-radius: 24px; border: 1px solid #e2e8f0; margin-bottom: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+.management-overlay {
+    background: #fff; padding: 32px; border-radius: 24px; border: 1px solid #e2e8f0;
+    margin-bottom: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    /* Rede de seguranca: a pagina inteira trava em 100vh/overflow:hidden
+       via body.dashboard-fit-vh (pensado pro dashboard de graficos, nao pra
+       este painel, cujo conteudo cresce junto com o numero de unidades do
+       CEAI) - sem isso, se o conteudo nao couber (janela estreita, zoom,
+       unidade nova no futuro), ele fica cortado sem NENHUMA forma de rolar
+       ate o resto (mesmo bug ja documentado no CLAUDE.md pro CEAI em
+       2026-07-25, achado de novo ao adicionar a unidade Tapuirama). */
+    max-height: calc(100vh - 220px);
+    overflow-y: auto;
+}
 .mgmt-top-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -395,7 +407,13 @@ async function deleteOficina(id) {
 .sky-bg { background: #e0f2fe; color: #0284c7; }
 .mgmt-card-compact span { font-size: 13px; font-weight: 700; color: #1e3a8a; }
 
-.unit-cards-container-modern { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.unit-cards-container-modern { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; }
+@media (max-width: 1400px) {
+    .unit-cards-container-modern { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 640px) {
+    .unit-cards-container-modern { grid-template-columns: repeat(2, 1fr); }
+}
 .unit-action-card-modern { background: white; border-radius: 20px; padding: 20px; border: 1px solid #f1f5f9; transition: all 0.2s; }
 .unit-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .unit-icon-box { width: 40px; height: 40px; background: #f8fafc; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #6366f1; }
